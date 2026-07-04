@@ -17,6 +17,16 @@ An edge-first, AI-assisted competitive sailing platform built on [Signal K](http
 
 Help sailors **win races** by combining real-time onboard sensor data, historical performance analytics, tactical knowledge graphs, and local AI coaching — with or without internet connectivity.
 
+## Three SLA tiers
+
+| Tier | Domain | Runs on |
+|------|--------|---------|
+| **SLA-1** | On-boat telemetry (Signal K, InfluxDB) | Dedicated Pi + PiCAN-M |
+| **SLA-2** | Race & competitor info (Neo4j, tactical LLM) | Separate Pi (or shared with SLA-3) |
+| **SLA-3** | Sail performance vision (cameras, Coral, vision LLM) | Separate Pi with Coral dongle |
+
+Each tier has its own Docker Compose stack and may run on a **different Raspberry Pi**. See [spec.md §5](./spec.md#5-three-tier-sla-architecture).
+
 ## Quick stack
 
 - **Marine data hub:** Signal K Server (Node.js)

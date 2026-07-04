@@ -5,6 +5,7 @@ This directory contains [Architecture Decision Records](https://adr.github.io/) 
 | ADR | Title | Status |
 |-----|-------|--------|
 | [0001](./0001-system-architecture-and-technology-choices.md) | System architecture and technology choices | Accepted |
+| [0002](./0002-three-tier-sla-architecture.md) | Three-tier SLA architecture with isolated containers | Accepted |
 
 ## Format
 

@@ -59,6 +59,7 @@ We will implement the **AI Sailing System** with the following architecture:
 4. **Grafana for human consumption** — live and debrief dashboards.
 5. **LLaMA runs on CPU** via llama.cpp; Coral handles separate ML tasks, not transformer LLMs.
 6. **Offline by default** — cloud is optional; no runtime dependency on Cognite or external APIs during races.
+7. **Three SLA tiers** — see [ADR-0002](./0002-three-tier-sla-architecture.md); isolated containers, optional multi-Pi deployment.
 
 ---
 
