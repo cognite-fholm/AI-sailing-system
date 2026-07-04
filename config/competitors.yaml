@@ -1,0 +1,12 @@
+# Competitor polar sources — derived from ORC certificate images/PDFs
+# Dev path resolves to: C:\Repositories\boat_system\off_course.png
+
+competitors:
+  - name: "OFF COURSE"
+    sail_number: "NOR 15788"
+    mmsi: null                 # auto-filled when AIS target appears
+    polar:
+      source_type: certificate_image
+      path: "../off_course.png"
+      # path: "/data/polars/competitors/off_course.png"
+      status: pending          # pending | approved | rejected

@@ -28,7 +28,8 @@ Implement in **SLA-2** as dedicated containers:
 |---------|----------------|
 | `grib-ingest` | Scheduled fetch (6 h), manual upload, USB inbox |
 | `grib-parser` | GRIB2 → queryable wind grid |
-| `polar-manager` | Own + competitor polar files per MMSI |
+| `polar-manager` | Own-boat **SLK** parse + canonical YAML serve |
+| `polar-certificate-extractor` | Competitor **PNG/PDF** ORC certificate → derived polar |
 | `ais-collector` | AIS from SLA-1 Signal K stream → Influx + Neo4j |
 | `wind-field-analyzer` | Fuse GRIB + instruments + AIS/polar deltas → `WindAdvantageZone` |
 
@@ -37,6 +38,11 @@ Implement in **SLA-2** as dedicated containers:
 **GRIB schedule:** Automatic every 6 hours when `ONLINE_MODE=true`; parsed grids persist for offline race use.
 
 **Wind analysis:** Course sectors scored every 30–60 s using GRIB TWS/TWD, instrument bias correction, and fleet **SOG minus polar-expected SOG** as observed wind-pressure proxy.
+
+**Polar sources:**
+
+- **Own boat:** SYLK file `7710 (3).slk` (dev: `C:\Repositories\boat_system\7710 (3).slk`).
+- **Competitors:** ORC certificate images/PDFs (e.g. `off_course.png`) → OCR + VPP-lite → derived polar with confidence score.
 
 ---
 

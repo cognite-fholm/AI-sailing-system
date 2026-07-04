@@ -250,7 +250,8 @@ flowchart TB
 | `competitor-sync` | `ghcr.io/.../competitor-sync` | MMSI registry, fleet roster, polar linkage |
 | `grib-ingest` | `ghcr.io/.../grib-ingest` | Scheduled download, manual upload, GRIB validation |
 | `grib-parser` | `ghcr.io/.../grib-parser` | Decode GRIB2 → grid store; spatial query API |
-| `polar-manager` | `ghcr.io/.../polar-manager` | Load/store polars for own boat + competitors |
+| `polar-manager` | `ghcr.io/.../polar-manager` | Load **SLK** polar for own boat; serve canonical YAML |
+| `polar-certificate-extractor` | `ghcr.io/.../polar-certificate-extractor` | Derive competitor polars from ORC certificate **PNG/PDF** |
 | `wind-field-analyzer` | `ghcr.io/.../wind-field-analyzer` | Runtime course wind advantage from GRIB + AIS + polars |
 | `crawl-agent` | `ghcr.io/.../crawl-agent` | NOR/SI crawl ([crawl_web](https://github.com/cognite-fholm/crawl_web) lineage) |
 | `llama-tactical` | `ghcr.io/.../llama-cpp` | Text LLM — debrief, tactical Q&A |
@@ -1085,54 +1086,180 @@ sources:
 
 #### 7.12.3 Polar diagram management
 
-**Container:** `polar-manager`
+**Containers:** `polar-manager`, `polar-certificate-extractor`
 
-Polars define target boat speed and VMG for each **TWS × TWA** combination. Required for own boat and loaded for **each tracked competitor**.
+Polars define target boat speed and VMG for each **TWS × TWA** combination. The **own boat** uses a high-fidelity **SLK** performance file. **Competitors** derive polars from ORC **certificate images or PDFs** when no SLK is available.
 
-| Vessel | Source | Format | Required |
-|--------|--------|--------|----------|
-| **Own boat** | Owner upload, ORC certificate, season config | `.pol`, ORC XML, CSV | Yes |
-| **Competitors** | ORC database export, regatta entry list, manual per MMSI | `.pol`, CSV | Recommended per key competitor |
+##### Own boat — SLK file (primary source)
 
-**Canonical internal format** (`polars/{mmsi_or_vessel_id}.yaml`):
+| Attribute | Value |
+|-----------|-------|
+| **Format** | **SYLK (`.slk`)** — ORC / sail-performance export |
+| **Reference file (dev)** | `C:\Repositories\boat_system\7710 (3).slk` |
+| **Deploy path (Pi)** | `/data/polars/own/7710.slk` (copy at harbor sync) |
+| **Parser** | `polar-manager` SLK module (`slk_parser.py`) |
+| **Required** | Yes — system will not start race mode without own-boat polar |
 
-```yaml
-vessel_id: "own-boat"
-mmsi: "123456789"
-source: "orc-2026"
-points:
-  - tws: 8
-    twa: 45
-    bsp: 6.2
-    vmg: 4.4
-  - tws: 12
-    twa: 42
-    bsp: 7.1
-    vmg: 5.3
+**SLK column mapping** (from `7710 (3).slk` header):
+
+| SLK column | Canonical field | Unit |
+|------------|-----------------|------|
+| `TWS` | `tws` | knots |
+| `TWA` | `twa` | degrees |
+| `BTV` | `bsp` | knots (boat speed) |
+| `VMG` | `vmg` | knots |
+| `AWS` | `aws` | knots |
+| `AWA` | `awa` | degrees |
+| `Heel` | `heel` | degrees |
+| `Condition` | `point_of_sail` | `beat` \| `reach` \| `run` |
+| `Sail` / `Reef` / `Flat` | `sail_config` | reef / flat state |
+
+**Example SLK rows** (TWS 6 kt):
+
+```
+Condition=beat  TWA=42.4  BTV=5.26  VMG=3.89
+Condition=run   TWA=141.5 BTV=4.91  VMG=3.84
+Condition=reach TWA=52.0  BTV=5.86  VMG=3.61
 ```
 
-**API:**
+**`config/vessel.yaml` (own boat):**
+
+```yaml
+vessel:
+  id: own-boat
+  name: "7710"
+  mmsi: "257771000"          # set to transponder MMSI
+  is_own: true
+polar:
+  source_type: slk
+  path: "../7710 (3).slk"    # relative to repo on dev machine
+  # path: "/data/polars/own/7710.slk"   # on Raspberry Pi
+  slk_id: "7710"
+  auto_reload: true          # re-parse when file mtime changes
+```
+
+On Windows dev: `polar-manager` resolves `../7710 (3).slk` from `AI-sailing-system/` → `C:\Repositories\boat_system\7710 (3).slk`.
+
+##### Competitors — certificate image / PDF extraction
+
+Competitors rarely provide SLK files. Polars are **derived** from ORC rating certificate diagrams.
+
+| Attribute | Value |
+|-----------|-------|
+| **Input formats** | `.png`, `.jpg`, `.pdf` (ORC sail plan / certificate) |
+| **Reference file (dev)** | `C:\Repositories\boat_system\off_course.png` |
+| **Example vessel** | *OFF COURSE* — sail no. **NOR 15788** |
+| **Container** | `polar-certificate-extractor` |
+| **Confidence** | Lower than SLK — flagged `polar_source: derived` |
+
+**Reference certificate content** (`off_course.png`):
+
+| Extracted data | Example value | Use |
+|----------------|---------------|-----|
+| Boat name | OFF COURSE | Neo4j `Vessel.name` |
+| Sail number | NOR 15788 | Roster matching |
+| Mainsail area | 63.99 m² | VPP input |
+| Headsail area | 46.36 m² | VPP input |
+| Asymmetric | 158.63 m² | Downwind model |
+| LOA, P, E, J, IG | 13.69, 17.25, 6.00, 5.02, 17.17 m | Rating geometry |
+| MHW, HHU, SHW, … | sail widths | Shape coefficients |
+
+**Extraction pipeline:**
+
+```mermaid
+flowchart LR
+    CERT["Certificate\nPNG / PDF"]
+    OCR["OCR + layout\nTesseract / PaddleOCR"]
+    VISION["Vision LLM\noptional validation"]
+    VPP["VPP-lite\nORC regression"]
+    YAML["polars/{mmsi}.yaml\nderived polar"]
+    CERT --> OCR --> VPP
+    OCR --> VISION --> VPP
+    VPP --> YAML
+    YAML --> PM["polar-manager"]
+```
+
+1. **`polar-certificate-extractor`** — OCR reads labelled dimensions and sail areas from diagram.
+2. **Vision LLM** (optional cross-check on SLA-3 or SLA-2) validates OCR against image regions.
+3. **VPP-lite** — estimates `TWS × TWA → BSP/VMG` from ORC dimensions (class-based regression or simplified velocity prediction).
+4. Output saved as `polars/competitors/{mmsi}_derived.yaml` with `confidence` and `source_file` metadata.
+5. Human review recommended in harbor before regatta (`polar_status: pending` → `approved`).
+
+**`config/competitors.yaml` (example):**
+
+```yaml
+competitors:
+  - name: "OFF COURSE"
+    sail_number: "NOR 15788"
+    mmsi: null                    # filled when AIS seen
+    polar:
+      source_type: certificate_image
+      path: "../off_course.png"   # C:\Repositories\boat_system\off_course.png
+      # path: "/data/polars/competitors/off_course.png"
+      status: pending             # pending | approved | rejected
+```
+
+**API (extended):**
 
 | Endpoint | Action |
 |----------|--------|
-| `POST /polars/upload` | Upload polar file; associate with `vessel_id` or MMSI |
-| `GET /polars/{mmsi}` | Return canonical polar |
-| `GET /polars/{mmsi}/target?aws=12&awa=38` | Interpolated target BSP/VMG |
-| `POST /polars/batch` | Regatta fleet import (CSV/ZIP of competitor polars) |
+| `POST /polars/own/reload` | Re-parse SLK from configured path |
+| `POST /polars/competitor/extract` | Upload PNG/PDF → run certificate extractor |
+| `POST /polars/competitor/{id}/approve` | Mark derived polar approved for race use |
+| `GET /polars/{mmsi}` | Return canonical polar (`source: slk` \| `derived`) |
+| `GET /polars/{mmsi}/target?tws=12&twa=42` | Interpolated target BSP/VMG |
+| `GET /polars/{mmsi}/meta` | `source_type`, `confidence`, `source_file` |
+
+##### Canonical internal format
+
+All sources normalize to `polars/{mmsi_or_vessel_id}.yaml`:
+
+```yaml
+vessel_id: own-boat
+mmsi: "257771000"
+source_type: slk                    # slk | derived | manual
+source_file: "7710 (3).slk"
+confidence: 1.0                     # derived polars: 0.6–0.9 typical
+boat_name: "7710"
+points:
+  - tws: 6
+    twa: 42.4
+    bsp: 5.262
+    vmg: 3.8873
+    aws: 10.5041
+    awa: 22.64
+    heel: 10.31
+    point_of_sail: beat
+```
 
 **Neo4j:**
 
 ```cypher
 MERGE (v:Vessel {mmsi: $mmsi})
 MERGE (p:Polar {vessel_id: $vessel_id, season: $year})
+SET p.source_type = $source_type,    // "slk" or "derived"
+    p.source_file = $source_file,
+    p.confidence = $confidence
 MERGE (v)-[:HAS_POLAR {active: true}]->(p)
 ```
 
 **Runtime use:**
 
-- **Own boat:** `actual_VMG / target_VMG` → polar performance % on grafana-race.
-- **Competitors:** expected BSP from their polar at observed TWS/TWA → detect **overperformance** (likely better wind).
-- **wind-field-analyzer:** fleet expected-vs-actual speed delta per course sector.
+- **Own boat (SLK):** `actual_VMG / target_VMG` → polar performance % — full confidence.
+- **Competitors (derived):** same formula; `wind-field-analyzer` weights fleet term by `polar.confidence`.
+- Low-confidence derived polars (&lt; 0.7) show warning badge on grafana-race.
+
+**File layout on dev machine:**
+
+```
+C:\Repositories\boat_system\
+├── 7710 (3).slk              ← own-boat polar (SLK)
+├── off_course.png            ← competitor certificate example
+└── AI-sailing-system\        ← git repo
+    └── config\
+        ├── vessel.yaml
+        └── competitors.yaml
+```
 
 #### 7.12.4 AIS collection — own boat and competitors
 
@@ -1451,12 +1578,15 @@ flowchart LR
 | FR-16 | `ais-collector` refreshes fleet positions ≤ 10 s (class A) from N2K via Signal K |
 | FR-17 | **GRIB** auto-fetched every 6 h when `ONLINE_MODE=true`; manual upload supported |
 | FR-18 | Latest GRIB usable offline; age warning if stale &gt; 12 h at race start |
-| FR-19 | **Polar diagrams** loaded for own boat (required) and competitors (per MMSI) |
-| FR-20 | `polar-manager` interpolates target BSP/VMG for any TWS/TWA |
-| FR-21 | `wind-field-analyzer` updates course wind-advantage map every 30–60 s during race |
-| FR-22 | Wind zones fuse GRIB, own instruments, fleet AIS overperformance vs polars |
-| FR-23 | Crew sees heatmap + recommendation (e.g. favored side of beat) on grafana-race |
-| FR-24 | crawl_web agent ingests NOR/SI when online |
+| FR-19 | **Own-boat polar** loaded from **SLK** file (`7710 (3).slk`); auto-reload on change |
+| FR-20 | `polar-manager` parses SYLK columns: TWS, TWA, BTV, VMG, AWS, AWA, Heel, Condition |
+| FR-21 | **Competitor polars** derived from ORC certificate **PNG/PDF** via `polar-certificate-extractor` |
+| FR-22 | Derived polars require harbor **approve** before use in wind-field scoring (configurable) |
+| FR-23 | `polar-manager` interpolates target BSP/VMG for any TWS/TWA |
+| FR-24 | `wind-field-analyzer` updates course wind-advantage map every 30–60 s during race |
+| FR-25 | Wind zones fuse GRIB, own instruments, fleet AIS overperformance vs polars |
+| FR-26 | Crew sees heatmap + recommendation (e.g. favored side of beat) on grafana-race |
+| FR-27 | crawl_web agent ingests NOR/SI when online |
 
 ### 11.3 SLA-3 — Sail performance vision (GoPro HERO13)
 
@@ -1547,15 +1677,19 @@ AI-sailing-system/
 ├── ais-collector/                  # SLA-2 AIS ingest from Signal K
 ├── grib-ingest/                    # SLA-2 scheduled GRIB fetch + upload
 ├── grib-parser/                    # SLA-2 GRIB2 → wind grid
-├── polar-manager/                  # SLA-2 own + competitor polars
+├── polar-manager/                  # SLA-2 SLK parser + polar API
+├── polar-certificate-extractor/    # SLA-2 ORC PNG/PDF → derived polar
 ├── wind-field-analyzer/            # SLA-2 runtime course wind zones
 ├── config/
-│   ├── cameras.yaml                # GoPro mount extrinsics per boat
-│   ├── grib-sources.yaml           # GRIB download sources + schedule
-│   └── vessel.yaml                 # Own MMSI, boat name, default polars
+│   ├── vessel.yaml                 # Own boat — SLK path (../7710 (3).slk)
+│   ├── competitors.yaml            # Competitor certs (../off_course.png)
+│   ├── cameras.yaml
+│   └── grib-sources.yaml
+├── examples/
+│   └── README.md                   # Parent-dir polar files (boat_system/)
 ├── data/                           # gitignored — runtime volumes
-│   ├── grib/                       # GRIB2 files + parsed grids
-│   └── polars/                     # Canonical polar YAML per MMSI
+│   ├── grib/
+│   └── polars/                     # Canonical YAML (generated from SLK / derived)
 ├── tactical-coach/                 # SLA-2
 ├── gopro-orchestrator/           # SLA-3 Open GoPro fleet control
 ├── media-ingest/                   # SLA-3 GoPro HTTP download
@@ -1569,8 +1703,6 @@ AI-sailing-system/
 │   ├── trim-transformer-trainer/
 │   ├── model-evaluator/
 │   └── docker-compose.sla-shore.yml
-├── config/
-│   └── cameras.yaml                # GoPro mount extrinsics per boat
 ├── models/
 │   ├── sla-2/                      # Text GGUF manifests
 │   └── sla-3/                      # Vision GGUF manifests
@@ -1602,7 +1734,8 @@ AI-sailing-system/
 ### Phase 2 — SLA-2 race, GRIB, polars, AIS & wind
 - [ ] Neo4j schema (Vessel, Polar, GribModel, WindAdvantageZone)
 - [ ] `docker-compose.sla-2.yml`
-- [ ] `ais-collector` + `polar-manager`
+- [ ] `polar-manager` — SLK parser for `7710 (3).slk`
+- [ ] `polar-certificate-extractor` — ORC PNG/PDF (e.g. `off_course.png`)
 - [ ] `grib-ingest` (6 h schedule) + `grib-parser`
 - [ ] `wind-field-analyzer` + grafana-race heatmap
 - [ ] Tactical LLM + coach (wind-zone context)
@@ -1635,7 +1768,7 @@ AI-sailing-system/
 | # | Question | Notes |
 |---|----------|-------|
 | OQ-1 | Primary GRIB model for region? | GFS global vs regional HARMONIE/AROME |
-| OQ-2 | Competitor polar source of truth? | ORC certificate DB vs manual per regatta |
+| OQ-2 | VPP-lite model for derived polars? | ORC regression table vs custom neural VPP |
 | OQ-3 | AIS class B timeout handling? | Stale track grey-out after 5 min |
 | OQ-4 | Wind-zone weight tuning per class? | One-design vs ORC handicap fleet |
 | OQ-5 | GRIB spatial resolution on Pi? | 0.25° vs clipped high-res regional |

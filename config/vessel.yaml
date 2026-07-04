@@ -1,0 +1,15 @@
+# Own-boat configuration — polar from SLK file
+# Dev path resolves to: C:\Repositories\boat_system\7710 (3).slk
+
+vessel:
+  id: own-boat
+  name: "7710"
+  mmsi: "257771000"          # TODO: set to your AIS transponder MMSI
+  is_own: true
+
+polar:
+  source_type: slk
+  path: "../7710 (3).slk"    # relative to AI-sailing-system/ repo root
+  # path: "/data/polars/own/7710.slk"   # Raspberry Pi deploy path
+  slk_id: "7710"
+  auto_reload: true
