@@ -1,6 +1,6 @@
 # AI Sailing System — Specification
 
-**Version:** 0.3.0-draft  
+**Version:** 0.4.0-draft  
 **Date:** 2026-07-04  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
@@ -16,7 +16,7 @@ The platform is organized into **three SLA tiers**, each running in **dedicated 
 | Tier | Domain | SLA priority |
 |------|--------|----------------|
 | **SLA-1** | On-boat telemetry | Critical — must never fail during a race |
-| **SLA-2** | Race & competitor information | Important — tactical context; may degrade |
+| **SLA-2** | Race & competitor information | Important — tactical context; GRIB, polars, AIS, wind-on-course |
 | **SLA-3** | Sail performance (vision / LLM) | Analytical — best-effort; heaviest compute |
 
 The system is designed to:
@@ -35,9 +35,9 @@ The system is designed to:
 Competitive sailors need more than raw instrument readouts. They need:
 
 1. **Unified data** — wind, speed, heading, depth, engine, autopilot, polar data, and custom sensors in one model.
-2. **Race context** — marks, legs, start line, fleet position, and course geometry linked to live telemetry.
-3. **Performance insight** — VMG, target angles, polar comparison, tack/gybe quality, and leg summaries.
-4. **Tactical memory** — what worked on this course, in these conditions, against this fleet.
+2. **Race context** — marks, legs, start line, fleet position, course geometry, **GRIB wind fields**, and **polar targets** linked to live telemetry.
+3. **Performance insight** — VMG, target angles, polar comparison (own boat + competitors), tack/gybe quality, and leg summaries.
+4. **Tactical memory** — what worked on this course, in these conditions, against this fleet — including **runtime wind-advantage zones** derived from GRIB + AIS fleet behavior.
 5. **Trustworthy edge operation** — must work at sea with intermittent or zero connectivity.
 
 The prior CogSail stack proved that Signal K → stream buffer → structured storage works, but relied on **Cognite Data Fusion (CDF)** in the cloud. This system keeps the proven ingestion patterns and replaces CDF with **InfluxDB + Neo4j + Grafana**, adding **local LLaMA** for AI assistance.
@@ -60,6 +60,9 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G8 | Reuse and migrate concepts from cognite-fholm CogSail repos |
 | G9 | Three isolated SLA tiers in separate containers; tiers may run on separate RPi nodes |
 | G10 | SLA-1 telemetry survives failure or overload of SLA-2 / SLA-3 |
+| G11 | GRIB files refreshed on a regular schedule when online; usable offline after sync |
+| G12 | Polar diagrams for own boat and competitors drive VMG/target analysis |
+| G13 | AIS tracks for own boat and fleet enable runtime wind-on-course analysis |
 
 ### 3.2 Non-goals (v1)
 
@@ -110,7 +113,7 @@ I²C sensors (wind, env) ──► Qwiic (J4)
 
 **Signal K configuration (reference):**
 
-- NMEA 2000: `canboatjs` or Signal K N2K plugin reading `can0`.
+- NMEA 2000: `canboatjs` or Signal K N2K plugin reading `can0` — includes **AIS PGNs** (129038, 129039, 129809, 129810) forwarded to SLA-2.
 - NMEA 0183: serial port plugin on `/dev/ttyS0` (4800/38400/115200 as appropriate).
 - I²C sensors: optional plugin or custom Python reader publishing Signal K deltas.
 
@@ -154,14 +157,20 @@ flowchart TB
         direction TB
         T2_N4J["neo4j"]
         T2_RACE["race-intelligence"]
+        T2_AIS["ais-collector"]
         T2_COMP["competitor-sync"]
-        T2_CRAWL["crawl-agent"]
-        T2_LLM["llama-tactical"]
+        T2_GRIB["grib-ingest"]
+        T2_POLAR["polar-manager"]
+        T2_WIND["wind-field-analyzer"]
         T2_GF["grafana-race"]
+        T2_GRIB --> T2_WIND
+        T2_AIS --> T2_WIND
+        T2_POLAR --> T2_WIND
         T2_RACE --> T2_N4J
+        T2_AIS --> T2_N4J
         T2_COMP --> T2_N4J
-        T2_CRAWL --> T2_N4J
-        T2_RACE --> T2_LLM
+        T2_POLAR --> T2_N4J
+        T2_WIND --> T2_N4J
         T2_N4J --> T2_GF
     end
 
@@ -219,29 +228,38 @@ flowchart TB
 
 #### SLA-2 — Race and competitor information
 
-**Purpose:** Model **races, courses, marks, fleet, and competitors**; provide tactical context, start-line logic, and text-based coaching grounded in structured data.
+**Purpose:** Model **races, courses, marks, fleet, and competitors**; ingest **GRIB** weather grids and **polar diagrams**; collect **AIS** for own boat and competitors; run **runtime wind-on-course analysis** to identify where favorable wind exists on the course.
 
 | Attribute | Target |
 |-----------|--------|
 | **Availability** | 99.9% during race; graceful degradation acceptable |
 | **Query latency** | Neo4j tactical query &lt; 3 s (p95) |
-| **Competitor refresh** | AIS / manual fleet list ≤ 30 s when sources available |
+| **AIS refresh** | Own + competitor positions ≤ 10 s (from N2K AIS PGNs) |
+| **GRIB refresh** | Scheduled every 6 h when online; manual pre-race upload |
+| **Wind-field analysis** | Course wind map updated every 30–60 s during active race |
 | **Recovery time** | &lt; 2 min; SLA-1 unaffected |
-| **Internet** | Optional — crawl agent and competitor feeds when online |
+| **Internet** | Required for GRIB auto-fetch; optional for AIS (local N2K) |
 
 **Containers (`docker-compose.sla-2.yml`):**
 
 | Container | Image | Responsibility |
 |-----------|-------|----------------|
-| `neo4j` | `neo4j:5-community` | Race graph, vessels, marks, tactics |
+| `neo4j` | `neo4j:5-community` | Race graph, vessels, marks, polars, wind zones |
 | `race-intelligence` | `ghcr.io/.../race-intelligence` | Session control, tack/gybe detection, leg timing |
-| `competitor-sync` | `ghcr.io/.../competitor-sync` | AIS/MMSI fleet ingest → Neo4j |
+| `ais-collector` | `ghcr.io/.../ais-collector` | Own-boat + competitor AIS from SLA-1 Signal K stream |
+| `competitor-sync` | `ghcr.io/.../competitor-sync` | MMSI registry, fleet roster, polar linkage |
+| `grib-ingest` | `ghcr.io/.../grib-ingest` | Scheduled download, manual upload, GRIB validation |
+| `grib-parser` | `ghcr.io/.../grib-parser` | Decode GRIB2 → grid store; spatial query API |
+| `polar-manager` | `ghcr.io/.../polar-manager` | Load/store polars for own boat + competitors |
+| `wind-field-analyzer` | `ghcr.io/.../wind-field-analyzer` | Runtime course wind advantage from GRIB + AIS + polars |
 | `crawl-agent` | `ghcr.io/.../crawl-agent` | NOR/SI crawl ([crawl_web](https://github.com/cognite-fholm/crawl_web) lineage) |
 | `llama-tactical` | `ghcr.io/.../llama-cpp` | Text LLM — debrief, tactical Q&A |
-| `tactical-coach` | `ghcr.io/.../tactical-coach` | FastAPI RAG over Neo4j + SLA-1 Influx (read-only) |
-| `grafana-race` | `grafana/grafana` | Race, fleet, leg, tactical dashboards |
+| `tactical-coach` | `ghcr.io/.../tactical-coach` | FastAPI RAG over Neo4j + Influx + wind zones |
+| `grafana-race` | `grafana/grafana` | Fleet map, polars, GRIB overlay, wind-advantage heatmap |
 
-**Reads from SLA-1:** InfluxDB HTTP API (read token) and/or Signal K WebSocket fan-out on boat LAN (`ws://telemetry.local:3000/signalk/v1/stream`). **Never writes to SLA-1 storage.**
+**Reads from SLA-1:** InfluxDB (telemetry + AIS-derived paths), Signal K WebSocket (`navigation`, `environment.wind`, AIS deltas). **Never writes to SLA-1 storage.**
+
+See [§7.12](#712-grib-polars-ais--wind-on-course-analysis).
 
 **Hardware:** Raspberry Pi 5 (8 GB). May share a Pi with SLA-3 in compact profile; **must not share with SLA-1** in race profile.
 
@@ -360,8 +378,8 @@ flowchart LR
 
 | From → To | Protocol | Data | Direction |
 |-----------|----------|------|-----------|
-| SLA-1 → SLA-2 | Influx HTTP API | Telemetry queries (Flux) | Read-only |
-| SLA-1 → SLA-2 | Signal K WebSocket | Live deltas (optional) | Read-only fan-out |
+| SLA-1 → SLA-2 | Signal K WebSocket | AIS deltas + own-boat navigation | Read-only fan-out |
+| SLA-1 → SLA-2 | Influx HTTP API | Telemetry, wind, SOG/COG | Read-only |
 | SLA-1 → SLA-3 | Influx HTTP API | AWA/AWS/heel window | Read-only |
 | SLA-2 → SLA-3 | REST | `race_id`, active leg, target AWA | Push on leg change |
 | SLA-3 → SLA-2 | REST | `SailAnalysis`, trim scores | Push on analysis complete |
@@ -439,31 +457,33 @@ sequenceDiagram
     participant SK as Signal K (SLA-1)
     participant IFX as InfluxDB (SLA-1)
     participant G1 as grafana-telemetry
+    participant G2 as grafana-race (SLA-2)
     participant N4J as Neo4j (SLA-2)
-    participant RACE as race-intelligence (SLA-2)
+    participant AIS as ais-collector (SLA-2)
+    participant GRIB as grib-parser (SLA-2)
+    participant POLAR as polar-manager (SLA-2)
+    participant WIND as wind-field-analyzer (SLA-2)
     participant GOPRO as gopro-orchestrator (SLA-3)
     participant GEO as sail-geometry (SLA-3)
-    participant MATCH as condition-matcher (SLA-3)
     participant VLLM as llama-vision (SLA-3)
 
-    N2K->>SK: Raw sentences / PGNs
-    SK->>IFX: Delta → time series
+    N2K->>SK: AIS PGNs + instruments
+    SK->>IFX: Deltas → time series
     G1->>IFX: Live instrument panels
+    SK-->>AIS: AIS target deltas (WS)
+    AIS->>N4J: Own + competitor positions
 
-    SK-->>RACE: WS fan-out (optional)
-    RACE->>IFX: Read telemetry (read token)
-    RACE->>N4J: Tack, leg, mark events
+    GRIB->>WIND: TWS/TWD grid on course
+    IFX-->>WIND: Own AWS/TWD/SOG/COG
+    AIS-->>WIND: Fleet SOG vs polar
+    POLAR-->>WIND: Target BSP/VMG (own + fleet)
+    WIND->>N4J: WindAdvantageZone scores
+    N4J-->>G2: Wind heatmap + fleet map
 
-    RACE-->>GOPRO: leg stable / capture_trigger
-    GOPRO->>GOPRO: BLE shutter → HERO13 × N
-    GOPRO->>GEO: Aligned JPEGs + t_influx
-    IFX-->>GEO: heel, AWA, AWS window
-    GEO->>GEO: boom angle, draft, twist metrics
-    IFX-->>MATCH: condition vector
-    N4J-->>MATCH: BestTrimSnapshot k-NN
-    MATCH->>N4J: TrimDelta vs best
-    GEO->>VLLM: Cropped sails + metrics
-    VLLM->>N4J: SailAnalysis narrative
+    GOPRO->>GEO: Aligned GoPro JPEGs
+    IFX-->>GEO: Telemetry window
+    GEO->>VLLM: Sail geometry + crops
+    VLLM->>N4J: SailAnalysis
 ```
 
 ### 6.3 Offline vs online modes
@@ -515,7 +535,7 @@ Signal K is the **single source of truth** for live marine data. It:
 
 **Schema strategy:**
 
-- **Bucket:** `signalk` (raw, 90-day retention); `race` (downsampled, long retention).
+- **Bucket:** `signalk` (raw, 90-day retention); `race` (downsampled, long retention); `ais_tracks` (competitor + own-boat AIS positions, 30-day retention).
 - **Measurement:** derived from Signal K path (e.g. `navigation_speedOverGround`).
 - **Tags:** `vessel`, `source`, `pgn` (N2K), `context`, `race_id` (when active).
 - **Fields:** numeric values; store strings in Neo4j instead.
@@ -531,7 +551,12 @@ Signal K is the **single source of truth** for live marine data. It:
 
 | Label | Examples |
 |-------|----------|
-| `Vessel` | Own boat, competitors (MMSI) |
+| `Vessel` | Own boat (`is_own: true`), competitors (MMSI) |
+| `Polar` | Polar diagram for a vessel (TWS × TWA → target BSP/VMG) |
+| `GribModel` | Imported GRIB file metadata (model run, valid time, bbox) |
+| `WindGrid` | Parsed wind field reference (linked to GribModel) |
+| `WindAdvantageZone` | Course sector scored for favorable wind (runtime) |
+| `AisTrack` | Time-series reference for vessel movement |
 | `Race` | Regatta, passage race |
 | `Course` | Windward/leeward, coastal |
 | `Mark` | Physical or virtual marks |
@@ -549,7 +574,12 @@ Signal K is the **single source of truth** for live marine data. It:
 
 ```cypher
 (v:Vessel)-[:COMPETED_IN]->(r:Race)
+(v:Vessel)-[:HAS_POLAR]->(p:Polar)
+(r:Race)-[:USES_GRIB]->(g:GribModel)
 (r:Race)-[:ON_COURSE]->(c:Course)
+(c:Course)-[:HAS_ZONE]->(z:WindAdvantageZone)
+(v:Vessel)-[:AIS_POSITION]->(pos:AisTrack)
+(z:WindAdvantageZone)-[:DERIVED_FROM]->(g:GribModel)
 (c:Course)-[:HAS_MARK]->(m:Mark)
 (v:Vessel)-[:ROUNDED]->(m:Mark)
 (v:Vessel)-[:PERFORMED]->(t:Tack)
@@ -565,7 +595,7 @@ Neo4j holds **context** (who, what, where, why); InfluxDB holds **telemetry** (h
 | Instance | Tier | Port (default) | Dashboards |
 |----------|------|----------------|------------|
 | `grafana-telemetry` | SLA-1 | 3001 | SOG, COG, AWA, AWS, depth, heel, system health |
-| `grafana-race` | SLA-2 | 3002 | Fleet, legs, marks, tactics, debrief |
+| `grafana-race` | SLA-2 | 3002 | Fleet AIS map, polars, GRIB wind overlay, wind-advantage heatmap, legs |
 | `grafana-sail` | SLA-3 | 3003 | Trim timeline, sail images, vision LLM output |
 
 ### 7.5 AI — LLaMA + Coral
@@ -598,9 +628,10 @@ Neo4j holds **context** (who, what, where, why); InfluxDB holds **telemetry** (h
 Responsibilities:
 
 - Start sequence helper (time-to-start, line bias from headings).
-- Polar comparison (requires polar file ingestion).
+- Polar comparison for **own boat and competitors** via `polar-manager`.
 - Wind shift detection (statistical + graph persistence).
-- Debrief generation post-race (LLaMA + structured data).
+- Trigger `wind-field-analyzer` on leg changes.
+- Debrief generation post-race (LLaMA + structured data + wind-zone summary).
 
 This replaces implicit analytics that were previously envisioned in CDF tools / future Java apps.
 
@@ -974,6 +1005,245 @@ After training and evaluation:
 | Retention | Raw images on shore: 24 months; delete on request |
 | Race mode | `training-export` container **stopped** when `RACE_MODE=true` |
 
+| Race mode | `training-export` container **stopped** when `RACE_MODE=true` |
+
+---
+
+### 7.12 GRIB, polars, AIS & wind-on-course analysis
+
+**SLA tier:** SLA-2 (`grib-ingest`, `grib-parser`, `polar-manager`, `ais-collector`, `wind-field-analyzer`)  
+**AIS source:** SLA-1 Signal K (NMEA 2000 AIS via PiCAN-M)  
+**Languages:** Python 3.11+ (`cfgrib`/`xarray`, `pyais`, FastAPI)
+
+#### 7.12.1 Data flow overview
+
+```mermaid
+flowchart TB
+    subgraph SLA1["SLA-1 — telemetry.local"]
+        N2K["NMEA 2000\nAIS PGNs"]
+        SK["Signal K"]
+        IFX["InfluxDB"]
+        N2K --> SK --> IFX
+    end
+
+    subgraph SLA2["SLA-2 — race.local"]
+        AIS["ais-collector"]
+        GRIB_IN["grib-ingest"]
+        GRIB_P["grib-parser"]
+        POLAR["polar-manager"]
+        WIND["wind-field-analyzer"]
+        N4J["neo4j"]
+        GF["grafana-race"]
+
+        GRIB_IN --> GRIB_P --> WIND
+        AIS --> WIND
+        POLAR --> WIND
+        AIS --> N4J
+        POLAR --> N4J
+        GRIB_P --> N4J
+        WIND --> N4J
+        N4J --> GF
+    end
+
+    SK -.->|AIS deltas WS| AIS
+    IFX -.->|own-boat wind\nSOG/COG/heel| WIND
+```
+
+#### 7.12.2 GRIB ingestion — regular upload schedule
+
+**Containers:** `grib-ingest`, `grib-parser`  
+**Storage:** `/data/grib/` on SLA-2 (persistent volume `grib-store`)
+
+| Mode | Schedule | Trigger |
+|------|----------|---------|
+| **Automatic fetch** | Every **6 hours** when `ONLINE_MODE=true` | `grib-ingest` cron (`0 */6 * * *`) |
+| **Pre-race fetch** | Manual + 24 h before start | Grafana / API `POST /grib/fetch` |
+| **Manual upload** | Anytime in harbor | `POST /grib/upload` (multipart `.grb2`) |
+| **USB import** | Harbor | Copy to `/data/grib/inbox/` — file watcher ingests |
+| **Shore push** | Optional | Shore server rsync/scp to `race.local` |
+
+**Configured sources (`config/grib-sources.yaml`):**
+
+```yaml
+sources:
+  - name: gfs-opendap
+    url_template: "https://{host}/grib2/{run}/gfswave.t{fh}z.global.0p25.f{step}.grib2"
+    model: GFS
+    schedule: "0 */6 * * *"
+    bbox_from: course   # auto-clip to active course + 10 NM margin
+  - name: manual
+    type: upload
+```
+
+**Ingest pipeline:**
+
+1. Download or receive GRIB2 file.
+2. Validate magic bytes, record `model_run`, `valid_from`, `valid_to`, `bbox`.
+3. `grib-parser` extracts **U/V wind** (and optional gust, pressure) → `WindGrid` store (Zarr or GeoJSON tiles on Pi).
+4. Register `GribModel` node in Neo4j; link to active `Race` when `race_id` set.
+5. Prune GRIB files older than **7 days** (configurable).
+
+**Offline use:** Latest successfully parsed GRIB remains queryable at sea without internet. Grafana shows **GRIB age** warning if valid time &gt; 12 h behind race start.
+
+#### 7.12.3 Polar diagram management
+
+**Container:** `polar-manager`
+
+Polars define target boat speed and VMG for each **TWS × TWA** combination. Required for own boat and loaded for **each tracked competitor**.
+
+| Vessel | Source | Format | Required |
+|--------|--------|--------|----------|
+| **Own boat** | Owner upload, ORC certificate, season config | `.pol`, ORC XML, CSV | Yes |
+| **Competitors** | ORC database export, regatta entry list, manual per MMSI | `.pol`, CSV | Recommended per key competitor |
+
+**Canonical internal format** (`polars/{mmsi_or_vessel_id}.yaml`):
+
+```yaml
+vessel_id: "own-boat"
+mmsi: "123456789"
+source: "orc-2026"
+points:
+  - tws: 8
+    twa: 45
+    bsp: 6.2
+    vmg: 4.4
+  - tws: 12
+    twa: 42
+    bsp: 7.1
+    vmg: 5.3
+```
+
+**API:**
+
+| Endpoint | Action |
+|----------|--------|
+| `POST /polars/upload` | Upload polar file; associate with `vessel_id` or MMSI |
+| `GET /polars/{mmsi}` | Return canonical polar |
+| `GET /polars/{mmsi}/target?aws=12&awa=38` | Interpolated target BSP/VMG |
+| `POST /polars/batch` | Regatta fleet import (CSV/ZIP of competitor polars) |
+
+**Neo4j:**
+
+```cypher
+MERGE (v:Vessel {mmsi: $mmsi})
+MERGE (p:Polar {vessel_id: $vessel_id, season: $year})
+MERGE (v)-[:HAS_POLAR {active: true}]->(p)
+```
+
+**Runtime use:**
+
+- **Own boat:** `actual_VMG / target_VMG` → polar performance % on grafana-race.
+- **Competitors:** expected BSP from their polar at observed TWS/TWA → detect **overperformance** (likely better wind).
+- **wind-field-analyzer:** fleet expected-vs-actual speed delta per course sector.
+
+#### 7.12.4 AIS collection — own boat and competitors
+
+**Containers:** `ais-collector` (SLA-2), Signal K (SLA-1 ingest)
+
+AIS arrives on the **NMEA 2000 backbone** via PiCAN-M (`can0`). Signal K decodes AIS PGNs into delta paths under `sensors.ais.*`.
+
+| Target | MMSI source | Signal K path (reference) |
+|--------|-------------|---------------------------|
+| **Own boat** | Transponder MMSI | `navigation.position`, `navigation.courseOverGroundTrue`, `navigation.speedOverGround` + `sensors.ais.class` |
+| **Competitors** | AIS class A/B | `sensors.ais.targets.{mmsi}.position`, `.course`, `.speed`, `.name` |
+
+**`ais-collector` pipeline:**
+
+1. Subscribe to `ws://telemetry.local:3000/signalk/v1/stream/?subscribe=none` — filter AIS deltas.
+2. Write to **SLA-2 InfluxDB** replica bucket `ais_tracks` (or SLA-1 write + SLA-2 read — prefer SLA-2 local copy to avoid SLA-1 write load):
+
+| Measurement | Tags | Fields |
+|-------------|------|--------|
+| `ais_position` | `mmsi`, `name`, `is_own`, `race_id` | `lat`, `lon`, `cog`, `sog`, `heading` |
+
+3. Upsert `Vessel` nodes in Neo4j; mark `is_own: true` for configured own MMSI.
+4. `competitor-sync` maintains regatta roster — links known competitors from entry list to AIS tracks.
+
+**Refresh rate:** ≤ 10 s for class A; class B as received (typically 30 s–3 min).
+
+**Own-boat cross-check:** Compare AIS SOG/COG with instrument SOG/COG from SLA-1; flag calibration drift &gt; 5%.
+
+#### 7.12.5 Runtime wind-on-course analysis
+
+**Container:** `wind-field-analyzer`  
+**Runs:** Every **30–60 s** during active `race_id`; triggered on leg change and significant wind shift (&gt; 8° TWD in 5 min).
+
+**Purpose:** Fuse **GRIB forecast**, **own instrument wind**, **fleet AIS movement**, and **polars** to estimate **where on the course favorable wind currently exists** — including areas where competitors are outperforming their polars (proxy for better pressure).
+
+```mermaid
+flowchart LR
+    GRIB["GRIB grid\nTWS/TWD per cell"]
+    OWN["Own boat\nAWS/AWA/TWD"]
+    AIS["Fleet AIS\ntracks × polars"]
+    COURSE["Course geometry\nmarks + legs"]
+    FUSE["wind-field-analyzer"]
+    ZONES["WindAdvantageZone\nscores + bearing"]
+    UI["grafana-race\nheatmap + advice"]
+
+    GRIB --> FUSE
+    OWN --> FUSE
+    AIS --> FUSE
+    COURSE --> FUSE
+    FUSE --> ZONES --> UI
+```
+
+**Course discretization:**
+
+- Divide active leg into **sectors** (default 0.25 NM grid or 500 m along-leg bins).
+- For each sector center `(lat, lon)`:
+
+| Input | Computation |
+|-------|-------------|
+| GRIB | Interpolate TWS/TWD at valid time nearest race now |
+| Own instruments | Bias-correct GRIB with recent `AWS/TWD` residual (last 15 min) |
+| Fleet AIS | For competitors in sector: `Δ = SOG_actual − SOG_polar(TWS,TWA)` |
+| Own polar | `VMG_target` vs `VMG_actual` if own boat transited sector |
+
+**Wind advantage score (0–1 per sector):**
+
+```
+score = w₁ · normalize(TWS)
+      + w₂ · fleet_overperformance_mean
+      + w₃ · (1 - competitor_density_penalty)
+      + w₄ · vmg_potential_own_polar
+```
+
+Default weights: `w₁=0.35, w₂=0.40, w₃=0.10, w₄=0.15` (tunable per boat class).
+
+**Outputs:**
+
+| Artifact | Destination |
+|----------|-------------|
+| `WindAdvantageZone` nodes | Neo4j — sector polygon, score, TWS/TWD, timestamp |
+| `wind_zone` time series | InfluxDB — sector scores for replay |
+| Tactical recommendation | `tactical-coach` + grafana-race — e.g. *"Port side of beat: +1.2 kt fleet overperformance vs polars"* |
+| GeoJSON layer | grafana-race geomap — green/yellow/red sectors |
+
+**Example Cypher result:**
+
+```cypher
+(:WindAdvantageZone {
+  sector_id: "leg2_bin_04",
+  score: 0.82,
+  tws_kn: 13.4,
+  twd_deg: 245,
+  fleet_delta_sog: 0.9,
+  recommendation: "Favor port tack ladder — fleet gaining on polars"
+})
+```
+
+**Offline behavior:** Without fresh GRIB, analyzer uses **last GRIB + instrument bias + AIS fleet deltas only** (degraded mode banner). AIS and polars work fully offline.
+
+#### 7.12.6 Grafana-race panels (wind & fleet)
+
+| Panel | Data source |
+|-------|-------------|
+| Fleet AIS map | Influx `ais_tracks` + Neo4j `Vessel` |
+| GRIB wind barbs | `grib-parser` API overlay on course |
+| Polar performance % | own + selected competitor MMSI |
+| Wind advantage heatmap | `WindAdvantageZone` GeoJSON |
+| GRIB freshness | `GribModel.valid_from` age indicator |
+
 ---
 
 ## 8. Technology matrix
@@ -992,6 +1262,10 @@ After training and evaluation:
 | Sail geometry | OpenCV + custom calib | Python | Angles and shape metrics |
 | Onshore training | PyTorch + Hugging Face | Python | TrimTransformer on GPU servers |
 | Model registry | MLflow | — | Versioned shore → edge deploy |
+| GRIB parsing | cfgrib / xarray / eccodes | Python | Decode GRIB2 wind grids on SLA-2 |
+| AIS decode | pyais + Signal K paths | Python | Fleet position ingest |
+| Polars | NumPy interpolation | Python | Target BSP/VMG per TWS/TWA |
+| Wind analysis | Custom fusion service | Python | GRIB + AIS + polar runtime |
 | API / coach | FastAPI | Python | Async, typed, small footprint |
 | Containers | Docker Compose | YAML | Repeatable; works on Pi arm64 |
 | Remote updates | Watchtower or custom agent | — | Pull from GHCR when online |
@@ -1018,13 +1292,22 @@ graph TB
     subgraph sla2["docker-compose.sla-2.yml — race.local"]
         neo["neo4j :7474"]
         race["race-intelligence"]
+        ais["ais-collector"]
         comp["competitor-sync"]
-        crawl["crawl-agent"]
+        grib_in["grib-ingest"]
+        grib_p["grib-parser"]
+        polar["polar-manager"]
+        wind["wind-field-analyzer"]
         llm2["llama-tactical :8080"]
         coach["tactical-coach :8090"]
         g2["grafana-race :3002"]
         race --> neo
+        ais --> neo
         comp --> neo
+        polar --> neo
+        grib_in --> grib_p --> wind --> neo
+        ais --> wind
+        polar --> wind
         coach --> llm2
         coach --> neo
         neo --> g2
@@ -1157,23 +1440,31 @@ flowchart LR
 | FR-5 | Support optional I²C environmental sensors |
 | FR-6 | SLA-1 operates independently when SLA-2 and SLA-3 are offline |
 
-### 11.2 SLA-2 — Race & competitors
+### 11.2 SLA-2 — Race, competitors, GRIB, polars & wind
 
 | ID | Requirement |
 |----|-------------|
 | FR-10 | User can start/stop a **race session** (tags all data with `race_id`) |
 | FR-11 | System detects tacks and gybes from heading/rudder/AWA thresholds |
-| FR-12 | Grafana-race shows live VMG, target %, and polar delta when polar file loaded |
+| FR-12 | Grafana-race shows live VMG and **polar %** for own boat and selected competitors |
 | FR-13 | Neo4j stores leg boundaries, mark roundings, and competitor positions |
-| FR-14 | Post-race debrief available as text within 5 min of session end |
-| FR-15 | Competitor vessels ingested by MMSI/AIS into Neo4j |
-| FR-16 | crawl_web agent ingests NOR/SI when online |
+| FR-14 | Post-race debrief includes wind-zone summary within 5 min of session end |
+| FR-15 | **AIS** collected for own boat and all visible competitors (MMSI, COG, SOG, position) |
+| FR-16 | `ais-collector` refreshes fleet positions ≤ 10 s (class A) from N2K via Signal K |
+| FR-17 | **GRIB** auto-fetched every 6 h when `ONLINE_MODE=true`; manual upload supported |
+| FR-18 | Latest GRIB usable offline; age warning if stale &gt; 12 h at race start |
+| FR-19 | **Polar diagrams** loaded for own boat (required) and competitors (per MMSI) |
+| FR-20 | `polar-manager` interpolates target BSP/VMG for any TWS/TWA |
+| FR-21 | `wind-field-analyzer` updates course wind-advantage map every 30–60 s during race |
+| FR-22 | Wind zones fuse GRIB, own instruments, fleet AIS overperformance vs polars |
+| FR-23 | Crew sees heatmap + recommendation (e.g. favored side of beat) on grafana-race |
+| FR-24 | crawl_web agent ingests NOR/SI when online |
 
 ### 11.3 SLA-3 — Sail performance vision (GoPro HERO13)
 
 | ID | Requirement |
 |----|-------------|
-| FR-20 | Orchestrate 3–5 GoPro HERO13 cameras via Open GoPro BLE/Wi-Fi |
+| FR-30 | Orchestrate 3–5 GoPro HERO13 cameras via Open GoPro BLE/Wi-Fi |
 | FR-21 | Synchronized multi-camera still burst within ±200 ms |
 | FR-22 | Coral preprocess extracts sail/boom ROI before geometry + LLM |
 | FR-23 | `sail-geometry` computes boom angle, mast heel, draft, twist, luff metrics |
@@ -1200,20 +1491,21 @@ flowchart LR
 
 | ID | Requirement |
 |----|-------------|
-| FR-30 | SLA-2 text LLM answers tactical questions in &lt; 30 s on Pi 5 |
-| FR-31 | No tier sends data off-device without explicit opt-in |
-| FR-32 | SLA-2 coach context: last 15 min SLA-1 telemetry + active race graph |
-| FR-33 | SLA-3 vision LLM runs only on vision node; no SLA-1 co-location in race profile |
+| FR-60 | SLA-2 text LLM answers tactical questions in &lt; 30 s on Pi 5 |
+| FR-61 | No tier sends data off-device without explicit opt-in |
+| FR-62 | SLA-2 coach context: telemetry + race graph + **active wind zones** |
+| FR-63 | SLA-3 vision LLM runs only on vision node; no SLA-1 co-location in race profile |
 
 ### 11.6 Operations
 
 | ID | Requirement |
 |----|-------------|
-| FR-40 | SLA-1 full stack boots in &lt; 60 s on power-on |
-| FR-41 | Remote container update per tier without manual SSH (when online) |
-| FR-42 | `RACE_MODE=true` disables Watchtower on all tiers; SLA-1 never auto-updates |
-| FR-43 | System runs with zero internet for 72+ hours across all tiers |
-| FR-44 | Each tier deployable via separate `docker compose -f docker-compose.sla-N.yml` |
+| FR-70 | SLA-1 full stack boots in &lt; 60 s on power-on |
+| FR-71 | Remote container update per tier without manual SSH (when online) |
+| FR-72 | `RACE_MODE=true` disables Watchtower on all tiers; SLA-1 never auto-updates |
+| FR-73 | System runs with zero internet for 72+ hours across all tiers |
+| FR-74 | Each tier deployable via separate `docker compose -f docker-compose.sla-N.yml` |
+| FR-75 | `grib-store` and `polars/` volumes persist across reboots on SLA-2 |
 
 ---
 
@@ -1223,7 +1515,7 @@ flowchart LR
 |----------|-------|-------|-------|
 | Availability (race) | 99.99% | 99.9% | 95% |
 | Latency (dashboard) | &lt; 1 s | &lt; 3 s | &lt; 60 s per analysis |
-| Storage | 32 GB min; 7 days raw @ 10 Hz | Neo4j 16 GB+ volume | GoPro JPEG ring 64 GB+; export staging |
+| Storage | 32 GB min; 7 days raw @ 10 Hz | Neo4j 16 GB+; GRIB 2–5 GB; polars &lt;100 MB | GoPro JPEG ring 64 GB+ |
 | Power | N2K SMPS or 12 V DC | 12 V DC | 12 V DC |
 | Isolation | Dedicated Pi in race profile | Separate Pi or shared with SLA-3 | Separate Pi required in race profile |
 | Security | No default passwords; read token for cross-tier Influx | Neo4j auth; REST API keys | Camera data local only |
@@ -1253,8 +1545,19 @@ AI-sailing-system/
 │   └── sail/                     # SLA-3 dashboards
 ├── neo4j/                        # SLA-2
 ├── race-intelligence/            # SLA-2
-├── competitor-sync/                # SLA-2
-├── crawl-agent/                    # SLA-2 (crawl_web lineage)
+├── competitor-sync/                # SLA-2 fleet roster
+├── ais-collector/                  # SLA-2 AIS ingest from Signal K
+├── grib-ingest/                    # SLA-2 scheduled GRIB fetch + upload
+├── grib-parser/                    # SLA-2 GRIB2 → wind grid
+├── polar-manager/                  # SLA-2 own + competitor polars
+├── wind-field-analyzer/            # SLA-2 runtime course wind zones
+├── config/
+│   ├── cameras.yaml                # GoPro mount extrinsics per boat
+│   ├── grib-sources.yaml           # GRIB download sources + schedule
+│   └── vessel.yaml                 # Own MMSI, boat name, default polars
+├── data/                           # gitignored — runtime volumes
+│   ├── grib/                       # GRIB2 files + parsed grids
+│   └── polars/                     # Canonical polar YAML per MMSI
 ├── tactical-coach/                 # SLA-2
 ├── gopro-orchestrator/           # SLA-3 Open GoPro fleet control
 ├── media-ingest/                   # SLA-3 GoPro HTTP download
@@ -1298,12 +1601,13 @@ AI-sailing-system/
 - [ ] InfluxDB bridge
 - [ ] grafana-telemetry live dashboard
 
-### Phase 2 — SLA-2 race & competitors
-- [ ] Neo4j schema
+### Phase 2 — SLA-2 race, GRIB, polars, AIS & wind
+- [ ] Neo4j schema (Vessel, Polar, GribModel, WindAdvantageZone)
 - [ ] `docker-compose.sla-2.yml`
-- [ ] Race session + competitor-sync
-- [ ] grafana-race dashboards
-- [ ] Tactical LLM + coach
+- [ ] `ais-collector` + `polar-manager`
+- [ ] `grib-ingest` (6 h schedule) + `grib-parser`
+- [ ] `wind-field-analyzer` + grafana-race heatmap
+- [ ] Tactical LLM + coach (wind-zone context)
 
 ### Phase 3 — SLA-3 GoPro sail vision
 - [ ] `docker-compose.sla-3.yml`
@@ -1332,11 +1636,11 @@ AI-sailing-system/
 
 | # | Question | Notes |
 |---|----------|-------|
-| OQ-1 | Minimum GoPro fleet size? | 3 (mast, boom, bow); 4th deck optional |
-| OQ-2 | BLE dongles vs Wi-Fi-only trigger? | Hybrid recommended; Wi-Fi for media |
-| OQ-3 | TrimTransformer training GPU target? | Single L40S min; multi-GPU for fleet |
-| OQ-4 | Human label workflow tool? | Label Studio vs custom |
-| OQ-5 | AIS source for competitor-sync? | N2K AIS PGN vs dedicated receiver |
+| OQ-1 | Primary GRIB model for region? | GFS global vs regional HARMONIE/AROME |
+| OQ-2 | Competitor polar source of truth? | ORC certificate DB vs manual per regatta |
+| OQ-3 | AIS class B timeout handling? | Stale track grey-out after 5 min |
+| OQ-4 | Wind-zone weight tuning per class? | One-design vs ORC handicap fleet |
+| OQ-5 | GRIB spatial resolution on Pi? | 0.25° vs clipped high-res regional |
 | OQ-6 | Include rig load cells in training labels? | If available on N2K |
 
 ---
@@ -1352,5 +1656,7 @@ AI-sailing-system/
 - [llama.cpp](https://github.com/ggerganov/llama.cpp)
 - [Open GoPro specification](https://gopro.github.io/OpenGoPro/)
 - [Open GoPro Python SDK](https://gopro.github.io/OpenGoPro/python_sdk/)
+- [cfgrib documentation](https://ecmwf.github.io/cfgrib/)
+- [pyais](https://github.com/M0r13n/pyais)
 - [GoPro HERO13 Black](https://gopro.com/en/us/shop/cameras/hero13-black/CHDHX-131-master.html)
 - [CogSail Python (prior art)](https://github.com/cognite-fholm/cogsail-python)
