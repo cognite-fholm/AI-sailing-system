@@ -1,0 +1,36 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# Data & models (large binaries)
+*.gguf
+data/
+influxdb/data/
+neo4j/data/
+grafana/data/
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
