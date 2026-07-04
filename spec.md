@@ -1,6 +1,6 @@
 # AI Sailing System — Specification
 
-**Version:** 0.2.0-draft  
+**Version:** 0.3.0-draft  
 **Date:** 2026-07-04  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
@@ -84,7 +84,8 @@ Hardware is assigned **per SLA tier**. A single-boat deployment may use 1–3 Ra
 | **Raspberry Pi 5** (8 GB) | SLA-3 | Vision node | Cameras, Coral dongle, sail vision LLM |
 | **PiCAN-M HAT + 3 A SMPS** | SLA-1 only | Marine I/O + power | NMEA 0183 + NMEA 2000; **must** live on telemetry node |
 | **Google Coral accelerator** | SLA-3 | Sail image preprocessing | USB/PCIe on vision node; see [§7.5](#75-ai--llama--coral) |
-| **USB / CSI cameras** | SLA-3 | Sail trim capture | Mast, boom, or deck-mounted; 1–3 cameras |
+| **GoPro HERO13 Black** (×3–5) | SLA-3 | Sail & boom imaging | Wireless capture via [Open GoPro](https://gopro.github.io/OpenGoPro/); see [§7.9](#79-gopro-hero13-black-fleet) |
+| **USB Bluetooth 5.0 dongles** (×2, optional) | SLA-3 | Multi-GoPro BLE | One BLE central per camera; or Wi-Fi station mode on boat LAN |
 | **32 GB+ industrial microSD** or **NVMe (Pi 5)** | All nodes | OS + data | Per-node persistent storage |
 | **Boat LAN (Ethernet/Wi-Fi)** | All | Inter-node link | Gigabit preferred when tiers are split across Pis |
 | **12 V marine supply** | All | Power | N2K SMPS on telemetry node; DC-DC for additional nodes |
@@ -166,12 +167,16 @@ flowchart TB
 
     subgraph SLA3["SLA-3 — Sail Performance Vision (Analytical)"]
         direction TB
-        T3_CAM["camera-capture"]
+        T3_GOPRO["gopro-orchestrator\nHERO13 × N"]
+        T3_CAM["media-ingest"]
         T3_CORAL["coral-preprocess"]
         T3_VLLM["llama-vision"]
+        T3_GEO["sail-geometry"]
+        T3_MATCH["condition-matcher"]
         T3_API["sail-analysis-api"]
         T3_STORE["image-store"]
-        T3_CAM --> T3_CORAL --> T3_VLLM --> T3_API
+        T3_GOPRO --> T3_CAM --> T3_CORAL --> T3_GEO --> T3_VLLM --> T3_API
+        T3_GEO --> T3_MATCH --> T3_API
         T3_CAM --> T3_STORE
     end
 
@@ -242,40 +247,58 @@ flowchart TB
 
 ---
 
-#### SLA-3 — Sail performance (vision / LLM)
+#### SLA-3 — Sail performance (GoPro vision / LLM)
 
-**Purpose:** Capture **sail images**, analyze trim, shape, and performance using **vision-capable LLM** inference plus Coral-accelerated preprocessing.
+**Purpose:** Orchestrate a fleet of **GoPro HERO13 Black** cameras to photograph sails and boom rigging, extract **geometry** (angles, camber, twist), compare against **best-known trim in similar conditions**, and publish coaching insights.
 
 | Attribute | Target |
 |-----------|--------|
 | **Availability** | 95% — best-effort; may be paused during maneuvers |
-| **Analysis latency** | Single frame analysis &lt; 60 s (p95) on Pi 5 |
-| **Capture rate** | 0.2–1 fps per camera (configurable) |
+| **Capture sync** | Multi-GoPro still burst within ±200 ms (PPS via `capture_trigger`) |
+| **Analysis latency** | Geometry + condition match &lt; 60 s (p95) on Pi 5 |
+| **Capture rate** | 0.2–1 Hz per camera (configurable); burst on leg stable |
 | **Recovery time** | &lt; 5 min; no impact on SLA-1 |
-| **Internet** | Not required (models pre-loaded) |
+| **Internet** | Not required at sea; harbor sync for training export |
 
 **Containers (`docker-compose.sla-3.yml`):**
 
 | Container | Image | Responsibility |
 |-----------|-------|----------------|
-| `camera-capture` | `ghcr.io/.../camera-capture` | USB/CSI frame grab; exposure sync |
-| `coral-preprocess` | `ghcr.io/.../coral-preprocess` | ROI detection, luff detection, image normalize |
-| `llama-vision` | `ghcr.io/.../llama-cpp-vision` | Multimodal LLM — sail shape, trim, curl analysis |
-| `sail-analysis-api` | `ghcr.io/.../sail-analysis` | FastAPI; publishes trim scores to SLA-2 |
-| `image-store` | `ghcr.io/.../image-store` | Local ring buffer of frames + analysis metadata |
-| `grafana-sail` | `grafana/grafana` | Sail trim timeline, overlay panels |
+| `gopro-orchestrator` | `ghcr.io/.../gopro-orchestrator` | Discover, arm, and trigger HERO13 fleet via Open GoPro BLE/Wi-Fi |
+| `media-ingest` | `ghcr.io/.../media-ingest` | Download photos from GoPro HTTP API; timestamp alignment |
+| `coral-preprocess` | `ghcr.io/.../coral-preprocess` | Sail ROI, luff line, boom line detection (TFLite on Coral) |
+| `sail-geometry` | `ghcr.io/.../sail-geometry` | Compute angles & shape metrics from ROIs + camera extrinsics |
+| `condition-matcher` | `ghcr.io/.../condition-matcher` | Find best historical trim in similar wind/heel/SOG |
+| `llama-vision` | `ghcr.io/.../llama-cpp-vision` | Multimodal LLM — qualitative sail shape narrative |
+| `sail-analysis-api` | `ghcr.io/.../sail-analysis` | FastAPI; merge geometry + match + LLM → SLA-2 |
+| `image-store` | `ghcr.io/.../image-store` | Ring buffer of frames, geometry JSON, capture metadata |
+| `training-export` | `ghcr.io/.../training-export` | Harbor-only bundles for onshore ML (opt-in) |
+| `grafana-sail` | `grafana/grafana` | Trim timeline, geometry gauges, best-vs-actual overlays |
 
-**Vision LLM scope (examples):**
+**GoPro fleet (reference: 4 cameras):**
 
-- Leech telltale behavior and upper-twist indication from mast camera.
-- Genoa luff break vs. entry angle from bow camera.
-- Mainsail draft position and vang/cunningham effectiveness (debrief, not real-time actuation).
-- Post-leg summary: *"Mainsail was over-trimmed above 15 kt AWA on port tack leg 2."*
+| Camera ID | Mount | Primary metrics |
+|-----------|-------|-----------------|
+| `gopro-mast` | Mast, above spreaders | Mainsail camber, draft %, leech twist, mast bend hint |
+| `gopro-boom` | Boom gooseneck / mid-boom | **Boom angle** vs centerline, vang/kicker geometry, foot tension |
+| `gopro-bow` | Bow pulpit | Genoa/jib luff, entry angle, sheet lead hint |
+| `gopro-deck` (optional) | Cockpit looking up | Mainsail profile, **mast heel** visual, traveler context |
 
-**Reads from SLA-1:** Optional telemetry window (AWA, AWS, heel) to correlate sail state with conditions.  
-**Writes to SLA-2:** `SailAnalysis` nodes and `TRIM_INDICATES` relationships in Neo4j via API.
+**Vision + geometry scope:**
 
-**Hardware:** Raspberry Pi 5 (8 GB) + **Coral dongle** + 1–3 cameras. **Always isolated from SLA-1** — vision workloads are CPU/GPU/RAM heavy.
+- **Boom angle** (° off centerline / relative to TWA bucket).
+- **Mast heel** (° — fused from SLA-1 `attitude.heel` + visual mast axis from `gopro-mast`).
+- **Sail shape:** camber depth, draft position (% chord), leech twist (°), luff break severity.
+- **Rig settings (visual proxy):** vang tension indicator, cunningham, outhaul, traveler position (where visible).
+- **Condition comparison:** *"In 12–14 kt AWA 25–35° you historically carried 2° more boom angle and 15% further-aft draft with +0.3 kt VMG."*
+
+**Reads from SLA-1:** AWA, AWS, TWS, TWD, SOG, VMG, heel, rudder, sheet/load sensors if available.  
+**Reads from SLA-2:** `race_id`, leg, tack, `ConditionBucket` nodes.  
+**Writes to SLA-2:** `SailAnalysis`, `SailGeometry`, `TrimDelta` nodes; links to `BestTrimSnapshot`.
+
+**Hardware:** Raspberry Pi 5 (8 GB) + **Coral dongle** + 3–5× **GoPro HERO13 Black** + boat LAN Wi-Fi AP. **Always isolated from SLA-1.**
+
+See [§7.9](#79-gopro-hero13-black-fleet), [§7.10](#710-sail-geometry--condition-similarity), and [§7.11](#711-onshore-transformer-training-pipeline).
 
 ---
 
@@ -287,6 +310,7 @@ flowchart TB
 | Uptime target | 99.99% | 99.9% | 95% |
 | PiCAN-M required | Yes | No | No |
 | Coral required | No | No | Yes (preprocess) |
+| Cameras | — | — | 3–5× GoPro HERO13 Black |
 | LLM type | None | Text (llama.cpp) | Vision (llama.cpp multimodal) |
 | Primary store | InfluxDB | Neo4j | Image store + metadata |
 | Grafana instance | `grafana-telemetry` | `grafana-race` | `grafana-sail` |
@@ -391,12 +415,14 @@ flowchart TB
     end
 
     subgraph SLA3["SLA-3 — vision.local"]
-        CAM["cameras"]
-        CORAL["Coral preprocess"]
+        GOPRO["gopro-orchestrator"]
+        GEO["sail-geometry"]
+        MATCH["condition-matcher"]
         VLLM["llama-vision"]
         SAIL["sail-analysis-api"]
         G3["grafana-sail"]
-        CAM --> CORAL --> VLLM --> SAIL --> G3
+        GOPRO --> GEO --> MATCH --> SAIL --> G3
+        GEO --> VLLM --> SAIL
     end
 
     IFX -.->|read-only| COACH
@@ -415,7 +441,9 @@ sequenceDiagram
     participant G1 as grafana-telemetry
     participant N4J as Neo4j (SLA-2)
     participant RACE as race-intelligence (SLA-2)
-    participant CAM as cameras (SLA-3)
+    participant GOPRO as gopro-orchestrator (SLA-3)
+    participant GEO as sail-geometry (SLA-3)
+    participant MATCH as condition-matcher (SLA-3)
     participant VLLM as llama-vision (SLA-3)
 
     N2K->>SK: Raw sentences / PGNs
@@ -425,12 +453,17 @@ sequenceDiagram
     SK-->>RACE: WS fan-out (optional)
     RACE->>IFX: Read telemetry (read token)
     RACE->>N4J: Tack, leg, mark events
-    N4J-->>RACE: Fleet / course context
 
-    CAM->>VLLM: Sail frame + Coral ROI
-    IFX-->>VLLM: AWA/AWS context (read)
-    N4J-->>VLLM: race_id, leg
-    VLLM->>N4J: SailAnalysis trim result
+    RACE-->>GOPRO: leg stable / capture_trigger
+    GOPRO->>GOPRO: BLE shutter → HERO13 × N
+    GOPRO->>GEO: Aligned JPEGs + t_influx
+    IFX-->>GEO: heel, AWA, AWS window
+    GEO->>GEO: boom angle, draft, twist metrics
+    IFX-->>MATCH: condition vector
+    N4J-->>MATCH: BestTrimSnapshot k-NN
+    MATCH->>N4J: TrimDelta vs best
+    GEO->>VLLM: Cropped sails + metrics
+    VLLM->>N4J: SailAnalysis narrative
 ```
 
 ### 6.3 Offline vs online modes
@@ -507,6 +540,10 @@ Signal K is the **single source of truth** for live marine data. It:
 | `Sailor` | Crew roles |
 | `Tactic` | Pre-race plan, observed pattern |
 | `WindSector` | Shift / persistent pattern |
+| `SailGeometry` | Per-capture metrics from GoPro analysis (SLA-3) |
+| `BestTrimSnapshot` | Top performance trim in a condition cluster |
+| `TrimDelta` | Current vs best/optimal gap |
+| `SailAnalysis` | Vision LLM narrative + fused recommendation |
 
 **Example relationships:**
 
@@ -572,13 +609,7 @@ This replaces implicit analytics that were previously envisioned in CDF tools / 
 **Language:** Python 3.11+  
 **SLA tier:** SLA-3 only
 
-Responsibilities:
-
-- Capture frames from USB/CSI cameras on a fixed or configurable interval.
-- Run Coral TFLite models for sail ROI detection and luff-line extraction.
-- Pass cropped, annotated frames to **vision LLM** (Llama 3.2 Vision or equivalent GGUF via llama.cpp multimodal).
-- Correlate analysis with SLA-1 telemetry (AWA, AWS, heel) and SLA-2 `race_id` / leg context.
-- Publish structured `SailAnalysis` results to SLA-2 Neo4j via REST.
+Orchestrates the GoPro fleet → geometry → condition-match → vision LLM pipeline. See [§7.9–7.11](#79-gopro-hero13-black-fleet).
 
 **Does not** run on the telemetry node in race profile.
 
@@ -587,6 +618,361 @@ Responsibilities:
 **Source repo:** [crawl_web](https://github.com/cognite-fholm/crawl_web)
 
 When online, crawl race documents (NOR, SI, sailing instructions) and ingest summaries into Neo4j as `RaceDocument` nodes linked to `Race`. Not required for onboard core loop.
+
+When online, crawl race documents (NOR, SI, sailing instructions) and ingest summaries into Neo4j as `RaceDocument` nodes linked to `Race`. Not required for onboard core loop.
+
+### 7.9 GoPro HERO13 Black fleet
+
+**API:** [Open GoPro](https://gopro.github.io/OpenGoPro/) (BLE + Wi-Fi HTTP) via [Python SDK](https://gopro.github.io/OpenGoPro/python_sdk/)  
+**Camera:** GoPro HERO13 Black (firmware ≥ v01.10.00)  
+**Container:** `gopro-orchestrator` (Python 3.11+, `open-gopro` package)
+
+#### 7.9.1 Fleet topology
+
+```mermaid
+flowchart TB
+    subgraph VisionPi["vision.local — SLA-3 Pi"]
+        ORCH["gopro-orchestrator"]
+        INGEST["media-ingest"]
+        BLE1["BLE dongle 1"]
+        BLE2["BLE dongle 2"]
+        WIFI["Wi-Fi client\nboat LAN"]
+    end
+
+    subgraph GoPros["GoPro HERO13 fleet"]
+        G1["gopro-mast\nserial …01"]
+        G2["gopro-boom\nserial …02"]
+        G3["gopro-bow\nserial …03"]
+        G4["gopro-deck\nserial …04"]
+    end
+
+    subgraph BoatLAN["Boat LAN Wi-Fi AP"]
+        AP["vision.local AP\nor existing router"]
+    end
+
+    ORCH --> BLE1 --> G1
+    ORCH --> BLE1 --> G2
+    ORCH --> BLE2 --> G3
+    ORCH --> BLE2 --> G4
+    G1 & G2 & G3 & G4 -.->|Station mode| AP
+    INGEST --> WIFI --> AP
+    G1 & G2 & G3 & G4 -.->|HTTP media download| INGEST
+```
+
+**BLE constraint:** Each HERO13 accepts **one BLE central** at a time. The orchestrator uses:
+
+1. **Round-robin BLE** across 1–2 USB dongles for shutter triggers and health polls.
+2. **Wi-Fi station mode** — cameras join boat LAN (`boat-vision` SSID); `media-ingest` pulls JPEGs via HTTP (`/gopro/media/list`, `/videos/DCIM/...`).
+
+#### 7.9.2 Capture modes
+
+| Mode | Trigger | Use case |
+|------|---------|----------|
+| **Scheduled still** | Cron every N s on stable leg | Continuous trim monitoring |
+| **Synchronized burst** | `capture_trigger` event (AWA/AWS stable ±2° for 10 s) | Multi-camera geometry snapshot |
+| **Maneuver bracket** | Tack/gybe detected (SLA-2 webhook) | Before/after trim comparison |
+| **Manual** | Crew Grafana button | Ad-hoc inspection |
+
+**Open GoPro commands (reference flow):**
+
+```python
+# Simplified — gopro-orchestrator
+async with WirelessGoPro(identifier="…01") as gopro:
+    await gopro.ble_command.set_shutter(shutter=Toggle.ENABLE)   # photo mode preset
+    await gopro.ble_setting.photo_output.set(PhotoOutput.MAX_27MP)
+    await gopro.ble_command.set_date_time(dt=synced_utc)         # GPS/NTP aligned
+    await gopro.http_command.set_photo()                          # Wi-Fi path after connect
+```
+
+#### 7.9.3 Camera configuration (HERO13)
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| Mode | Photo (not video) | Lower storage; sharper geometry |
+| Resolution | 27 MP linear | Crop flexibility for sail ROI |
+| FOV | Linear | Minimize distortion for angle math |
+| Protune | Flat, sharpness high | Better edge detection |
+| GPS | On (camera GPS) | Secondary timestamp; fuse with boat GPS |
+| Wi-Fi | Station → boat LAN | Media download without phone |
+| Sleep | Disabled during race session | Avoid HERO13 BLE wake bug — power-cycle checklist in docs |
+
+#### 7.9.4 Timestamp alignment
+
+Every capture record carries:
+
+| Field | Source |
+|-------|--------|
+| `capture_id` | UUID generated by orchestrator |
+| `t_trigger` | Vision Pi monotonic clock at shutter command |
+| `t_exif` | EXIF DateTimeOriginal from GoPro JPEG |
+| `t_influx` | Nearest SLA-1 telemetry window (±100 ms interpolated) |
+| `race_id`, `leg_id` | SLA-2 session context |
+| `camera_id` | `gopro-mast` \| `gopro-boom` \| `gopro-bow` \| `gopro-deck` |
+
+All geometry and training exports key off `capture_id` + `t_influx`.
+
+---
+
+### 7.10 Sail geometry & condition similarity
+
+**Containers:** `coral-preprocess`, `sail-geometry`, `condition-matcher`
+
+#### 7.10.1 Geometry extraction pipeline
+
+```mermaid
+flowchart LR
+    IMG["GoPro JPEG\n× N cameras"]
+    CORAL["Coral TFLite\nsail/boom ROI"]
+    CV["sail-geometry\nOpenCV + calib"]
+    METRICS["SailGeometry JSON"]
+    LLM["llama-vision\nqualitative layer"]
+    MATCH["condition-matcher"]
+
+    IMG --> CORAL --> CV --> METRICS
+    METRICS --> LLM
+    METRICS --> MATCH
+    IFX["SLA-1 Influx\nheel, AWA, AWS"] --> MATCH
+    N4J["SLA-2 Neo4j\nBestTrimSnapshot"] --> MATCH
+```
+
+**`SailGeometry` metrics (per capture, per sail type):**
+
+| Metric | Unit | Cameras | Description |
+|--------|------|---------|-------------|
+| `boom_angle` | ° | gopro-boom, gopro-deck | Boom angle relative to boat centerline (vision + IMU fusion) |
+| `mast_heel` | ° | gopro-mast + SLA-1 heel | Mast axis angle; cross-check instrument heel |
+| `draft_position` | % chord | gopro-mast | Deepest camber point from leading edge |
+| `camber_depth` | % chord | gopro-mast | Max thickness / chord |
+| `leech_twist` | ° | gopro-mast | Angle between upper and lower leech tangent |
+| `luff_break_angle` | ° | gopro-bow | Genoa luff separation from forestay plane |
+| `foot_tension_proxy` | 0–1 | gopro-boom | Visual foot shelf / wrinkle score |
+| `vang_tension_proxy` | 0–1 | gopro-boom | Boom-to-leech geometry hint |
+
+Camera extrinsics (mount position + bearing) are stored in `config/cameras.yaml` and refined per boat during calibration sail.
+
+#### 7.10.2 Condition vector
+
+Each capture is tagged with a **condition vector** for similarity search:
+
+```json
+{
+  "tws_bucket": "12-14",
+  "awa_bucket": "25-35",
+  "twa_bucket": "32-42",
+  "heel_bucket": "8-15",
+  "sea_state": 2,
+  "tack": "port",
+  "sail_plan": "main+jib",
+  "vmg_percentile": 0.82
+}
+```
+
+Buckets derived from SLA-1 telemetry at `t_influx`. Stored on `SailGeometry` nodes in Neo4j.
+
+#### 7.10.3 Best-trim comparison
+
+**`BestTrimSnapshot`** nodes represent historically strong performance in a condition cluster:
+
+```cypher
+(:BestTrimSnapshot {
+  condition_hash: "tws12_awa30_port",
+  boom_angle: 4.2,
+  mast_heel: 12.1,
+  draft_position: 42,
+  leech_twist: 8.5,
+  vmg_avg: 5.8,
+  session_id: "2025-06-regatta-3",
+  rank: 1
+})
+```
+
+**`condition-matcher` algorithm (onboard):**
+
+1. Compute `condition_hash` from current telemetry.
+2. Query Neo4j for `BestTrimSnapshot` within ±1 bucket on TWS, AWA, heel (Cypher + optional vector index).
+3. If onshore-trained model available (see §7.11), call `trim-predictor` edge artifact for optimal targets.
+4. Emit `TrimDelta` — difference between current `SailGeometry` and best/optimal.
+
+**Crew-facing output (Grafana-sail):**
+
+| Current | Best in conditions | Δ | Recommendation |
+|---------|-------------------|---|----------------|
+| Boom 6.2° | 4.0° | +2.2° | Ease boom 2° |
+| Draft 38% | 45% | −7% | Move draft aft (outhaul/vang) |
+| Heel 18° | 12° | +6° | Depower — traveler down / vang |
+
+---
+
+### 7.11 Onshore transformer training pipeline
+
+**SLA tier:** **SLA-S (Shore)** — runs on larger onshore machines only; **not required at sea**.
+
+**Purpose:** Train **multimodal transformer models** on aligned sensor + image data to learn optimal **boom angle**, **mast heel**, **sail shape**, and rig settings for any condition. Deploy compressed artifacts back to the boat for SLA-3 inference.
+
+#### 7.11.1 End-to-end ML lifecycle
+
+```mermaid
+flowchart TB
+    subgraph Boat["Onboard — harbor / opt-in export"]
+        SLA1["SLA-1 InfluxDB\ntelemetry windows"]
+        SLA3["SLA-3 image-store\nGoPro JPEG + SailGeometry"]
+        EXP["training-export\nbundle builder"]
+        SLA1 --> EXP
+        SLA3 --> EXP
+    end
+
+    subgraph Transfer["Data transfer — harbor only"]
+        USB["USB / NAS"]
+        S3["Object store\nMinIO / S3"]
+        EXP --> USB --> S3
+        EXP -.->|LTE optional| S3
+    end
+
+    subgraph Shore["SLA-S — onshore GPU cluster"]
+        CURATE["dataset-curator\nquality + label"]
+        TRAIN["trim-transformer-trainer\nPyTorch / HF"]
+        EVAL["model-evaluator\nVMG holdout"]
+        REG["model-registry\nMLflow"]
+        QUANT["quantize → ONNX / GGUF"]
+        S3 --> CURATE --> TRAIN --> EVAL --> REG --> QUANT
+    end
+
+    subgraph Deploy["Back to boat"]
+        GHCR["GHCR model artifacts"]
+        SLA3INF["SLA-3 trim-predictor\n+ updated Neo4j snapshots"]
+        QUANT --> GHCR --> SLA3INF
+    end
+```
+
+#### 7.11.2 Training dataset format
+
+Each **training sample** = one synchronized multimodal window:
+
+```
+training_bundle/
+├── manifest.json
+├── sessions/
+│   └── {session_id}/
+│       ├── telemetry.parquet      # SLA-1: 30 s window @ 10 Hz
+│       ├── captures/
+│       │   ├── {capture_id}_mast.jpg
+│       │   ├── {capture_id}_boom.jpg
+│       │   └── {capture_id}_bow.jpg
+│       ├── geometry/
+│       │   └── {capture_id}.json  # SailGeometry (auto or human-refined)
+│       └── labels/
+│           └── {capture_id}.json  # OptimalTrim targets (see below)
+```
+
+**`manifest.json` fields:** `session_id`, `vessel_id`, `race_id`, `opt_in`, `export_timestamp`, `checksum`.
+
+**Label sources (priority order):**
+
+| Source | Description |
+|--------|-------------|
+| **Performance-derived** | Top-decile VMG segments in condition cluster → `SailGeometry` becomes positive label |
+| **Expert annotation** | Coach labels optimal boom/heel/shape in web UI (shore) |
+| **LLM-assisted pre-label** | Vision LLM proposes labels; human confirms in curation |
+| **Transformer pseudo-label** | Prior model iteration bootstraps new sessions |
+
+**`OptimalTrim` label schema:**
+
+```json
+{
+  "boom_angle_deg": 4.0,
+  "mast_heel_deg": 12.0,
+  "draft_position_pct": 45,
+  "camber_depth_pct": 12,
+  "leech_twist_deg": 8.5,
+  "vang_setting": 0.65,
+  "cunningham_setting": 0.40,
+  "outhaul_setting": 0.55,
+  "traveler_position": 0.30,
+  "confidence": 0.91
+}
+```
+
+#### 7.11.3 Model architecture — TrimTransformer
+
+**Framework:** PyTorch 2.x + Hugging Face Transformers (onshore); ONNX Runtime or quantized GGUF for edge deployment.
+
+```mermaid
+flowchart LR
+    subgraph Inputs
+        TS["Telemetry encoder\n1D Transformer / PatchTST"]
+        IMG["Vision encoder\nViT or SigLIP\nper camera view"]
+    end
+
+    subgraph Fusion
+        XATTN["Cross-attention\nfusion layers"]
+    end
+
+    subgraph Outputs
+        HEAD["Trim prediction head\nOptimalTrim vector"]
+        CONF["Uncertainty head"]
+    end
+
+    TS --> XATTN
+    IMG --> XATTN
+    XATTN --> HEAD
+    XATTN --> CONF
+```
+
+| Component | Specification |
+|-----------|---------------|
+| **Telemetry encoder** | 30 s × N channels (AWA, AWS, TWS, SOG, VMG, heel, rudder, loads); PatchTST or small Temporal Fusion Transformer |
+| **Vision encoder** | One ViT-B/16 (or SigLIP) per camera view; weights optionally init from sail-pretrained checkpoint |
+| **Fusion** | 4-layer cross-attention; telemetry tokens attend to image patch tokens |
+| **Output head** | Regression → `OptimalTrim` (10–15 continuous targets) |
+| **Auxiliary loss** | VMG prediction (helps learn performance-aligned representations) |
+| **Training hardware** | 1–8× NVIDIA GPU (A100/L40S class); 32 GB+ VRAM for multi-view + long context |
+
+**Loss function:**
+
+```
+L = λ₁ · MSE(optimal_trim, predicted_trim)
+  + λ₂ · Huber(vmg, predicted_vmg)
+  + λ₃ · contrastive(condition_embed, same_bucket)   # similar conditions cluster
+```
+
+#### 7.11.4 Shore infrastructure (SLA-S)
+
+| Service | Technology | Role |
+|---------|------------|------|
+| `dataset-curator` | Python, Label Studio | QA, dedup, consent check, train/val/test split by **session** (no leakage) |
+| `trim-transformer-trainer` | PyTorch Lightning | Distributed training |
+| `model-registry` | MLflow | Versioned checkpoints |
+| `model-evaluator` | Custom + W&B | Holdout by regatta; report per-condition MAE |
+| `neo4j-shore` | Neo4j (optional) | Aggregate fleet learnings → publish `BestTrimSnapshot` sets to boats |
+
+**Containers:** `docker-compose.sla-shore.yml` (not deployed on Pi).
+
+#### 7.11.5 Deployment back to boat
+
+After training and evaluation:
+
+1. **Quantize** model → ONNX INT8 or distil to smaller edge checkpoint.
+2. Publish to `ghcr.io/cognite-fholm/trim-predictor:{version}`.
+3. Harbor sync: SLA-3 pulls artifact; `condition-matcher` uses hybrid **k-NN (Neo4j) + neural predictor**.
+4. Export curated `BestTrimSnapshot` Cypher → SLA-2 Neo4j import script.
+
+**Onboard inference (no GPU required):**
+
+| Artifact | Latency target | Runs in |
+|----------|----------------|---------|
+| `trim-predictor-lite.onnx` | &lt; 2 s | SLA-3 `condition-matcher` |
+| `llama-vision` GGUF | &lt; 60 s | SLA-3 qualitative narrative |
+| Neo4j `BestTrimSnapshot` | &lt; 500 ms | SLA-3 k-NN fallback (offline) |
+
+#### 7.11.6 Data governance
+
+| Rule | Implementation |
+|------|----------------|
+| Opt-in export | `TRAINING_EXPORT_CONSENT=true` in harbor UI; per-session toggle |
+| PII / crew | No faces in training set — Coral blur pass optional |
+| Competitor data | Exclude unless consented |
+| Retention | Raw images on shore: 24 months; delete on request |
+| Race mode | `training-export` container **stopped** when `RACE_MODE=true` |
 
 ---
 
@@ -602,6 +988,10 @@ When online, crawl race documents (NOR, SI, sailing instructions) and ingest sum
 | Dashboards | Grafana OSS | — | De facto for InfluxDB |
 | LLM runtime | llama.cpp | C++ / Python bindings | Best ARM edge performance for LLaMA |
 | Edge ML | Coral libedgetpu | Python | Accelerate non-LLM models |
+| GoPro control | Open GoPro Python SDK | Python | HERO13 BLE + Wi-Fi capture |
+| Sail geometry | OpenCV + custom calib | Python | Angles and shape metrics |
+| Onshore training | PyTorch + Hugging Face | Python | TrimTransformer on GPU servers |
+| Model registry | MLflow | — | Versioned shore → edge deploy |
 | API / coach | FastAPI | Python | Async, typed, small footprint |
 | Containers | Docker Compose | YAML | Repeatable; works on Pi arm64 |
 | Remote updates | Watchtower or custom agent | — | Pull from GHCR when online |
@@ -641,14 +1031,19 @@ graph TB
     end
 
     subgraph sla3["docker-compose.sla-3.yml — vision.local"]
-        cam["camera-capture"]
+        gopro["gopro-orchestrator"]
+        ingest["media-ingest"]
         coral["coral-preprocess"]
+        geo["sail-geometry"]
+        match["condition-matcher"]
         llm3["llama-vision :8081"]
         sail["sail-analysis-api :8091"]
         store["image-store"]
+        export["training-export"]
         g3["grafana-sail :3003"]
-        cam --> coral --> llm3 --> sail
-        cam --> store
+        gopro --> ingest --> coral --> geo --> match --> sail
+        geo --> llm3 --> sail
+        ingest --> store
         sail --> g3
     end
 
@@ -774,18 +1169,34 @@ flowchart LR
 | FR-15 | Competitor vessels ingested by MMSI/AIS into Neo4j |
 | FR-16 | crawl_web agent ingests NOR/SI when online |
 
-### 11.3 SLA-3 — Sail performance vision
+### 11.3 SLA-3 — Sail performance vision (GoPro HERO13)
 
 | ID | Requirement |
 |----|-------------|
-| FR-20 | Capture sail images from 1–3 cameras at configurable rate |
-| FR-21 | Coral preprocess extracts sail ROI before LLM inference |
-| FR-22 | Vision LLM produces trim analysis (shape, twist, luff) per frame or burst |
-| FR-23 | Sail analysis correlated with AWA/AWS from SLA-1 read API |
-| FR-24 | Results published to SLA-2 Neo4j as `SailAnalysis` nodes |
-| FR-25 | SLA-3 pausable without affecting SLA-1 or SLA-2 core functions |
+| FR-20 | Orchestrate 3–5 GoPro HERO13 cameras via Open GoPro BLE/Wi-Fi |
+| FR-21 | Synchronized multi-camera still burst within ±200 ms |
+| FR-22 | Coral preprocess extracts sail/boom ROI before geometry + LLM |
+| FR-23 | `sail-geometry` computes boom angle, mast heel, draft, twist, luff metrics |
+| FR-24 | Each capture aligned to SLA-1 telemetry (`t_influx` ±100 ms) |
+| FR-25 | `condition-matcher` finds best `BestTrimSnapshot` in similar conditions |
+| FR-26 | Crew sees current vs best Δ for boom, heel, draft on grafana-sail |
+| FR-27 | Vision LLM produces qualitative trim narrative per capture burst |
+| FR-28 | Results published to SLA-2 Neo4j as `SailGeometry`, `TrimDelta`, `SailAnalysis` |
+| FR-29 | SLA-3 pausable without affecting SLA-1 or SLA-2 |
 
-### 11.4 AI coaching (cross-tier)
+### 11.4 Onshore training (SLA-S)
+
+| ID | Requirement |
+|----|-------------|
+| FR-50 | `training-export` builds multimodal bundles (telemetry + images + geometry) in harbor |
+| FR-51 | Export requires explicit `TRAINING_EXPORT_CONSENT` per session |
+| FR-52 | Shore pipeline trains TrimTransformer on GPU machines (PyTorch) |
+| FR-53 | Model predicts optimal boom angle, mast heel, sail shape for condition vector |
+| FR-54 | Evaluator holds out full regatta sessions — no random frame leakage |
+| FR-55 | Quantized `trim-predictor` artifact deployable to SLA-3 via GHCR |
+| FR-56 | `BestTrimSnapshot` sets sync from shore to boat Neo4j after training round |
+
+### 11.5 AI coaching (cross-tier)
 
 | ID | Requirement |
 |----|-------------|
@@ -794,7 +1205,7 @@ flowchart LR
 | FR-32 | SLA-2 coach context: last 15 min SLA-1 telemetry + active race graph |
 | FR-33 | SLA-3 vision LLM runs only on vision node; no SLA-1 co-location in race profile |
 
-### 11.5 Operations
+### 11.6 Operations
 
 | ID | Requirement |
 |----|-------------|
@@ -812,7 +1223,7 @@ flowchart LR
 |----------|-------|-------|-------|
 | Availability (race) | 99.99% | 99.9% | 95% |
 | Latency (dashboard) | &lt; 1 s | &lt; 3 s | &lt; 60 s per analysis |
-| Storage | 32 GB min; 7 days raw @ 10 Hz | Neo4j 16 GB+ volume | Image ring buffer 8 GB |
+| Storage | 32 GB min; 7 days raw @ 10 Hz | Neo4j 16 GB+ volume | GoPro JPEG ring 64 GB+; export staging |
 | Power | N2K SMPS or 12 V DC | 12 V DC | 12 V DC |
 | Isolation | Dedicated Pi in race profile | Separate Pi or shared with SLA-3 | Separate Pi required in race profile |
 | Security | No default passwords; read token for cross-tier Influx | Neo4j auth; REST API keys | Camera data local only |
@@ -845,9 +1256,20 @@ AI-sailing-system/
 ├── competitor-sync/                # SLA-2
 ├── crawl-agent/                    # SLA-2 (crawl_web lineage)
 ├── tactical-coach/                 # SLA-2
-├── camera-capture/                 # SLA-3
+├── gopro-orchestrator/           # SLA-3 Open GoPro fleet control
+├── media-ingest/                   # SLA-3 GoPro HTTP download
+├── sail-geometry/                  # SLA-3 angle & shape metrics
+├── condition-matcher/              # SLA-3 best-trim comparison
 ├── coral-preprocess/               # SLA-3
-├── sail-analysis/                  # SLA-3
+├── sail-analysis/                  # SLA-3 API
+├── training-export/                # SLA-3 harbor bundle builder
+├── shore/                          # SLA-S onshore only
+│   ├── dataset-curator/
+│   ├── trim-transformer-trainer/
+│   ├── model-evaluator/
+│   └── docker-compose.sla-shore.yml
+├── config/
+│   └── cameras.yaml                # GoPro mount extrinsics per boat
 ├── models/
 │   ├── sla-2/                      # Text GGUF manifests
 │   └── sla-3/                      # Vision GGUF manifests
@@ -883,11 +1305,12 @@ AI-sailing-system/
 - [ ] grafana-race dashboards
 - [ ] Tactical LLM + coach
 
-### Phase 3 — SLA-3 sail vision
+### Phase 3 — SLA-3 GoPro sail vision
 - [ ] `docker-compose.sla-3.yml`
-- [ ] Camera capture + Coral preprocess
-- [ ] Vision LLM sail analysis
-- [ ] grafana-sail dashboards
+- [ ] `gopro-orchestrator` — HERO13 fleet (Open GoPro)
+- [ ] `sail-geometry` + `condition-matcher`
+- [ ] Coral preprocess + vision LLM
+- [ ] grafana-sail dashboards (current vs best trim)
 
 ### Phase 4 — Multi-Pi & remote ops
 - [ ] Race profile (3-node) deployment guide
@@ -896,18 +1319,25 @@ AI-sailing-system/
 - [ ] tier-watchdog for compact profile
 - [ ] Migrate `cogsail-python` mapping utilities
 
+### Phase 5 — Onshore training (SLA-S)
+- [ ] `training-export` harbor bundles
+- [ ] `docker-compose.sla-shore.yml` on GPU server
+- [ ] TrimTransformer training pipeline
+- [ ] `trim-predictor` edge deployment to SLA-3
+- [ ] `BestTrimSnapshot` shore → boat sync
+
 ---
 
 ## 15. Open questions
 
 | # | Question | Notes |
 |---|----------|-------|
-| OQ-1 | Minimum deployment profile for v1 MVP? | SLA-1 only first; SLA-2/3 follow |
-| OQ-2 | Vision model size on Pi 5? | 11B vision quant may need 8 GB dedicated SLA-3 Pi |
-| OQ-3 | Camera placement standard? | Mast + bow combo recommended |
-| OQ-4 | AIS source for competitor-sync? | N2K AIS PGN vs. dedicated receiver |
-| OQ-5 | Polar file format standard? | `.pol` / ORC / custom CSV |
-| OQ-6 | Integration with race broadcast APIs? | Future phase |
+| OQ-1 | Minimum GoPro fleet size? | 3 (mast, boom, bow); 4th deck optional |
+| OQ-2 | BLE dongles vs Wi-Fi-only trigger? | Hybrid recommended; Wi-Fi for media |
+| OQ-3 | TrimTransformer training GPU target? | Single L40S min; multi-GPU for fleet |
+| OQ-4 | Human label workflow tool? | Label Studio vs custom |
+| OQ-5 | AIS source for competitor-sync? | N2K AIS PGN vs dedicated receiver |
+| OQ-6 | Include rig load cells in training labels? | If available on N2K |
 
 ---
 
@@ -920,4 +1350,7 @@ AI-sailing-system/
 - [InfluxDB documentation](https://docs.influxdata.com/)
 - [Neo4j documentation](https://neo4j.com/docs/)
 - [llama.cpp](https://github.com/ggerganov/llama.cpp)
+- [Open GoPro specification](https://gopro.github.io/OpenGoPro/)
+- [Open GoPro Python SDK](https://gopro.github.io/OpenGoPro/python_sdk/)
+- [GoPro HERO13 Black](https://gopro.com/en/us/shop/cameras/hero13-black/CHDHX-131-master.html)
 - [CogSail Python (prior art)](https://github.com/cognite-fholm/cogsail-python)

@@ -23,9 +23,12 @@ Help sailors **win races** by combining real-time onboard sensor data, historica
 |------|--------|---------|
 | **SLA-1** | On-boat telemetry (Signal K, InfluxDB) | Dedicated Pi + PiCAN-M |
 | **SLA-2** | Race & competitor info (Neo4j, tactical LLM) | Separate Pi (or shared with SLA-3) |
-| **SLA-3** | Sail performance vision (cameras, Coral, vision LLM) | Separate Pi with Coral dongle |
+| **SLA-3** | Sail performance vision (GoPro HERO13, Coral, vision LLM) | Separate Pi with Coral dongle |
+| **SLA-S** | Onshore TrimTransformer training (GPU servers, harbor export) | Shore only — not at sea |
 
-Each tier has its own Docker Compose stack and may run on a **different Raspberry Pi**. See [spec.md §5](./spec.md#5-three-tier-sla-architecture).
+Each onboard tier has its own Docker Compose stack and may run on a **different Raspberry Pi**. See [spec.md §5](./spec.md#5-three-tier-sla-architecture).
+
+**GoPro + ML loop:** HERO13 cameras capture sail/boom imagery → geometry & condition matching onboard → harbor export trains **TrimTransformer** onshore → quantized model returns to boat. See [spec.md §7.9–7.11](./spec.md#79-gopro-hero13-black-fleet).
 
 ## Quick stack
 
