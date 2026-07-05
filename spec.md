@@ -1,8 +1,8 @@
 # AI Sailing System — Specification
 
-**Version:** 0.11.0-draft  
+**Version:** 0.12.0-draft  
 **Date:** 2026-07-05  
-**Changelog (0.11):** Restored §5/§6 headings; consolidated architecture index; dual-repo + iRegatta + H5000 reference models (ADR-0009–0011); FR-42–123.  
+**Changelog (0.12):** Race-side MCP gateway for laptop Cursor ad hoc analysis (ADR-0012, §7.18).  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
 
@@ -15,6 +15,8 @@ The **AI Sailing System** is an onboard edge platform for **competitive sailing*
 The platform is organized into **three SLA tiers**, each running in **dedicated containers** and optionally on **separate Raspberry Pi devices**. Race and boat **content** lives in the companion **[AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)** repository; **code and containers** live here.
 
 **Reference UX / instruments:** [iRegatta](https://zifigo.com/) (race phone app — [§7.16](#716-iregatta-reference-model--feature-traceability)) and [B&G H5000](https://www.bandg.com/bg/series/h5000/) (helm instruments — [§7.17](#717-bg-h5000-reference-model--integration)) define parity targets for start line, laylines, polars, and SailSteer displays.
+
+**Race laptop:** [§7.18](#718-race-side-mcp--laptop-cursor) — bring a laptop on boat Wi‑Fi; **Cursor** connects via **MCP** to `race-mcp-gateway` for live standings, telemetry, and ad hoc analysis.
 
 | Tier | Domain | SLA priority |
 |------|--------|----------------|
@@ -78,6 +80,7 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G23 | Onboard **race-data-sync** pulls newer data from GitHub via Teltonika LTE when available |
 | G24 | **iRegatta-equivalent** race UX for start, laylines, polars, and navigation — see [§7.16](#716-iregatta-reference-model--feature-traceability) and [ADR-0010](./adr/0010-iregatta-reference-model.md) |
 | G25 | **B&G H5000-equivalent** instrument semantics, SailSteer/StartLine pages, calibration YAML — see [§7.17](#717-bg-h5000-reference-model--integration) and [ADR-0011](./adr/0011-bg-h5000-reference-model.md) |
+| G26 | **Race-side MCP** — laptop on boat LAN runs **Cursor** with live Neo4j, Influx, standings, and YAML context for ad hoc analysis — [§7.18](#718-race-side-mcp--laptop-cursor), [ADR-0012](./adr/0012-race-side-mcp-laptop-cursor.md) |
 
 ### 3.2 Non-goals (v1)
 
@@ -2660,6 +2663,151 @@ Key variables: **BSP**, **COG**, **SOG**, **HDG**, **Course** (HDG+leeway), **TW
 
 Full traceability: [ADR-0011](./adr/0011-bg-h5000-reference-model.md).
 
+### 7.18 Race-side MCP & laptop Cursor
+
+**ADR:** [0012 — Race-side MCP](./adr/0012-race-side-mcp-laptop-cursor.md)
+
+At the regatta the user may bring a **laptop** with **Cursor**, join the **boat LAN** (Teltonika Wi‑Fi or Ethernet), and run the same agent-assisted analysis used on shore — but against **live** race state.
+
+#### 7.18.1 Purpose
+
+| Shore (GitHub) | At race (boat LAN + MCP) |
+|----------------|--------------------------|
+| Prepare `AI-sailing-data` in Cursor | Query **live** standings, legs, AIS |
+| Static YAML + wiki | **Influx** history — VMG, wind, polars |
+| Neo4j import templates | **Neo4j** runtime graph — ad hoc Cypher |
+| OKF concepts | **wind-field-analyzer** recommendations |
+| — | **Signal K** snapshots — current instruments |
+
+MCP bridges Cursor’s tool protocol to onboard services without exposing raw database admin ports to the laptop.
+
+#### 7.18.2 Service: `race-mcp-gateway`
+
+**Container:** `race-mcp-gateway` (SLA-2)  
+**Endpoint:** `http://race.local:3100` (MCP over HTTP/SSE)  
+**Language:** Python 3.11+ with official MCP SDK
+
+```mermaid
+flowchart LR
+  subgraph laptop [Navigator laptop]
+    CUR[Cursor]
+    MCPc[MCP client]
+    CUR --> MCPc
+  end
+
+  subgraph sla2 [race.local SLA-2]
+    GW[race-mcp-gateway :3100]
+    LR[live-results]
+    PM[polar-manager]
+    WF[wind-field-analyzer]
+    GW --> LR
+    GW --> PM
+    GW --> WF
+  end
+
+  subgraph backends [Read-only backends]
+    NEO[Neo4j]
+    IFX[InfluxDB]
+    SK[Signal K]
+    DATA[AI-sailing-data mount]
+  end
+
+  MCPc -->|Wi‑Fi boat LAN| GW
+  GW --> NEO
+  GW --> IFX
+  GW --> SK
+  GW --> DATA
+```
+
+#### 7.18.3 MCP server bundles
+
+Configured in `config/mcp-gateway.yaml`:
+
+| Server id | Tools | Backend |
+|-----------|-------|---------|
+| `race-graph` | `cypher_query`, `get_live_standings`, `get_course_selection`, `get_fleet_by_class` | Neo4j read role |
+| `race-telemetry` | `flux_query`, `get_latest_instruments`, `get_series` | Influx read token (SLA-1) |
+| `race-context` | `read_yaml`, `read_wiki`, `search_okf`, `get_fleet_yaml` | `/opt/ai-sailing-data` |
+| `race-tactical` | `get_wind_zones`, `get_polar_target`, `get_start_line_state` | SLA-2 REST |
+| `signalk-snapshot` | `get_wind_now`, `get_navigation` | Signal K HTTP |
+
+**v1:** all tools **read-only**.  
+**v2 (optional):** `append_race_note` → `wiki/race-day.md` with explicit enable flag.
+
+#### 7.18.4 Laptop setup workflow
+
+1. **Before race:** Clone `AI-sailing-data` on laptop; note active regatta path from `index.yaml`.
+2. **On boat:** Join boat Wi‑Fi; verify `ping race.local`.
+3. **Cursor MCP config** (user or project `.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "race-boat": {
+      "url": "http://race.local:3100/mcp",
+      "headers": {
+        "Authorization": "Bearer ${RACE_MCP_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+4. Open `AI-sailing-data` workspace in Cursor; set `spec.active.regatta_id` context in prompts.
+5. Example prompts:
+   - *“Use race MCP: live standings for Doublehanded and corrected-time delta to leader.”*
+   - *“Flux query: our VMG and TWA for the last 20 minutes on this beat.”*
+   - *“Cypher: competitors within 0.5 nm on port side of the course.”*
+
+See [docs/race-laptop-mcp.md](./docs/race-laptop-mcp.md).
+
+#### 7.18.5 Security
+
+| Control | Setting |
+|---------|---------|
+| Network scope | Boat LAN only — **no** LTE port forwarding |
+| Authentication | `RACE_MCP_API_KEY` in `deploy/env/race.env` |
+| Neo4j | Dedicated `mcp_analyst` user — read-only |
+| Influx | Read token scoped to race bucket |
+| Rate limits | `max_cypher_per_minute`, `max_flux_range_hours` in config |
+| RACE_MODE | Gateway **stays on** — analysis does not mutate race state |
+| Forbidden | Autopilot, Signal K write, `docker`, `git push` from MCP |
+
+#### 7.18.6 Relationship to onboard LLM coach
+
+| | `tactical-coach` (Pi LLM) | MCP + Cursor (laptop) |
+|--|---------------------------|------------------------|
+| Hardware | Raspberry Pi CPU | User laptop GPU/CPU |
+| UI | Grafana / API | Cursor chat |
+| Best for | Quick helm questions | Deep ad hoc analysis, multi-step queries |
+| Offline | Yes | Yes (boat LAN only) |
+
+Both consume OKF + live data; MCP does not replace `tactical-coach`.
+
+#### 7.18.7 Config reference
+
+```yaml
+# config/mcp-gateway.yaml (reference)
+apiVersion: sailing.cognite-fholm/v1
+kind: McpGatewayConfig
+spec:
+  listen_port: 3100
+  bind: boat_lan_only
+  enabled_servers:
+    - race-graph
+    - race-telemetry
+    - race-context
+    - race-tactical
+    - signalk-snapshot
+  limits:
+    max_cypher_per_minute: 30
+    max_flux_range_hours: 48
+  data_repo_path: /opt/ai-sailing-data
+  signalk_url: http://telemetry.local:3000
+  influx_url: http://telemetry.local:8086
+  neo4j_uri: bolt://localhost:7687
+```
+
 ---
 
 ## 8. Technology matrix
@@ -2690,6 +2838,7 @@ Full traceability: [ADR-0011](./adr/0011-bg-h5000-reference-model.md).
 | Race/boat data | **AI-sailing-data** GitHub repo | YAML/OKF | Temporal planning; Neo4j import source |
 | Data sync | `race-data-sync` | Python | Git pull data repo via LTE/Wi-Fi |
 | Graph import | `race-import` | Python | MERGE neo4j YAML bundles |
+| Race MCP | `race-mcp-gateway` + MCP SDK | Python | Laptop Cursor → live Neo4j/Influx/YAML on boat LAN |
 | API / coach | FastAPI | Python | Async, typed, small footprint |
 | Containers | Docker Compose | YAML | Repeatable; works on Pi arm64 |
 | CI/CD | **GitHub Actions** | YAML | Lint, test, build arm64, push GHCR |
@@ -3224,6 +3373,20 @@ flowchart LR
 | FR-122 | Harbor export slot for H5000 webserver calibration backup under `instrumentation/backup/` |
 | FR-123 | Autopilot mode, setpoint, rudder angle ingested read-only — no drive commands from Pi |
 
+### 11.8 Race-side MCP (laptop Cursor)
+
+| ID | Requirement |
+|----|-------------|
+| FR-124 | `race-mcp-gateway` on SLA-2 exposes MCP over boat LAN (`race.local:3100`) |
+| FR-125 | MCP tools read live standings, fleet positions, and course selection from Neo4j |
+| FR-126 | MCP tools run bounded Flux queries against Influx telemetry (read token) |
+| FR-127 | MCP tools read active race/boat YAML and wiki from mounted `AI-sailing-data` |
+| FR-128 | MCP tools return wind zones, polar targets, and start-line state from SLA-2 APIs |
+| FR-129 | MCP gateway authenticated; not exposed on LTE WAN; read-only default role |
+| FR-130 | Rate limits protect SLA-2 CPU during ad hoc agent queries |
+| FR-131 | Gateway remains available when `RACE_MODE=true` |
+| FR-132 | [docs/race-laptop-mcp.md](./docs/race-laptop-mcp.md) documents laptop + Cursor setup |
+
 ---
 
 ## 12. Non-functional requirements
@@ -3281,6 +3444,7 @@ AI-sailing-system/
 ├── race-intelligence/            # SLA-2 start line, lift, steering
 ├── race-data-sync/               # SLA-2 git pull AI-sailing-data
 ├── race-import/                  # SLA-2 Neo4j YAML MERGE
+├── race-mcp-gateway/             # SLA-2 MCP for laptop Cursor (boat LAN)
 ├── competitor-sync/                # SLA-2 fleet roster
 ├── ais-collector/                  # SLA-2 AIS ingest from Signal K
 ├── grib-ingest/                    # SLA-2 scheduled GRIB fetch + upload
@@ -3327,6 +3491,7 @@ AI-sailing-system/
     ├── hardware-setup.md
     ├── sla-tiers.md
     ├── deployment-lifecycle.md
+    ├── race-laptop-mcp.md          # Laptop Cursor + MCP at regatta
     └── references/README.md
 ```
 
@@ -3338,7 +3503,7 @@ AI-sailing-system/
 
 - [x] Repository created; [spec.md](./spec.md) v0.11
 - [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
-- [x] ADR-0001 through ADR-0006, ADR-0008, ADR-0009, ADR-0010, ADR-0011
+- [x] ADR-0001 through ADR-0006, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012
 - [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide
 - [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); schema + example YAML in data repo
 - [x] Deploy scaffolding, workflow stubs, harbor scripts
@@ -3362,6 +3527,7 @@ AI-sailing-system/
 - [ ] `live-results` — corrected-time standings + VMG
 - [ ] `race-intelligence` — start line, lift, steering (iRegatta + H5000 parity)
 - [ ] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
+- [ ] `race-mcp-gateway` — MCP for laptop Cursor on boat LAN ([ADR-0012](./adr/0012-race-side-mcp-laptop-cursor.md))
 - [ ] grafana-race dashboards (SailSteer, Start, WindPlot, Highway per §7.17)
 
 ### Phase 3 — SLA-3 GoPro sail vision

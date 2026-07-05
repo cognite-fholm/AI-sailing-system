@@ -8,6 +8,8 @@ Operational guide for **GitHub Actions → GHCR → Docker Compose** on Raspberr
 - [spec.md §9 — Deployment architecture](../spec.md#9-deployment-architecture)
 - [ADR-0008 — GitHub + Docker lifecycle](../adr/0008-github-docker-deployment-lifecycle.md)
 - [ADR-0009 — Dual repository](../adr/0009-dual-repository-race-data.md) — `race-data-sync` on boat
+- [ADR-0012 — Race-side MCP](../adr/0012-race-side-mcp-laptop-cursor.md) — laptop Cursor at regatta
+- [race-laptop-mcp.md](./race-laptop-mcp.md) — setup guide
 - [deploy/README.md](../deploy/README.md) — env files, lock files, race freeze checklist
 
 ## Quick reference

@@ -2,7 +2,7 @@
 
 Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, data stores, and reference products fit together. Normative detail remains in [spec.md](../spec.md) and [adr/](../adr/).
 
-**Last updated:** 2026-07-05 · **Spec version:** 0.11.0-draft
+**Last updated:** 2026-07-05 · **Spec version:** 0.12.0-draft
 
 ---
 
@@ -61,6 +61,17 @@ flowchart TB
     GIT[GitHub]
     GIT -->|race-data-sync| data
   end
+
+  subgraph laptop [Navigator laptop]
+    CUR[Cursor + MCP]
+    CUR -.->|boat LAN Wi‑Fi| GW
+  end
+
+  subgraph mcp [SLA-2 MCP]
+    GW[race-mcp-gateway]
+    GW --> NEO
+    GW --> IFX
+  end
 ```
 
 Spec: [§5 Three-tier SLA](../spec.md#5-three-tier-sla-architecture) · [§6 Data flow](../spec.md#6-system-context-and-data-flow)
@@ -90,8 +101,9 @@ The Pi stack **extends** familiar sailing tools; it does not replace helm instru
 |---------|-----|------|--------------|
 | **[iRegatta](https://zifigo.com/)** v2.86 | [0010](../adr/0010-iregatta-reference-model.md) | [§7.16](../spec.md#716-iregatta-reference-model--feature-traceability) | `grafana-race`, `course-editor`, `race-intelligence` |
 | **[B&G H5000](https://www.bandg.com/bg/series/h5000/)** | [0011](../adr/0011-bg-h5000-reference-model.md) | [§7.17](../spec.md#717-bg-h5000-reference-model--integration) | Signal K ingest, SailSteer/Start Grafana pages, `InstrumentProfile` YAML |
+| **Laptop Cursor + MCP** | [0012](../adr/0012-race-side-mcp-laptop-cursor.md) | [§7.18](../spec.md#718-race-side-mcp--laptop-cursor) | `race-mcp-gateway` on boat LAN |
 
-**Beyond both:** AIS fleet, live ORC corrected standings, GRIB wind zones, SI PDF courses, start-boat flags, LLM coach, GoPro trim vision.
+**Beyond reference products:** AIS fleet, live ORC corrected standings, GRIB wind zones, SI PDF courses, start-boat flags, LLM coach, GoPro trim vision, **race-side MCP**.
 
 Manuals: [docs/references/README.md](./references/README.md)
 
@@ -111,6 +123,7 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0009](../adr/0009-dual-repository-race-data.md) | Dual repo + Teltonika sync |
 | [0010](../adr/0010-iregatta-reference-model.md) | iRegatta UX benchmark |
 | [0011](../adr/0011-bg-h5000-reference-model.md) | H5000 instrument benchmark |
+| [0012](../adr/0012-race-side-mcp-laptop-cursor.md) | Race-side MCP for laptop Cursor |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -144,10 +157,22 @@ Detail: [data repo schema/README.md](https://github.com/cognite-fholm/AI-sailing
 | `handicap-manager` | ORC multi-number + WRS TCF |
 | `ais-collector` | Fleet AIS from Signal K |
 | `tactical-coach` | Local LLM advisory |
+| `race-mcp-gateway` | MCP tools for laptop Cursor on boat LAN ([guide](./race-laptop-mcp.md)) |
 
 ---
 
-## Deployment & lifecycle
+## Race laptop (Cursor + MCP)
+
+Bring a **laptop** on boat Wi‑Fi; Cursor connects to `race-mcp-gateway` at `http://race.local:3100` for live standings, Influx queries, Neo4j, and YAML context — ad hoc analysis during the race.
+
+| Doc | Content |
+|-----|---------|
+| [race-laptop-mcp.md](./race-laptop-mcp.md) | Laptop setup, MCP config, example prompts |
+| [ADR-0012](../adr/0012-race-side-mcp-laptop-cursor.md) | Architecture decision |
+
+**Note:** MCP stays **enabled** when `RACE_MODE=true` (read-only; does not auto-update containers).
+
+---
 
 | Doc | Content |
 |-----|---------|

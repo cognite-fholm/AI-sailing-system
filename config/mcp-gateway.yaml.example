@@ -1,0 +1,33 @@
+# MCP gateway — race laptop Cursor access
+# Copy to config/mcp-gateway.yaml on SLA-2 Pi (or mount via compose)
+apiVersion: sailing.cognite-fholm/v1
+kind: McpGatewayConfig
+metadata:
+  ref: mcp-gateway-default
+spec:
+  listen_port: 3100
+  bind: boat_lan_only
+  auth:
+    bearer_env: RACE_MCP_API_KEY
+  enabled_servers:
+    - race-graph
+    - race-telemetry
+    - race-context
+    - race-tactical
+    - signalk-snapshot
+  limits:
+    max_cypher_per_minute: 30
+    max_flux_range_hours: 48
+    max_concurrent_requests: 5
+  paths:
+    data_repo: /opt/ai-sailing-data
+  upstreams:
+    signalk_url: http://telemetry.local:3000
+    influx_url: http://telemetry.local:8086
+    influx_token_env: INFLUX_READ_TOKEN
+    neo4j_uri: bolt://neo4j:7687
+    neo4j_user: mcp_analyst
+    neo4j_password_env: NEO4J_MCP_PASSWORD
+    live_results_url: http://localhost:8000
+    polar_manager_url: http://localhost:8001
+    wind_analyzer_url: http://localhost:8002

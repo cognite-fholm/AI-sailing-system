@@ -11,8 +11,9 @@ An edge-first, AI-assisted competitive sailing platform built on [Signal K](http
 | Document | Purpose |
 |----------|---------|
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | **Architecture index** — repos, tiers, ADRs, data schema summary |
-| [spec.md](./spec.md) | Full system specification (v0.11) |
+| [spec.md](./spec.md) | Full system specification (v0.12) |
 | [docs/deployment-lifecycle.md](./docs/deployment-lifecycle.md) | GitHub + Docker CI/CD, Pi deploy, race freeze, shore PC |
+| [docs/race-laptop-mcp.md](./docs/race-laptop-mcp.md) | Laptop + Cursor + MCP at the regatta |
 | [docs/references/README.md](./docs/references/README.md) | iRegatta + H5000 manual links |
 | [deploy/README.md](./deploy/README.md) | Env templates, digest locks, guardrails checklist |
 | [adr/README.md](./adr/README.md) | All Architecture Decision Records |
@@ -45,6 +46,8 @@ Each onboard tier has its own Docker Compose stack and may run on a **different 
 **Race UX reference:** [iRegatta](https://zifigo.com/) v2.86 ([§7.16](./spec.md#716-iregatta-reference-model--feature-traceability), [ADR-0010](./adr/0010-iregatta-reference-model.md)).
 
 **Instrument reference:** [B&G H5000](https://www.bandg.com/bg/series/h5000/) ([§7.17](./spec.md#717-bg-h5000-reference-model--integration), [ADR-0011](./adr/0011-bg-h5000-reference-model.md)).
+
+**Race laptop:** [Cursor + MCP on boat LAN](./docs/race-laptop-mcp.md) — live standings and ad hoc analysis ([§7.18](./spec.md#718-race-side-mcp--laptop-cursor), [ADR-0012](./adr/0012-race-side-mcp-laptop-cursor.md)).
 
 ## Quick stack
 
