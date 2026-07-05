@@ -219,6 +219,7 @@ Bring a **laptop** on boat Wi‑Fi; Cursor connects to `race-mcp-gateway` at `ht
 
 | Doc | Content |
 |-----|---------|
+| [USER_GUIDE.md](./USER_GUIDE.md) | **Sailor user guide** — links to data-repo prep + onboard |
 | [deployment-lifecycle.md](./deployment-lifecycle.md) | Harbor vs race mode, scripts |
 | [deploy/README.md](../deploy/README.md) | Env templates, digest locks |
 | [spec §9](../spec.md#9-deployment-architecture) | Full deployment architecture |

@@ -10,11 +10,13 @@ An edge-first, AI-assisted competitive sailing platform built on [Signal K](http
 
 | Document | Purpose |
 |----------|---------|
-| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | **Architecture index** — repos, tiers, ADRs, data schema summary |
-| [spec.md](./spec.md) | Full system specification (v0.12) |
-| [docs/deployment-lifecycle.md](./docs/deployment-lifecycle.md) | GitHub + Docker CI/CD, Pi deploy, race freeze, shore PC |
+| [docs/USER_GUIDE.md](./docs/USER_GUIDE.md) | **User guide** — shore prep links + onboard overview |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Architecture index — repos, tiers, ADRs |
+| [spec.md](./spec.md) | Full system specification |
+| [docs/deployment-lifecycle.md](./docs/deployment-lifecycle.md) | GitHub + Docker CI/CD, Pi deploy, race freeze |
 | [docs/race-laptop-mcp.md](./docs/race-laptop-mcp.md) | Laptop + Cursor + MCP at the regatta |
 | [docs/mcp-neo4j-influx.md](./docs/mcp-neo4j-influx.md) | Neo4j & Influx MCP tool reference |
+| [AI-sailing-data docs](https://github.com/cognite-fholm/AI-sailing-data/tree/main/docs) | **Race preparation** user guides |
 | [docs/references/README.md](./docs/references/README.md) | iRegatta + H5000 manual links |
 | [deploy/README.md](./deploy/README.md) | Env templates, digest locks, guardrails checklist |
 | [adr/README.md](./adr/README.md) | All Architecture Decision Records |
