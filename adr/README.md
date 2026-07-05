@@ -8,6 +8,7 @@ This directory contains [Architecture Decision Records](https://adr.github.io/) 
 | [0002](./0002-three-tier-sla-architecture.md) | Three-tier SLA architecture with isolated containers | Accepted |
 | [0003](./0003-gopro-capture-and-shore-training.md) | GoPro HERO13 fleet capture and onshore TrimTransformer training | Accepted |
 | [0004](./0004-grib-polars-ais-wind-analysis.md) | GRIB scheduling, polar fleet registry, AIS ingest, wind-on-course analysis | Accepted |
+| [0005](./0005-course-parsing-handicaps-live-results.md) | Course parsing from SI PDFs, multi-handicap scoring, live results | Accepted |
 
 ## Format
 

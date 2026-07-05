@@ -1,0 +1,32 @@
+# Active regatta course configuration
+# SI reference: ../Seilingsbestemmelser_Færderseilasen26_2.pdf (chapter 11)
+
+regatta:
+  id: faerderseilasen-2026
+  name: "Færderseilasen 2026"
+  si_pdf: "../Seilingsbestemmelser_Færderseilasen26_2.pdf"
+  scoring:
+    method: corrected_time          # SI §23: seilt tid × handicap
+  handicap_selector: scoring_aph      # default unless WRS TCF or triple-number active
+
+active_route: "11.1"                # Tristein — change per start
+
+routes:
+  - id: "11.1"
+    name: "Tristein"
+    section: "11.1"
+  - id: "11.2"
+    name: "Hollænderbåen"
+    section: "11.2"
+  - id: "11.3"
+    name: "Mefjordbåen"
+    section: "11.3"
+  - id: "11.4"
+    name: "Mølen"
+    section: "11.4"
+  - id: "11.5"
+    name: "Oslo – Moss"
+    section: "11.4"
+  - id: "11.6"
+    name: "Tristein (Sarpsborg)"
+    section: "11.5"

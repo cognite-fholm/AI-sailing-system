@@ -1,0 +1,73 @@
+# Handicap ratings — multiple per vessel (ORC certificate format)
+# Reference: ../ORC Certificate for Off Course.pdf
+
+scoring_rules:
+  # Færderseilasen 2026 §23 — Racing: corrected = elapsed × handicap
+  default_method: time_on_time
+  default_rating: scoring_aph
+  triple_number:
+    enabled: false
+    tws_light_max: 8
+    tws_heavy_min: 14
+
+vessels:
+  - name: "OFF COURSE"
+    sail_number: "NOR 15788"
+    mmsi: null
+    certificate:
+      path: "../ORC Certificate for Off Course.pdf"
+      cert_no: "667232"
+      orc_ref: "03440003WLQ"
+      valid_until: "2026-03-31"
+    ratings:
+      - type: aph_tot
+        value: 1.2082
+      - type: aph_tod
+        value: 496.6
+        unit: sec_per_nm
+      - type: scoring_aph
+        value: 1.2082
+        label: "Distanseseilas Singeltall (APH)"
+      - type: scoring_triple_light
+        value: 0.9544
+        label: "Distanseseilas Trippeltall svak vind"
+      - type: scoring_triple_medium
+        value: 1.2160
+        label: "Distanseseilas Trippeltall mellomvind"
+      - type: scoring_triple_heavy
+        value: 1.3471
+        label: "Distanseseilas Trippeltall sterk vind"
+      - type: scoring_wl_light
+        value: 0.7409
+        label: "Pølsebane Trippeltall svak vind"
+      - type: scoring_wl_medium
+        value: 0.9823
+      - type: scoring_wl_heavy
+        value: 1.1070
+      - type: scoring_upwind
+        value: 1.1113
+        label: "Motvind Singeltall"
+      - type: scoring_downwind
+        value: 1.2015
+        label: "Medvind Singeltall"
+      - type: tod_wl
+        value: 615.6
+        unit: sec_per_nm
+      - type: tod_allpurpose
+        value: 496.6
+        unit: sec_per_nm
+
+  # Own boat — add ORC certificate or club rating when available
+  - name: "7710"
+    sail_number: null
+    mmsi: "257771000"
+  #   ratings: []
+
+# Per-race WRS TCF — populated when ORC issues values before start
+wrs_overrides: []
+#  - race_id: faerderseilasen-2026
+#    mmsi: "…"
+#    type: wrs_tcf
+#    value: 1.0342
+#    pet_seconds: 87432
+#    issued_at: "2026-06-12T10:00:00Z"

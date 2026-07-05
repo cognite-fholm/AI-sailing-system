@@ -1,7 +1,7 @@
 # AI Sailing System — Specification
 
-**Version:** 0.4.0-draft  
-**Date:** 2026-07-04  
+**Version:** 0.5.0-draft  
+**Date:** 2026-07-05  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
 
@@ -63,6 +63,9 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G11 | GRIB files refreshed on a regular schedule when online; usable offline after sync |
 | G12 | Polar diagrams for own boat and competitors drive VMG/target analysis |
 | G13 | AIS tracks for own boat and fleet enable runtime wind-on-course analysis |
+| G14 | Parse race courses from competition program PDFs (e.g. SI chapter 11) |
+| G15 | Live corrected-time standings from waypoints, handicaps, and AIS progress |
+| G16 | Multiple handicap numbers per boat (ORC certificate + per-race WRS TCF) |
 
 ### 3.2 Non-goals (v1)
 
@@ -252,7 +255,10 @@ flowchart TB
 | `grib-parser` | `ghcr.io/.../grib-parser` | Decode GRIB2 → grid store; spatial query API |
 | `polar-manager` | `ghcr.io/.../polar-manager` | Load **SLK** polar for own boat; serve canonical YAML |
 | `polar-certificate-extractor` | `ghcr.io/.../polar-certificate-extractor` | Derive competitor polars from ORC certificate **PNG/PDF** |
-| `wind-field-analyzer` | `ghcr.io/.../wind-field-analyzer` | Runtime course wind advantage from GRIB + AIS + polars |
+| `handicap-manager` | `ghcr.io/.../handicap-manager` | ORC certificate handicaps + per-race WRS TCF per vessel |
+| `course-parser` | `ghcr.io/.../course-parser` | Extract courses/waypoints from SI/NOR PDFs |
+| `live-results` | `ghcr.io/.../live-results` | Corrected-time standings + VMG along course legs |
+| `course-editor` | `ghcr.io/.../course-editor` | React/TypeScript UX — manual waypoint coordinates |
 | `crawl-agent` | `ghcr.io/.../crawl-agent` | NOR/SI crawl ([crawl_web](https://github.com/cognite-fholm/crawl_web) lineage) |
 | `llama-tactical` | `ghcr.io/.../llama-cpp` | Text LLM — debrief, tactical Q&A |
 | `tactical-coach` | `ghcr.io/.../tactical-coach` | FastAPI RAG over Neo4j + Influx + wind zones |
@@ -260,7 +266,7 @@ flowchart TB
 
 **Reads from SLA-1:** InfluxDB (telemetry + AIS-derived paths), Signal K WebSocket (`navigation`, `environment.wind`, AIS deltas). **Never writes to SLA-1 storage.**
 
-See [§7.12](#712-grib-polars-ais--wind-on-course-analysis).
+See [§7.12](#712-grib-polars-ais--wind-on-course-analysis), [§7.13](#713-race-courses-waypoints--live-results), and [§7.14](#714-handicap-numbers--scoring).
 
 **Hardware:** Raspberry Pi 5 (8 GB). May share a Pi with SLA-3 in compact profile; **must not share with SLA-1** in race profile.
 
@@ -559,7 +565,11 @@ Signal K is the **single source of truth** for live marine data. It:
 | `WindAdvantageZone` | Course sector scored for favorable wind (runtime) |
 | `AisTrack` | Time-series reference for vessel movement |
 | `Race` | Regatta, passage race |
-| `Course` | Windward/leeward, coastal |
+| `Course` | Windward/leeward, coastal — parsed from SI |
+| `CourseRoute` | Named route variant (e.g. `11.1 Tristein`) |
+| `Waypoint` | Mark/gate with lat/lon, rounding rule, optional distance |
+| `HandicapRating` | ORC ToT/ToD/APH or WRS TCF for a vessel |
+| `LiveStanding` | Current corrected-time position in fleet |
 | `Mark` | Physical or virtual marks |
 | `Leg` | Between marks |
 | `Tack` / `Gybe` | Maneuver events |
@@ -596,7 +606,8 @@ Neo4j holds **context** (who, what, where, why); InfluxDB holds **telemetry** (h
 | Instance | Tier | Port (default) | Dashboards |
 |----------|------|----------------|------------|
 | `grafana-telemetry` | SLA-1 | 3001 | SOG, COG, AWA, AWS, depth, heel, system health |
-| `grafana-race` | SLA-2 | 3002 | Fleet AIS map, polars, GRIB wind overlay, wind-advantage heatmap, legs |
+| `grafana-race` | SLA-2 | 3002 | Fleet map, polars, wind heatmap, **live standings**, course overlay |
+| `course-editor` | SLA-2 | 3010 | React/TypeScript waypoint editor (when coords missing) |
 | `grafana-sail` | SLA-3 | 3003 | Trim timeline, sail images, vision LLM output |
 
 ### 7.5 AI — LLaMA + Coral
@@ -1371,6 +1382,345 @@ Default weights: `w₁=0.35, w₂=0.40, w₃=0.10, w₄=0.15` (tunable per boat 
 
 ---
 
+### 7.13 Race courses, waypoints & live results
+
+**SLA tier:** SLA-2  
+**Containers:** `course-parser`, `live-results`, `course-editor` (React/TypeScript)  
+**Reference SI:** `C:\Repositories\boat_system\Seilingsbestemmelser_Færderseilasen26_2.pdf` — **Chapter 11 (Løpene)**
+
+#### 7.13.1 Competition program course parsing
+
+Regatta **Sailing Instructions (SI)** and **Notice of Race (NOR)** PDFs describe race routes as narrative bullet lists — often with mixed coordinate precision. The system must parse these into structured waypoints for **VMG**, **leg geometry**, and **live results**.
+
+**Reference — Færderseilasen 2026, §11:**
+
+> *"Oppgitte GPS posisjoner er omtrentlige. De oppgitte distansene brukes til resultatberegning."*  
+> *(Stated GPS positions are approximate. Stated distances are used for result calculation.)*
+
+**Example routes extracted from chapter 11:**
+
+| Route ID | Name | Coordinates in SI | Rounding notes |
+|----------|------|-------------------|----------------|
+| `11.1` | Tristein | Nærsnes `N59°46,3 Ø010°31,0`; lysbøye `N59°52,50' Ø010°38,76'` | Tristein stb, Bile port |
+| `11.2` | Hollænderbåen | Same partial coords | Hollænderbåen stb |
+| `11.3` | Mefjordbåen | Same | Mefjordbåen stb |
+| `11.4` | Mølen | Same | Mølen + Bile port |
+| `11.5` | Oslo–Moss | Same | Finish Moss |
+| `11.6` | Tristein (Sarpsborg) | No coords — named islands | Sandøy stb, Tresteinene port |
+
+**`course-parser` pipeline:**
+
+```mermaid
+flowchart LR
+    PDF["SI/NOR PDF\nFærderseilasen…"]
+    EXTRACT["PDF text + layout\nPyMuPDF"]
+    NLP["Section detector\nCh. 11 Løpene"]
+    COORD["Coordinate regex\nN59°52,50' Ø010°38,76'"]
+    WP["Waypoint list\n+ rounding rules"]
+    N4J["Neo4j CourseRoute"]
+    PDF --> EXTRACT --> NLP --> COORD --> WP --> N4J
+```
+
+**Coordinate patterns parsed (WGS-84):**
+
+| Pattern | Example | Decimal output |
+|---------|---------|----------------|
+| Degrees + decimal minutes | `N59°52,50' Ø010°38,76'` | `59.8750, 10.6460` |
+| Degrees + decimal minutes (no prime) | `N59°46,3 Ø010°31,01` | `59.7717, 10.5168` |
+| Named feature only | `Bygdøy og Nakholmen` | `coords: null` → user entry |
+
+**Parsed waypoint schema (`waypoints/{route_id}.json`):**
+
+```json
+{
+  "route_id": "11.1",
+  "name": "Tristein",
+  "regatta": "Færderseilasen 2026",
+  "source_file": "Seilingsbestemmelser_Færderseilasen26_2.pdf",
+  "source_section": "11.1",
+  "distance_nm": null,
+  "waypoints": [
+    {"seq": 1, "name": "Startlinje Oslo havn", "lat": null, "lon": null, "type": "start"},
+    {"seq": 2, "name": "Bygdøy og Nakholmen", "lat": null, "lon": null, "type": "gate", "note": "between"},
+    {"seq": 3, "name": "Lysbøye Nesoddtangen", "lat": 59.875, "lon": 10.646, "type": "mark", "rounding": "pass_north_west"},
+    {"seq": 4, "name": "Nærsnes", "lat": 59.7717, "lon": 10.5168, "type": "mark", "rounding": "pass_north_west"},
+    {"seq": 5, "name": "Tristeingrunnen / Færder Fyr", "lat": null, "lon": null, "type": "mark", "rounding": "starboard"},
+    {"seq": 6, "name": "Bile", "lat": null, "lon": null, "type": "mark", "rounding": "port"},
+    {"seq": 7, "name": "Mål", "lat": null, "lon": null, "type": "finish"}
+  ]
+}
+```
+
+**API:**
+
+| Endpoint | Action |
+|----------|--------|
+| `POST /courses/parse` | Upload SI/NOR PDF → extract all §11 routes |
+| `GET /courses/{race_id}/routes` | List parsed routes for active regatta |
+| `PUT /courses/{route_id}/waypoints` | Save user-edited coordinates |
+| `GET /courses/{route_id}/geojson` | Course line for Grafana map |
+
+#### 7.13.2 Manual waypoint entry — React/TypeScript UX
+
+When `course-parser` cannot resolve coordinates, the crew enters them via **`course-editor`** — a lightweight **React + TypeScript** SPA served from the SLA-2 Pi.
+
+| Attribute | Value |
+|-----------|-------|
+| **Stack** | React 18, TypeScript, Vite |
+| **Map** | Leaflet + OpenStreetMap tiles (cached offline) |
+| **Host** | `http://race.local:3010` |
+| **Container** | `course-editor` (nginx + static build) |
+| **Auth** | Local PIN (harbor setup) |
+
+**UX flow:**
+
+1. Select regatta → select route (e.g. `11.1 Tristein`).
+2. List shows waypoints with **red** (missing coords) / **green** (resolved).
+3. Tap waypoint → place pin on map or type `lat/lon` (decimal or DMS).
+4. Optional: tap own-boat AIS position to snap nearby mark.
+5. **Save** → `PUT /courses/{route_id}/waypoints` → Neo4j + JSON on disk.
+6. Export GeoJSON for Grafana-race overlay.
+
+```mermaid
+flowchart TB
+    USER["Crew tablet\nrace.local:3010"]
+    EDITOR["course-editor\nReact/TS"]
+    API["course-parser API"]
+    N4J["Neo4j Waypoint nodes"]
+    USER --> EDITOR --> API --> N4J
+```
+
+**Offline:** Map tiles pre-cached; editor works without internet after initial harbor setup.
+
+#### 7.13.3 VMG and progress along course
+
+**Container:** `live-results` (uses parsed waypoints + AIS + SLA-1 wind)
+
+For **own boat and each competitor**, compute:
+
+| Metric | Formula / method |
+|--------|------------------|
+| **Leg** | Active segment between last rounded WP and next WP |
+| **DTM** | Distance to next mark (nm) |
+| **BTM** | Bearing to mark (°T) |
+| **VMG** | `SOG × cos(angle between COG and BTM)` — toward next mark |
+| **Target VMG** | From polar at current TWS/TWA toward mark |
+| **Course %** | Distance sailed along route / total route distance |
+| **ETA** | `DTM / VMG` (when VMG &gt; 0) |
+
+Coordinates from chapter 11 enable VMG **relative to the rhumb line** on each leg, not just absolute SOG.
+
+**Influx measurements (`course_progress`):**
+
+| Tags | Fields |
+|------|--------|
+| `mmsi`, `race_id`, `route_id`, `leg_seq` | `vmg`, `dtm`, `btm`, `course_pct`, `lat`, `lon` |
+
+#### 7.13.4 Live results list (corrected time ordering)
+
+**Reference SI §23:** *"Korrigert tid brukes til resultatberegning, korrigert tid = seilt tid × handicap"*
+
+**`live-results`** computes **provisional standings** during the race:
+
+```mermaid
+flowchart LR
+    AIS["AIS positions\nown + fleet"]
+    WP["Waypoint route\n+ leg progress"]
+    HCAP["handicap-manager\nactive TCF/APH"]
+    LR["live-results"]
+    STAND["LiveStanding\nranked list"]
+    GF["grafana-race\nresults panel"]
+
+    AIS --> LR
+    WP --> LR
+    HCAP --> LR
+    LR --> STAND --> GF
+```
+
+**Per boat:**
+
+1. **Elapsed time** — from start signal to now (or projected finish).
+2. **Distance progress** — fraction of course completed (waypoint sequence + AIS projection).
+3. **Projected finish time** — `elapsed / course_pct` (when &gt; 5% complete).
+4. **Corrected time** — `projected_elapsed × handicap_factor` (see §7.14).
+5. **Rank** — sort all vessels by corrected time ascending.
+
+**Neo4j `LiveStanding` (refreshed every 30 s):**
+
+```cypher
+(:LiveStanding {
+  mmsi: "…",
+  rank: 3,
+  elapsed_s: 14400,
+  projected_finish_s: 28800,
+  corrected_s: 34790,
+  handicap_type: "aph_tot",
+  handicap_value: 1.2082,
+  course_pct: 0.50,
+  vmg_to_mark: 4.2,
+  updated_at: datetime()
+})
+```
+
+**Grafana-race panel:** scratch sheet style table — rank, sail no., name, corrected time, delta to leader, leg, VMG.
+
+---
+
+### 7.14 Handicap numbers & scoring
+
+**Container:** `handicap-manager`  
+**Reference certificate:** `C:\Repositories\boat_system\ORC Certificate for Off Course.pdf`  
+**Per-race scoring:** [ORC Weather Routing Scoring (WRS) 2026](https://orc.org/sailors/news-archive/orc-weather-routing-scoring-ready-for-2026-after-a-breakthrough-2025-season)
+
+A single boat may carry **multiple handicap numbers** simultaneously. The active factor depends on **regatta scoring rules** and **race type**.
+
+#### 7.14.1 Handicap types per vessel (ORC certificate)
+
+Parsed from ORC certificate PDF (same pipeline as competitor polar extraction):
+
+**Example — OFF COURSE (NOR 15788), CertNo 667232:**
+
+| Type | Key | Value | Use when |
+|------|-----|-------|----------|
+| **APH ToD** | `aph_tod` | 496.6 s/NM | Time-on-distance, windward/leeward |
+| **APH ToT** | `aph_tot` | 1.2082 | Time-on-time (single number) |
+| **Cert number** | `cert_no` | 667232 | ORC database reference |
+| **ORC Ref** | `orc_ref` | 03440003WLQ | Certificate ID |
+| **Distanseseilas Singeltall** | `scoring_aph` | 1.2082 | Færderseilasen distance race (§23) |
+| **Distanseseilas Trippeltall svak vind** | `scoring_triple_light` | 0.9544 | Light air |
+| **Distanseseilas Trippeltall mellomvind** | `scoring_triple_medium` | 1.2160 | Medium wind |
+| **Distanseseilas Trippeltall sterk vind** | `scoring_triple_heavy` | 1.3471 | Heavy wind |
+| **Pølsebane Trippeltall** (weak/med/strong) | `scoring_wl_*` | 0.7409 / 0.9823 / 1.1070 | Windward-leeward courses |
+| **Motvind Singeltall** | `scoring_upwind` | 1.1113 | Upwind-biased |
+| **Medvind Singeltall** | `scoring_downwind` | 1.2015 | Downwind-biased |
+| **Windward/Leeward ToD** | `tod_wl` | 615.6 s/NM | Course-specific allowance |
+| **All purpose ToD** | `tod_allpurpose` | 496.6 s/NM | General |
+
+**`config/handicaps.yaml` (OFF COURSE example):**
+
+```yaml
+vessels:
+  - name: "OFF COURSE"
+    sail_number: "NOR 15788"
+    mmsi: null
+    certificate:
+      path: "../ORC Certificate for Off Course.pdf"
+      cert_no: "667232"
+      orc_ref: "03440003WLQ"
+      valid_until: "2026-03-31"
+    ratings:
+      - type: aph_tot
+        value: 1.2082
+        source: certificate
+      - type: aph_tod
+        value: 496.6
+        unit: sec_per_nm
+        source: certificate
+      - type: scoring_triple_light
+        value: 0.9544
+        source: certificate
+      - type: scoring_triple_medium
+        value: 1.2160
+        source: certificate
+      - type: scoring_triple_heavy
+        value: 1.3471
+        source: certificate
+      # … additional scoring options from certificate page 2
+```
+
+**Neo4j model:**
+
+```cypher
+(v:Vessel)-[:HAS_HANDICAP]->(h:HandicapRating {
+  type: "aph_tot",
+  value: 1.2082,
+  source: "certificate",
+  valid_from: date("2025-08-11"),
+  valid_to: date("2026-03-31"),
+  active: false
+})
+```
+
+Multiple `HandicapRating` nodes per vessel; exactly one marked `active` per race.
+
+#### 7.14.2 Per-race handicap — ORC Weather Routing Scoring (WRS)
+
+For regattas using **[ORC WRS](https://orc.org/sailors/news-archive/orc-weather-routing-scoring-ready-for-2026-after-a-breakthrough-2025-season)**, each boat receives a **custom Time Correction Factor (TCF)** per race — derived from:
+
+- Predicted wind on each **leg** of the **declared course**
+- Boat's **ORC polar performance curves**
+- **Predicted Elapsed Time (PET)**
+
+| Attribute | WRS behaviour |
+|-----------|---------------|
+| **Issued** | Few hours before start by ORC |
+| **Scope** | Per race, per boat (not on certificate) |
+| **Overrides** | Static APH ToT for that race only |
+| **Input to system** | Manual upload, email, or `manage2sail` scrape |
+
+**`HandicapRating` for WRS:**
+
+```cypher
+(v:Vessel)-[:HAS_HANDICAP]->(h:HandicapRating {
+  type: "wrs_tcf",
+  value: 1.0342,
+  source: "orc_wrs",
+  race_id: "faerderseilasen-2026-leg1",
+  pet_seconds: 87432,
+  issued_at: datetime(),
+  active: true
+})
+```
+
+**`handicap-manager` selection logic:**
+
+```mermaid
+flowchart TD
+    START["Race session start"]
+    WRS{"WRS TCF issued\nfor this race?"}
+    RULES["Read SI §23\nscoring method"]
+    WIND{"Triple number\nwind band?"}
+    WRS_Y["Use wrs_tcf"]
+    SINGLE["Use scoring_aph or aph_tot"]
+    TRIPLE["Use scoring_triple_* by TWS"]
+    START --> WRS
+    WRS -->|yes| WRS_Y
+    WRS -->|no| RULES --> WIND
+    WIND -->|yes| TRIPLE
+    WIND -->|no| SINGLE
+```
+
+For **Færderseilasen 2026 §23** (Racing classes): `corrected = elapsed × handicap` → use `aph_tot` / `scoring_aph` (1.2082) unless WRS or triple-number specified in SI.
+
+#### 7.14.3 Integration with live results and polars
+
+| Component | Handicap use |
+|-----------|--------------|
+| `live-results` | Active `HandicapRating` → corrected time ranking |
+| `wind-field-analyzer` | Fleet overperformance vs **polar** (not handicap) |
+| `polar-manager` | Speed prediction; separate from time correction |
+| `tactical-coach` | Explains rank delta using handicap + VMG context |
+
+**Own boat** (`7710 (3).slk`) + **competitor** (`ORC Certificate for Off Course.pdf`): both need `HandicapRating` nodes before live results activate.
+
+#### 7.14.4 File layout (dev machine)
+
+```
+C:\Repositories\boat_system\
+├── Seilingsbestemmelser_Færderseilasen26_2.pdf   ← SI; chapter 11 routes
+├── ORC Certificate for Off Course.pdf              ← competitor handicaps + polar
+├── 7710 (3).slk                                  ← own-boat polar
+├── off_course.png                                ← competitor polar (image fallback)
+└── AI-sailing-system\
+    └── config\
+        ├── courses.yaml
+        ├── handicaps.yaml
+        ├── vessel.yaml
+        └── competitors.yaml
+```
+
+---
+
 ## 8. Technology matrix
 
 | Concern | Choice | Language | Rationale |
@@ -1391,6 +1741,10 @@ Default weights: `w₁=0.35, w₂=0.40, w₃=0.10, w₄=0.15` (tunable per boat 
 | AIS decode | pyais + Signal K paths | Python | Fleet position ingest |
 | Polars | NumPy interpolation | Python | Target BSP/VMG per TWS/TWA |
 | Wind analysis | Custom fusion service | Python | GRIB + AIS + polar runtime |
+| Course PDF parse | PyMuPDF + regex/NLP | Python | SI chapter 11 → waypoints |
+| Course editor | React + TypeScript + Vite | TS/TSX | Manual waypoint entry on Pi |
+| Live results | FastAPI + Neo4j | Python | Corrected-time standings |
+| Handicap registry | ORC PDF parser | Python | Certificate + WRS TCF per race |
 | API / coach | FastAPI | Python | Async, typed, small footprint |
 | Containers | Docker Compose | YAML | Repeatable; works on Pi arm64 |
 | Remote updates | Watchtower or custom agent | — | Pull from GHCR when online |
@@ -1423,6 +1777,10 @@ graph TB
         grib_p["grib-parser"]
         polar["polar-manager"]
         wind["wind-field-analyzer"]
+        course["course-parser"]
+        results["live-results"]
+        hcap["handicap-manager"]
+        editor["course-editor :3010"]
         llm2["llama-tactical :8080"]
         coach["tactical-coach :8090"]
         g2["grafana-race :3002"]
@@ -1430,9 +1788,15 @@ graph TB
         ais --> neo
         comp --> neo
         polar --> neo
+        course --> neo
+        hcap --> neo
+        results --> neo
         grib_in --> grib_p --> wind --> neo
         ais --> wind
         polar --> wind
+        ais --> results
+        course --> results
+        hcap --> results
         coach --> llm2
         coach --> neo
         neo --> g2
@@ -1587,21 +1951,29 @@ flowchart LR
 | FR-25 | Wind zones fuse GRIB, own instruments, fleet AIS overperformance vs polars |
 | FR-26 | Crew sees heatmap + recommendation (e.g. favored side of beat) on grafana-race |
 | FR-27 | crawl_web agent ingests NOR/SI when online |
+| FR-28 | `course-parser` extracts §11 routes from SI PDF (e.g. Færderseilasen) |
+| FR-29 | Coordinates parsed from `N59°52,50' Ø010°38,76'` (WGS-84) format |
+| FR-30 | Waypoints without coords editable in React `course-editor` at `:3010` |
+| FR-31 | `live-results` ranks fleet by corrected time (`elapsed × handicap`) |
+| FR-32 | VMG to next mark computed for own boat and competitors using waypoint geometry |
+| FR-33 | `handicap-manager` loads multiple ORC ratings per vessel from certificate PDF |
+| FR-34 | Per-race **ORC WRS TCF** overrides static handicap when issued |
+| FR-35 | Active handicap selected from SI scoring rule + wind band (single/triple/WRS) |
 
 ### 11.3 SLA-3 — Sail performance vision (GoPro HERO13)
 
 | ID | Requirement |
 |----|-------------|
-| FR-30 | Orchestrate 3–5 GoPro HERO13 cameras via Open GoPro BLE/Wi-Fi |
-| FR-21 | Synchronized multi-camera still burst within ±200 ms |
-| FR-22 | Coral preprocess extracts sail/boom ROI before geometry + LLM |
-| FR-23 | `sail-geometry` computes boom angle, mast heel, draft, twist, luff metrics |
-| FR-24 | Each capture aligned to SLA-1 telemetry (`t_influx` ±100 ms) |
-| FR-25 | `condition-matcher` finds best `BestTrimSnapshot` in similar conditions |
-| FR-26 | Crew sees current vs best Δ for boom, heel, draft on grafana-sail |
-| FR-27 | Vision LLM produces qualitative trim narrative per capture burst |
-| FR-28 | Results published to SLA-2 Neo4j as `SailGeometry`, `TrimDelta`, `SailAnalysis` |
-| FR-29 | SLA-3 pausable without affecting SLA-1 or SLA-2 |
+| FR-40 | Orchestrate 3–5 GoPro HERO13 cameras via Open GoPro BLE/Wi-Fi |
+| FR-41 | Synchronized multi-camera still burst within ±200 ms |
+| FR-42 | Coral preprocess extracts sail/boom ROI before geometry + LLM |
+| FR-43 | `sail-geometry` computes boom angle, mast heel, draft, twist, luff metrics |
+| FR-44 | Each capture aligned to SLA-1 telemetry (`t_influx` ±100 ms) |
+| FR-45 | `condition-matcher` finds best `BestTrimSnapshot` in similar conditions |
+| FR-46 | Crew sees current vs best Δ for boom, heel, draft on grafana-sail |
+| FR-47 | Vision LLM produces qualitative trim narrative per capture burst |
+| FR-48 | Results published to SLA-2 Neo4j as `SailGeometry`, `TrimDelta`, `SailAnalysis` |
+| FR-49 | SLA-3 pausable without affecting SLA-1 or SLA-2 |
 
 ### 11.4 Onshore training (SLA-S)
 
@@ -1679,10 +2051,16 @@ AI-sailing-system/
 ├── grib-parser/                    # SLA-2 GRIB2 → wind grid
 ├── polar-manager/                  # SLA-2 SLK parser + polar API
 ├── polar-certificate-extractor/    # SLA-2 ORC PNG/PDF → derived polar
-├── wind-field-analyzer/            # SLA-2 runtime course wind zones
+├── wind-field-analyzer/
+├── course-parser/                  # SLA-2 SI/NOR PDF → waypoints
+├── course-editor/                  # SLA-2 React/TS waypoint UX
+├── live-results/                   # SLA-2 corrected-time standings
+├── handicap-manager/               # SLA-2 ORC + WRS handicaps
 ├── config/
-│   ├── vessel.yaml                 # Own boat — SLK path (../7710 (3).slk)
-│   ├── competitors.yaml            # Competitor certs (../off_course.png)
+│   ├── vessel.yaml
+│   ├── competitors.yaml
+│   ├── courses.yaml                # Active regatta + route selection
+│   ├── handicaps.yaml              # Multi-rating per vessel
 │   ├── cameras.yaml
 │   └── grib-sources.yaml
 ├── examples/
@@ -1731,14 +2109,16 @@ AI-sailing-system/
 - [ ] InfluxDB bridge
 - [ ] grafana-telemetry live dashboard
 
-### Phase 2 — SLA-2 race, GRIB, polars, AIS & wind
-- [ ] Neo4j schema (Vessel, Polar, GribModel, WindAdvantageZone)
+### Phase 2 — SLA-2 race, GRIB, polars, AIS, courses & results
+- [ ] Neo4j schema (Vessel, Polar, GribModel, WindAdvantageZone, Waypoint, HandicapRating)
 - [ ] `docker-compose.sla-2.yml`
-- [ ] `polar-manager` — SLK parser for `7710 (3).slk`
-- [ ] `polar-certificate-extractor` — ORC PNG/PDF (e.g. `off_course.png`)
-- [ ] `grib-ingest` (6 h schedule) + `grib-parser`
-- [ ] `wind-field-analyzer` + grafana-race heatmap
-- [ ] Tactical LLM + coach (wind-zone context)
+- [ ] `ais-collector` + `polar-manager` (SLK + ORC PDF)
+- [ ] `grib-ingest` + `grib-parser` + `wind-field-analyzer`
+- [ ] `course-parser` — Færderseilasen §11 PDF
+- [ ] `course-editor` — React/TS waypoint UI
+- [ ] `handicap-manager` — ORC certificate + WRS TCF
+- [ ] `live-results` — corrected-time standings + VMG
+- [ ] grafana-race dashboards
 
 ### Phase 3 — SLA-3 GoPro sail vision
 - [ ] `docker-compose.sla-3.yml`

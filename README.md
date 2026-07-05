@@ -30,7 +30,9 @@ Each onboard tier has its own Docker Compose stack and may run on a **different 
 
 **GoPro + ML loop:** HERO13 cameras capture sail/boom imagery → geometry & condition matching onboard → harbor export trains **TrimTransformer** onshore → quantized model returns to boat. See [spec.md §7.9–7.11](./spec.md#79-gopro-hero13-black-fleet).
 
-**Wind & fleet:** GRIB files refresh every 6 h in harbor; polars loaded for own boat + competitors; AIS from N2K feeds runtime **wind-on-course** analysis. See [spec.md §7.12](./spec.md#712-grib-polars-ais--wind-on-course-analysis).
+**Wind & fleet:** GRIB refresh, polars, AIS, and wind-on-course analysis ([§7.12](./spec.md#712-grib-polars-ais--wind-on-course-analysis)).
+
+**Courses & results:** SI PDF course parsing (Færderseilasen §11), React waypoint editor, live corrected-time standings, multi-handicap ORC + WRS ([§7.13–7.14](./spec.md#713-race-courses-waypoints--live-results)).
 
 ## Quick stack
 
