@@ -6,7 +6,7 @@ vessel:
   id: own-boat
   name: "Xbox"
   sail_number: "NOR-10133"
-  mmsi: "257771000"          # TODO: set to your AIS transponder MMSI
+  mmsi: "257771000"          # confirmed AIS transponder MMSI (Xbox)
   is_own: true
   orc_cert_no: "7710"
 

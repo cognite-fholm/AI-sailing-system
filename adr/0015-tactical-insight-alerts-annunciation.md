@@ -93,8 +93,9 @@ Messages are short imperative phrases: *"Three places lost — check VMG"*, *"Of
 ### Safety boundary
 
 - Tactical alerts **never** replace depth, collision, or instrument limit alarms.
-- Voice annunciation **yields** to safety alarms (H5000 / Grafana critical rules interrupt TTS queue).
-- `category: safety` events are **rejected** by `insight-alerts` — safety stays on Signal K + Grafana path.
+- **H5000 is the only safety annunciator** — safety audio on H5000 speaker only ([ADR-0018](./0018-helm-ux-three-pi-dual-speaker.md)).
+- Tactical Piper TTS uses a **separate tactical speaker** — no shared queue or preemption with H5000.
+- `category: safety` events are **rejected** by `insight-alerts`.
 
 ## Rationale
 

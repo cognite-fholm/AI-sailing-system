@@ -1,7 +1,9 @@
 # AI Sailing System — Specification
 
-**Version:** 0.18.0-draft  
+**Version:** 0.20.0-draft  
 **Date:** 2026-07-05  
+**Changelog (0.20):** course-editor as coordinate system of record; GPX/Neo4j/runtime derived from editor saves ([ADR-0020](./adr/0020-course-editor-coordinate-system-of-record.md)).  
+**Changelog (0.19):** Three-Pi race deploy; helm UX (`race-ui` + Grafana scope); dual speaker / H5000-only safety ([ADR-0018](./adr/0018-helm-ux-three-pi-dual-speaker.md)); PredictWind multi-model GRIB + onboard scoring ([ADR-0019](./adr/0019-predictwind-multi-model-grib.md)).  
 **Changelog (0.18):** Gherkin acceptance tests per implementation phase (`tests/bdd/features/`).  
 **Changelog (0.17):** Implementation map — spec §1.1, §7.0, §14 phases; ADR index reordered by build sequence.  
 **Changelog (0.16):** Marine map GPX export bundle for chartplotter import (ADR-0017, §7.23).  
@@ -18,17 +20,19 @@
 
 The **AI Sailing System** is an onboard edge platform for **competitive sailing**. It ingests marine sensor data over NMEA 0183 and NMEA 2000, normalizes it through **Signal K**, stores high-frequency telemetry in **InfluxDB**, models boats, races, courses, and tactics in **Neo4j**, visualizes performance in **Grafana**, and provides **local AI coaching** using **LLaMA** models.
 
-The platform is organized into **three SLA tiers**, each running in **dedicated containers** and optionally on **separate Raspberry Pi devices**. Race and boat **content** lives in the companion **[AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)** repository; **code and containers** live here.
+The platform is organized into **three SLA tiers**, each on a **dedicated Raspberry Pi** in the **race profile** ([ADR-0018](./adr/0018-helm-ux-three-pi-dual-speaker.md)). Race and boat **content** lives in the companion **[AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)** repository; **code and containers** live here.
 
-**Reference UX / instruments:** [iRegatta](https://zifigo.com/) (race phone app — [§7.16](#716-iregatta-reference-model--feature-traceability)) and [B&G H5000](https://www.bandg.com/bg/series/h5000/) (helm instruments — [§7.17](#717-bg-h5000-reference-model--integration)) define parity targets for start line, laylines, polars, and SailSteer displays.
+**Helm UX:** **H5000** for instruments and **safety audio**; **`race-ui`** (Node.js/TypeScript on boat LAN) for interactive race optimization; **Grafana** for time-series, maps, and debrief only ([§7.4.1](#741-race-helm-ui-grafana--signalk-plugins)).
+
+**Reference UX / instruments:** [iRegatta](https://zifigo.com/) (optional phone app — [§7.16](#716-iregatta-reference-model--feature-traceability)) and [B&G H5000](https://www.bandg.com/bg/series/h5000/) (primary instruments — [§7.17](#717-bg-h5000-reference-model--integration)) define parity targets for calculations surfaced in `race-ui` and Grafana.
 
 **Race laptop:** [§7.18](#718-race-side-mcp--laptop-cursor) — bring a laptop on boat Wi‑Fi; **Cursor** connects via **MCP** to `race-mcp-gateway` for live standings, telemetry, and ad hoc analysis.
 
 **ORC certificates:** [§7.19](#719-orc-certificate-collection--fleet-enrichment) — automate fleet cert metadata and PDF download on shore via **orc-sailor-services** skill in AI-sailing-data ([ADR-0013](./adr/0013-orc-certificate-fleet-collection.md)).
 
-**Weather & current:** [§7.20](#720-shore-weather--current-collection) — MET Norway GRIB, Oslofjord current plots, SMHI wind validation in **AI-sailing-data** ([ADR-0014](./adr/0014-shore-weather-current-collection.md)).
+**Weather & current:** [§7.20](#720-shore-weather--current-collection) — **PredictWind** multi-model GRIB (best resolution), MET Norway current/waves, SMHI validation in **AI-sailing-data**; onboard **model scoring** selects best forecast per race leg ([ADR-0019](./adr/0019-predictwind-multi-model-grib.md), [ADR-0014](./adr/0014-shore-weather-current-collection.md)).
 
-**Tactical alerts:** [§7.21](#721-tactical-insight-alerts--annunciation) — proactive insight notifications (fleet position, course, trim) on helm UX and optional speaker read-out ([ADR-0015](./adr/0015-tactical-insight-alerts-annunciation.md)).
+**Tactical alerts:** [§7.21](#721-tactical-insight-alerts--annunciation) — race optimization alerts on `race-ui` / Grafana feed; optional voice on **dedicated tactical speaker** (H5000 remains **safety-only**) ([ADR-0015](./adr/0015-tactical-insight-alerts-annunciation.md), [ADR-0018](./adr/0018-helm-ux-three-pi-dual-speaker.md)).
 
 **Fleet polar performance:** [§7.22](#722-fleet-polar-performance-timeline) — time- and location-indexed polar % for every boat, stored in **InfluxDB** ([ADR-0016](./adr/0016-fleet-polar-performance-influx.md)).
 
@@ -52,14 +56,16 @@ Normative detail stays in §7–§11 and ADRs. This table is the **recommended b
 | **1** | SLA-1 telemetry | [0001](./adr/0001-system-architecture-and-technology-choices.md), [0011](./adr/0011-bg-h5000-reference-model.md) (ingest) | [§7.1](./spec.md#71-signal-k-server-hub--sla-1-only), [§7.2](./spec.md#72-time-series--influxdb--sla-1-only), [§7.4](./spec.md#74-visualization--grafana) | [11.1](./spec.md#111-sla-1--telemetry) | `signalk-server`, `signalk-influx-bridge`, `grafana-telemetry` |
 | **2A** | Shore race prep (data repo) | [0009](./adr/0009-dual-repository-race-data.md), [0013](./adr/0013-orc-certificate-fleet-collection.md), [0014](./adr/0014-shore-weather-current-collection.md), [0017](./adr/0017-marine-map-gpx-export.md) | [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§7.19](./spec.md#719-orc-certificate-collection--fleet-enrichment), [§7.20](./spec.md#720-shore-weather--current-collection), [§7.23](./spec.md#723-marine-map-gpx-export) | [11.9](./spec.md#119-orc-certificate-collection-shore), [11.10](./spec.md#1110-shore-weather--current-collection), [11.13](./spec.md#1113-marine-map-gpx-export) | [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) skills, YAML, `export/marine-map/` |
 | **2B** | Graph import & sync | [0009](./adr/0009-dual-repository-race-data.md) | [§7.3](./spec.md#73-knowledge-graph--neo4j--sla-2-only), [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) (import) | `neo4j`, `race-data-sync`, `race-import` |
-| **2C** | GRIB, polars, AIS, wind | [0004](./adr/0004-grib-polars-ais-wind-analysis.md) | [§7.12](./spec.md#712-grib-polars-ais--wind-on-course-analysis) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-15–26 | `grib-ingest`, `grib-parser`, `polar-manager`, `polar-certificate-extractor`, `ais-collector`, `wind-field-analyzer` |
+| **2C** | GRIB, polars, AIS, wind | [0004](./adr/0004-grib-polars-ais-wind-analysis.md), [0019](./adr/0019-predictwind-multi-model-grib.md) | [§7.12](./spec.md#712-grib-polars-ais--wind-on-course-analysis) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-15–26, [11.10](./spec.md#1110-shore-weather--current-collection) | `grib-ingest`, `grib-parser`, `grib-model-scorer`, `polar-manager`, `polar-certificate-extractor`, `ais-collector`, `wind-field-analyzer` |
 | **2D** | Courses, handicaps, results | [0005](./adr/0005-course-parsing-handicaps-live-results.md), [0006](./adr/0006-start-boat-course-flags.md) | [§7.13](./spec.md#713-race-courses-waypoints--live-results), [§7.14](./spec.md#714-handicap-numbers--scoring) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-27–41 | `course-parser`, `course-editor`, `course-flag-detector`, `handicap-manager`, `live-results` |
-| **2E** | Race UX (iRegatta + H5000 parity) | [0010](./adr/0010-iregatta-reference-model.md), [0011](./adr/0011-bg-h5000-reference-model.md) | [§7.6](./spec.md#76-race-intelligence-service--sla-2-only), [§7.16](./spec.md#716-iregatta-reference-model--feature-traceability), [§7.17](./spec.md#717-bg-h5000-reference-model--integration) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-42–59, [11.7](./spec.md#117-bg-h5000-integration--display-parity) | `race-intelligence`, `grafana-race` (SailSteer, Start, Highway) |
+| **2E** | Race UX (iRegatta + H5000 parity) | [0010](./adr/0010-iregatta-reference-model.md), [0011](./adr/0011-bg-h5000-reference-model.md), [0018](./adr/0018-helm-ux-three-pi-dual-speaker.md) | [§7.4.1](./spec.md#741-race-helm-ui-grafana--signalk-plugins), [§7.6](./spec.md#76-race-intelligence-service--sla-2-only), [§7.16](./spec.md#716-iregatta-reference-model--feature-traceability), [§7.17](./spec.md#717-bg-h5000-reference-model--integration) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-42–59, [11.7](./spec.md#117-bg-h5000-integration--display-parity) | `race-ui`, `race-intelligence`, `grafana-race` |
 | **2F** | Fleet analytics & alerts | [0016](./adr/0016-fleet-polar-performance-influx.md), [0015](./adr/0015-tactical-insight-alerts-annunciation.md) | [§7.22](./spec.md#722-fleet-polar-performance-timeline), [§7.21](./spec.md#721-tactical-insight-alerts--annunciation), [§7.5](./spec.md#75-ai--llama--coral) (coach) | [11.11](./spec.md#1111-tactical-insight-alerts--annunciation), [11.12](./spec.md#1112-fleet-polar-performance-timeline-influxdb), [11.5](./spec.md#115-ai-coaching-cross-tier) | `fleet-performance-tracker`, `insight-alerts`, `tactical-coach` |
 | **2G** | Race laptop MCP | [0012](./adr/0012-race-side-mcp-laptop-cursor.md) | [§7.18](./spec.md#718-race-side-mcp--laptop-cursor) | [11.8](./spec.md#118-race-side-mcp-laptop-cursor) | `race-mcp-gateway` |
 | **3** | SLA-3 sail vision | [0003](./adr/0003-gopro-capture-and-shore-training.md) | [§7.9](./spec.md#79-gopro-hero13-black-fleet)–[§7.11](./spec.md#711-onshore-transformer-training-pipeline), [§7.7](./spec.md#77-sail-vision-service-sla-3) | [11.3](./spec.md#113-sla-3--sail-performance-vision-gopro-hero13), [11.4](./spec.md#114-onshore-training-sla-s) | `gopro-orchestrator`, `sail-geometry`, `sail-analysis-api`, Coral |
 | **4** | CI/CD & multi-Pi ops | [0008](./adr/0008-github-docker-deployment-lifecycle.md) | [§9](./spec.md#9-deployment-architecture) | [11.6](./spec.md#116-operations) | GitHub Actions → GHCR, Watchtower, harbor scripts |
 | **5** | Shore TrimTransformer (SLA-S) | [0003](./adr/0003-gopro-capture-and-shore-training.md) | [§7.11](./spec.md#711-onshore-transformer-training-pipeline), [§9.6](./spec.md#96-shore-training--gaming-pc-sla-s) | [11.4](./spec.md#114-onshore-training-sla-s) | Gaming PC, `trim-transformer-trainer`, GHCR `trim-predictor` |
+
+**Hardware:** Regatta deployment uses the **three-Pi race profile** ([ADR-0018](./adr/0018-helm-ux-three-pi-dual-speaker.md)).
 
 ```mermaid
 flowchart LR
@@ -160,7 +166,7 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 - Autonomous vessel control or autopilot override.
 - Class rule enforcement or protest filing automation.
 - Replacing dedicated race tracking services (e.g. YB Tracking) — integration may come later.
-- Replacing the **iRegatta** iOS app as a personal phone UI — our stack is boat-LAN Grafana + `course-editor`; iRegatta may run in parallel on the same NMEA Wi‑Fi feed.
+- Replacing the **iRegatta** iOS app as a personal phone UI — optional on NMEA Wi‑Fi; primary boat-LAN UX is **`race-ui`** + Grafana; iRegatta may run in parallel.
 - Training large models onboard — only **inference** of pre-quantized models.
 - Full cloud SaaS replacement — optional sync/export may be added later.
 
@@ -191,9 +197,9 @@ Hardware is assigned **per SLA tier**. A single-boat deployment may use 1–3 Ra
 
 | Profile | Nodes | When to use |
 |---------|-------|-------------|
-| **Compact** | 1× Pi 5 (8 GB) | Testing, day sailing; all tiers with cgroup CPU/RAM limits |
-| **Standard** | 2× Pi — SLA-1 + SLA-2/3 combined | Club racing; telemetry isolated from vision |
-| **Race** | 3× Pi — one per tier | Recommended for serious regatta sailing |
+| **Compact** | 1× Pi 5 (8 GB) | Lab/testing only |
+| **Standard** | 2× Pi — SLA-1 + SLA-2/3 combined | Dev; not regatta |
+| **Race** | 3× Pi — one per tier | **Chosen deployment** for regattas ([ADR-0018](./adr/0018-helm-ux-three-pi-dual-speaker.md)) |
 
 ### 4.2 PiCAN-M integration
 
@@ -380,7 +386,8 @@ flowchart TB
 | `race-intelligence` | `ghcr.io/.../race-intelligence` | Start line (DTL/TTL/burn-gain), lift, steering hints, leg timing |
 | `ais-collector` | `ghcr.io/.../ais-collector` | Own-boat + competitor AIS from SLA-1 Signal K stream |
 | `competitor-sync` | `ghcr.io/.../competitor-sync` | MMSI registry, fleet roster, polar linkage |
-| `grib-ingest` | `ghcr.io/.../grib-ingest` | Scheduled download, manual upload, GRIB validation |
+| `grib-ingest` | `ghcr.io/.../grib-ingest` | PredictWind + MET download, manual upload, GRIB validation |
+| `grib-model-scorer` | `ghcr.io/.../grib-model-scorer` | Onboard wind-model accuracy scoring vs instruments |
 | `grib-parser` | `ghcr.io/.../grib-parser` | Decode GRIB2 → grid store; spatial query API |
 | `polar-manager` | `ghcr.io/.../polar-manager` | Load **SLK** polar for own boat; serve canonical YAML |
 | `polar-certificate-extractor` | `ghcr.io/.../polar-certificate-extractor` | Derive competitor polars from ORC certificate **PNG/PDF** |
@@ -395,7 +402,8 @@ flowchart TB
 | `crawl-agent` | `ghcr.io/.../crawl-agent` | NOR/SI crawl ([crawl_web](https://github.com/cognite-fholm/crawl_web) lineage) |
 | `llama-tactical` | `ghcr.io/.../llama-cpp` | Text LLM — debrief, tactical Q&A |
 | `tactical-coach` | `ghcr.io/.../tactical-coach` | FastAPI RAG over Neo4j + Influx + wind zones |
-| `insight-alerts` | `ghcr.io/.../insight-alerts` | Tactical alert broker — UI feed, ack, optional Piper TTS |
+| `insight-alerts` | `ghcr.io/.../insight-alerts` | Tactical alert broker — `race-ui` feed, ack, Piper TTS on **tactical speaker** |
+| `race-ui` | `ghcr.io/.../race-ui` | Node.js/TS primary helm race optimization UI |
 | `grafana-race` | `grafana/grafana` | Fleet map, polars, GRIB overlay, wind-advantage heatmap, **alert feed** |
 
 **Reads from SLA-1:** InfluxDB (telemetry + AIS-derived paths), Signal K WebSocket (`navigation`, `environment.wind`, AIS deltas). **Never writes to SLA-1 storage.**
@@ -836,14 +844,31 @@ Neo4j holds **context** (who, what, where, why); InfluxDB holds **telemetry** (h
 
 ### 7.4 Visualization — Grafana
 
-**One Grafana instance per SLA tier** — avoids dashboard load on the telemetry node.
+**One Grafana instance per SLA tier** — avoids dashboard load on the telemetry node. Grafana is **not** the primary helm UI for interactive race workflows ([§7.4.1](#741-race-helm-ui-grafana--signalk-plugins)).
 
 | Instance | Tier | Port (default) | Dashboards |
 |----------|------|----------------|------------|
 | `grafana-telemetry` | SLA-1 | 3001 | SOG, COG, AWA, AWS, depth, heel, system health |
-| `grafana-race` | SLA-2 | 3002 | Fleet map, polars, wind heatmap, **live standings**, course overlay |
-| `course-editor` | SLA-2 | 3010 | React/TS — waypoints + **Start Line** flag/course selection |
+| `grafana-race` | SLA-2 | 3002 | Fleet map, polars, wind heatmap, **live standings**, course overlay, model score timeline |
+| `race-ui` | SLA-2 | 3010 | **Primary helm** — Node.js/TS race optimization UI (see §7.4.1) |
 | `grafana-sail` | SLA-3 | 3003 | Trim timeline, sail images, vision LLM output |
+
+#### 7.4.1 Race helm UI — Grafana + Signal K plugins
+
+**ADR:** [0018 — Helm UX, three-Pi, dual speaker](./adr/0018-helm-ux-three-pi-dual-speaker.md)
+
+| Surface | Technology | Use for |
+|---------|------------|---------|
+| **B&G H5000** | Factory displays + **safety speaker** | Instruments, SailSteer, StartLine, depth/BSP/wind alarms |
+| **`race-ui`** | **Node.js** + **TypeScript** (React or Svelte), Fastify/static | Start line, course confirm, laylines, steering bars, tactical alert ack, active GRIB model indicator |
+| **Signal K plugins** | `@signalk/*` or custom SK plugin bundle | Embed instrument-adjacent panels in Signal K Freeboard / instrument UI on boat LAN |
+| **`course-editor`** | React/TS (legacy port 3010 — may merge into `race-ui`) | Waypoint edit, Start Line flag/course selection at harbor |
+| **Grafana-race** | Grafana OSS | Wind/VMG history, fleet map heatmap, fleet polar % timeline, debrief |
+| **iRegatta (phone)** | iOS app | Optional; same NMEA feed |
+
+**`race-ui` data sources:** Signal K WebSocket (SLA-1), `race-intelligence` REST, `live-results` REST, `insight-alerts` WebSocket, `grib-model-scorer` active model API.
+
+**Grafana scope (explicit):** time-series panels, geo map overlays, fleet performance tables, alert feed (read-only list), engineering health — **not** primary start-line or course-selection workflows.
 
 ### 7.5 AI — LLaMA + Coral
 
@@ -1412,41 +1437,56 @@ flowchart TB
     IFX -.->|own-boat wind\nSOG/COG/heel| WIND
 ```
 
-#### 7.12.2 GRIB ingestion — regular upload schedule
+#### 7.12.2 GRIB ingestion — PredictWind multi-model + MET supplement
 
-**Containers:** `grib-ingest`, `grib-parser`  
+**Containers:** `grib-ingest`, `grib-parser`, `grib-model-scorer`  
+**ADR:** [0019 — PredictWind multi-model GRIB](./adr/0019-predictwind-multi-model-grib.md)  
 **Storage:** `/data/grib/` on SLA-2 (persistent volume `grib-store`)
+
+**Primary source:** [PredictWind](https://www.predictwind.com/features/models) — download **all available high-resolution models** for the race bbox via subscription GRIB export and/or [PredictWind Marine](https://apps.apple.com/us/app/predictwind-marine-forecasts/id477048487) shore workflow. Shore skill **`predictwind-grib`** in AI-sailing-data records manifests.
+
+**Supplement:** MET Norway `gribfiles` (Oslofjord weather/current/waves), Oslofjord current PNG plots, SMHI MetObs validation ([§7.20](#720-shore-weather--current-collection)).
 
 | Mode | Schedule | Trigger |
 |------|----------|---------|
-| **Automatic fetch** | Every **6 hours** when `ONLINE_MODE=true` | `grib-ingest` cron (`0 */6 * * *`) |
-| **Pre-race fetch** | Manual + 24 h before start | Grafana / API `POST /grib/fetch` |
-| **Manual upload** | Anytime in harbor | `POST /grib/upload` (multipart `.grb2`) |
-| **USB import** | Harbor | Copy to `/data/grib/inbox/` — file watcher ingests |
-| **Shore push** | Optional | Shore server rsync/scp to `race.local` |
+| **PredictWind fetch** | Every **6 hours** when `ONLINE_MODE=true` | `grib-ingest` — **all configured PredictWind models** |
+| **Pre-race fetch** | 72 h and 12 h before start | Shore + onboard per `grib-plan.yaml` |
+| **Manual upload** | Harbor | PredictWind export, MET GRIB, `POST /grib/upload` |
+| **USB import** | Harbor | Copy to `/data/grib/inbox/` |
 
 **Configured sources (`config/grib-sources.yaml`):**
 
 ```yaml
 sources:
-  - name: gfs-opendap
-    url_template: "https://{host}/grib2/{run}/gfswave.t{fh}z.global.0p25.f{step}.grib2"
-    model: GFS
+  - name: predictwind
+    type: predictwind_grib
+    models: auto          # all models available for bbox — ECMWF, GFS, SPIRE, regional, etc.
+    resolution: best      # finest available per model; clip to course bbox + margin
     schedule: "0 */6 * * *"
-    bbox_from: course   # auto-clip to active course + 10 NM margin
+    docs: https://www.predictwind.com/features/models
+  - name: metno-oslofjord
+    type: metno_gribfiles
+    area: oslofjord
+    content: [current, waves]   # weather wind often superseded by PredictWind
+    schedule: "0 */6 * * *"
   - name: manual
     type: upload
 ```
 
+**Onboard model scoring (`grib-model-scorer`):**
+
+During active `race_id`, continuously compare each ingested model's forecast wind at the boat position vs **observed** TWD/TWS from SLA-1. Maintain rolling error scores (30 min, 2 h, leg-to-date). Publish **`ActiveWindModel`** — the best-performing model for **this race and time**. `wind-field-analyzer` uses the active model for heatmaps; logs scores to Influx (`grib_model_score`) and Neo4j for debrief.
+
 **Ingest pipeline:**
 
-1. Download or receive GRIB2 file.
-2. Validate magic bytes, record `model_run`, `valid_from`, `valid_to`, `bbox`.
-3. `grib-parser` extracts **U/V wind** (and optional gust, pressure) → `WindGrid` store (Zarr or GeoJSON tiles on Pi).
-4. Register `GribModel` node in Neo4j; link to active `Race` when `race_id` set.
-5. Prune GRIB files older than **7 days** (configurable).
+1. Download or receive GRIB2 file(s) per model.
+2. Validate magic bytes; record `provider`, `model_id`, `resolution_km`, `model_run`, `valid_from`, `valid_to`, `bbox`.
+3. `grib-parser` extracts **U/V wind** (and gust, pressure where present) → `WindGrid` store.
+4. Register `GribModel` in Neo4j; link to active `Race`.
+5. `grib-model-scorer` begins scoring when instruments provide ≥ 15 min of observations.
+6. Prune files older than **7 days** (configurable).
 
-**Offline use:** Latest successfully parsed GRIB remains queryable at sea without internet. Grafana shows **GRIB age** warning if valid time &gt; 12 h behind race start.
+**Offline use:** All successfully parsed models remain queryable at sea. `race-ui` and Grafana show **active model name**, age, and score margin vs runner-up. Warn if best model valid time &gt; 12 h behind race start.
 
 #### 7.12.3 Polar diagram management
 
@@ -2009,9 +2049,19 @@ flowchart TB
 
 **Integration with Færderseilasen-style regattas:** Routes like `11.1`–`11.6` may also be signaled from the committee boat; parser stores optional `StartBoatSignal` mappings when SI defines them. If not defined, user picks route manually from list (same UX, no vision mapping).
 
-#### 7.13.4 Manual waypoint entry — React/TypeScript UX
+#### 7.13.4 Waypoint coordinates — `course-editor` as system of record
 
-When `course-parser` cannot resolve coordinates, the crew enters them via **`course-editor`** — a lightweight **React + TypeScript** SPA served from the SLA-2 Pi.
+**ADR:** [0020 — course-editor as coordinate system of record](./adr/0020-course-editor-coordinate-system-of-record.md)
+
+`course-editor` is the **only** authoritative writer of waypoint **`lat` / `lon`**. `course-parser` and shore skills seed `WaypointList` YAML with structure and `si_coord` text; producers below **read** editor-saved YAML.
+
+| Role | Component | Coordinates |
+|------|-----------|-------------|
+| Bootstrap | `course-parser`, `course-from-si` skill | Provisional or `null` — not final |
+| **System of record** | **`course-editor`** | **Authoritative WGS-84** |
+| Producers | `race-import`, `marine-map-gpx-export`, `live-results`, `race-intelligence`, `race-ui` | Read-only from SoR YAML → Neo4j |
+
+When `course-parser` cannot resolve coordinates, the crew enters them via **`course-editor`** — a **React + TypeScript** SPA on the SLA-2 Pi (may merge into `race-ui` over time; coordinate SoR unchanged).
 
 | Attribute | Value |
 |-----------|-------|
@@ -2027,16 +2077,23 @@ When `course-parser` cannot resolve coordinates, the crew enters them via **`cou
 2. List shows waypoints with **red** (missing coords) / **green** (resolved).
 3. Tap waypoint → place pin on map or type `lat/lon` (decimal or DMS).
 4. Optional: tap own-boat AIS position to snap nearby mark.
-5. **Save** → `PUT /courses/{route_id}/waypoints` → Neo4j + JSON on disk.
-6. Export GeoJSON for Grafana-race overlay.
+5. **Save** → `PUT /courses/{route_id}/waypoints` → **`courses/routes/*.yaml`** (data repo) + Neo4j `Waypoint` MERGE (same values).
+6. Optional **Export marine map** → regenerates `export/marine-map/` from saved YAML ([§7.23](#723-marine-map-gpx-export)).
+7. Export GeoJSON for Grafana-race overlay (derived from SoR).
 
 ```mermaid
 flowchart TB
     USER["Crew tablet\nrace.local:3010"]
-    EDITOR["course-editor\nReact/TS"]
+    EDITOR["course-editor\nSoR for lat/lon"]
+    YAML["courses/routes/*.yaml"]
     API["course-parser API"]
-    N4J["Neo4j Waypoint nodes"]
-    USER --> EDITOR --> API --> N4J
+    N4J["Neo4j Waypoint"]
+    GPX["marine-map GPX export"]
+    USER --> EDITOR --> API
+    API --> YAML
+    API --> N4J
+    YAML --> GPX
+    YAML -->|race-import| N4J
 ```
 
 **Offline:** Map tiles pre-cached; editor works without internet after initial harbor setup.
@@ -3023,16 +3080,19 @@ No new SLA-2 container in v1 — collection is **shore-only** via Cursor skill. 
 
 ### 7.20 Shore weather & current collection
 
-**ADR:** [0014 — Shore weather and current collection](./adr/0014-shore-weather-current-collection.md)  
-**Data repo:** [AI-sailing-data weather skills](https://github.com/cognite-fholm/AI-sailing-data/tree/main/.cursor/skills)
+**Repository:** [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) (shore skills)  
+**ADR:** [0014](./adr/0014-shore-weather-current-collection.md), [0019](./adr/0019-predictwind-multi-model-grib.md)
 
-Oslofjord and Skagerrak regattas need **fjord-resolution** wind, wave, and tidal-current data linked to each race folder — not only coarse global models.
+**Primary wind forecast:** [PredictWind](https://www.predictwind.com/features/models) multi-model GRIB via skill **`predictwind-grib`** — download all available models at finest resolution ([PredictWind Marine app](https://apps.apple.com/us/app/predictwind-marine-forecasts/id477048487)). **Supplement:** MET Norway for Oslofjord **current** and **waves**; SMHI for boundary validation.
+
+Oslofjord and Skagerrak regattas need **high-resolution** multi-model wind (PredictWind) plus fjord **current** and **waves** (MET) linked to each race folder.
 
 #### 7.20.1 Sources
 
 | Source | API / URL | Content | Skill |
 |--------|-----------|---------|-------|
-| MET Norway GRIB | `api.met.no/weatherapi/gribfiles/1.1/?area=oslofjord&content={weather\|current\|waves}` | Wind, current (u/v −3 m), waves | `metno-oslofjord-weather` |
+| **PredictWind GRIB** | [predictwind.com/features/models](https://www.predictwind.com/features/models) · [Marine app](https://apps.apple.com/us/app/predictwind-marine-forecasts/id477048487) | Multi-model wind (ECMWF, GFS, SPIRE, regional) — **best resolution** | `predictwind-grib` |
+| MET Norway GRIB | `api.met.no/weatherapi/gribfiles/1.1/?area=oslofjord&content={weather\|current\|waves}` | Current (u/v −3 m), waves; wind supplement | `metno-oslofjord-weather` |
 | Oslofjord varsler | [projects.met.no/~nilsmk/oslofjord](https://projects.met.no/~nilsmk/oslofjord/) | Human portal → same GRIB + current PNGs | — |
 | YR GRIB help | [hjelp.yr.no GRIB article](https://hjelp.yr.no/hc/en-us/articles/360009342993-GRIB-weather-data) | Documentation for OpenCPN / local models | — |
 | Oslofjord current plots | `api.met.no/weatherapi/oslofjord/0.1/?area={ferder1..4\|drammen1}&hour={0..48}` | PNG forecast maps (arrows + color bar) | `oslofjord-current-plots` |
@@ -3045,18 +3105,23 @@ Oslofjord and Skagerrak regattas need **fjord-resolution** wind, wave, and tidal
 ```mermaid
 flowchart LR
   PLAN[planning/grib-plan.yaml]
+  PW[predictwind-grib]
   GRIB[metno-oslofjord-weather]
   PNG[oslofjord-current-plots]
   SMHI[smhi-wind-observations]
   MAN[collected/weather/manifest.yaml]
   NOTES[planning/weather-notes.md]
   BOAT["/data/grib/ on SLA-2"]
+  SCORER[grib-model-scorer]
 
+  PLAN --> PW --> MAN
   PLAN --> GRIB --> MAN
   PLAN --> PNG --> MAN
   PLAN --> SMHI --> MAN
   MAN --> NOTES
+  PW --> BOAT
   GRIB --> BOAT
+  BOAT --> SCORER
 ```
 
 | Script | Output |
@@ -3118,11 +3183,14 @@ Analysis services produce insights continuously; the helm needs **proactive noti
 
 | | Safety alarms ([§7.17.8](#7178-alarms)) | Tactical insight alerts (this section) |
 |---|----------------------------------------|----------------------------------------|
-| Purpose | Boat/instrument limits, collision risk | Performance, tactics, fleet position |
+| Purpose | Boat/instrument limits, collision risk | **Race optimization** — performance, tactics, fleet position |
 | Source | Signal K / H5000 thresholds | SLA-2/3 analysis services |
 | Severity | info / warning / **critical** | info / warning / **urgent** |
-| Voice | H5000 alarm module (if fitted) | Optional Piper TTS on Pi speaker |
+| Voice | **H5000 speaker only** ([ADR-0018](./adr/0018-helm-ux-three-pi-dual-speaker.md)) | Optional Piper TTS on **dedicated tactical speaker** (Speaker B) |
+| UI | H5000 displays | **`race-ui`** primary; Grafana alert feed secondary |
 | Config | `AlarmProfile` (`alarms.yaml`) | `InsightAlertProfile` (`tactical-alerts.yaml`) |
+
+**Two speakers:** H5000 safety audio and tactical TTS use **separate hardware**. Tactical alerts **never** route through H5000 alarm groups or the H5000 speaker.
 
 #### 7.21.2 Alert broker — `insight-alerts`
 
@@ -3137,8 +3205,8 @@ Central **SLA-2** service (`:8095`) that:
 ```mermaid
 flowchart LR
   P[Producers] -->|POST /events| IA[insight-alerts]
-  IA --> UI[Grafana + course-editor]
-  IA --> TTS[Piper → speaker]
+  IA --> UI[race-ui + Grafana feed]
+  IA --> TTS[Piper → tactical speaker B]
   IA --> NEO[Neo4j history]
 ```
 
@@ -3247,7 +3315,7 @@ When `spec.channels.tts.enabled`:
 2. **Piper** synthesizes WAV (offline arm64 model in harbor bundle)
 3. Playback via **ALSA** to USB or Bluetooth speaker (`speaker_device`)
 4. **espeak-ng** fallback if Piper model missing
-5. **Safety yield:** incoming safety Grafana alert cancels current TTS and clears queue
+5. **Separate audio path:** tactical TTS uses **Speaker B only** — H5000 safety annunciation on **Speaker A** is independent; no preemption or shared queue ([ADR-0018](./adr/0018-helm-ux-three-pi-dual-speaker.md))
 
 Helm acknowledges via course-editor or Grafana → `POST /alerts/{id}/ack` → suppresses repeat voice for `ack.cooldown_min`.
 
@@ -3452,7 +3520,7 @@ races/{year}/{race}/
       {RaceName}{Year}.zip    # optional import bundle
 ```
 
-Generated on **shore** after coordinates are complete; committed to **AI-sailing-data** git; synced to boat via `race-data-sync`.
+Generated **from `course-editor` saved coordinates** in `courses/routes/*.yaml`; committed to **AI-sailing-data** git; synced to boat via `race-data-sync`. Do not edit GPX by hand to fix marks — fix in **course-editor** and re-export ([ADR-0020](./adr/0020-course-editor-coordinate-system-of-record.md)).
 
 #### 7.23.2 GPX format
 
@@ -3480,13 +3548,16 @@ Set `export_label` on `CourseCatalog.routes[]` or `WaypointList.spec` for legacy
 
 ```mermaid
 flowchart LR
-  SI[SI PDF / course-parser]
+  SI[SI PDF / course-parser bootstrap]
+  CE[course-editor SoR]
   YAML[WaypointList YAML]
   SKILL[marine-map-gpx-export]
   GPX[export/marine-map/]
   CHART[Navionics / PredictWind / OpenCPN]
 
-  SI --> YAML --> SKILL --> GPX
+  SI -->|structure only| YAML
+  CE -->|lat/lon authority| YAML
+  YAML --> SKILL --> GPX
   GPX -->|SD card / phone| CHART
 ```
 
@@ -3499,16 +3570,17 @@ python .cursor/skills/marine-map-gpx-export/scripts/export_marine_map.py \
 
 | Layer | Source |
 |-------|--------|
-| Chartplotter route | Static GPX export (this section) |
-| Live leg / XTE | `race-intelligence` + Neo4j `CourseRoute` |
+| Chartplotter route | GPX export **derived from** `course-editor` YAML ([ADR-0020](./adr/0020-course-editor-coordinate-system-of-record.md)) |
+| Live leg / XTE | `race-intelligence` + Neo4j `CourseRoute` (imported from same YAML) |
 | Fleet progress | `live-results` + Influx `course_progress` |
 
 GPX is the **harbor handoff** to MFD apps; Neo4j remains runtime truth on the boat.
 
 #### 7.23.6 Follow-up (system)
 
-- `course-parser` auto-invokes export after SI coordinate extraction
-- `course-editor` "Export marine map" action (harbor API)
+- `marine-map-gpx-export` runs **after** `course-editor` save (harbor skill or editor button) — not directly from SI parse
+- `course-parser` seeds structure only; SI-extracted coords are **provisional** until confirmed in editor
+- Stale GPX detection when YAML `metadata.updated_at` &gt; `MarineMapExport.generated_at`
 
 ---
 
@@ -3976,7 +4048,7 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 | FR-27 | crawl_web agent ingests NOR/SI when online |
 | FR-28 | `course-parser` extracts §11 routes from SI PDF (e.g. Færderseilasen) |
 | FR-29 | Coordinates parsed from `N59°52,50' Ø010°38,76'` (WGS-84) format |
-| FR-30 | Waypoints without coords editable in React `course-editor` at `:3010` |
+| FR-30 | Waypoints without coords entered only in `course-editor` at `:3010`; editor is SoR for `lat`/`lon` ([ADR-0020](./adr/0020-course-editor-coordinate-system-of-record.md)) |
 | FR-31 | `live-results` ranks fleet by corrected time (`elapsed × handicap`) |
 | FR-32 | VMG to next mark computed for own boat and competitors using waypoint geometry |
 | FR-33 | `handicap-manager` loads multiple ORC ratings per vessel from certificate PDF |
@@ -4126,10 +4198,15 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 | FR-143 | `metno-oslofjord-weather` skill downloads GRIB (`weather`, `current`, `waves`) for `oslofjord` (or race bbox area) and writes `WeatherCollection` manifest |
 | FR-144 | `oslofjord-current-plots` skill fetches PNG maps for race-relevant areas (`ferder4`, etc.) with interpretation guide in `reference.md` |
 | FR-145 | `smhi-wind-observations` skill fetches MetObs JSON for configured validation stations (default 81350) |
-| FR-146 | `grib-plan.yaml` documents MET area, refresh schedule, SMHI stations, and boat path `/data/grib/` |
+| FR-146 | `grib-plan.yaml` documents PredictWind models, MET supplement, refresh schedule, SMHI stations, and boat path `/data/grib/` |
 | FR-147 | GRIB binaries gitignored; only manifests and planning YAML committed |
-| FR-148 | `collected-sources.yaml` registers `metno_gribfiles`, `metno_oslofjord_plots`, `smhi_metobs` provenance |
+| FR-148 | `collected-sources.yaml` registers `predictwind_grib`, `metno_gribfiles`, `metno_oslofjord_plots`, `smhi_metobs` provenance |
 | FR-149 | `planning/weather-notes.md` records agent/human interpretation after collection |
+| FR-181 | `predictwind-grib` skill documents PredictWind multi-model download for race bbox |
+| FR-182 | Shore workflow supports PredictWind Marine export and subscription GRIB into `collected/weather/grib/` |
+| FR-184 | `grib-ingest` ingests all configured PredictWind models at best available resolution |
+| FR-185 | `grib-model-scorer` ranks models vs observed wind during active `race_id` and publishes `ActiveWindModel` |
+| FR-186 | `race-ui` and Grafana show active GRIB model, score, and file age |
 
 ### 11.11 Tactical insight alerts & annunciation
 
@@ -4137,11 +4214,11 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 |----|-------------|
 | FR-150 | `insight-alerts` service on SLA-2 ingests `InsightEvent` from analysis producers and evaluates `InsightAlertProfile` rules |
 | FR-151 | Alert categories: `fleet_position`, `course`, `sail_trim`, `wind_tactics`, `start_line`, `coach` — separate from safety alarms (FR-121) |
-| FR-152 | Active alerts visible on `grafana-race` alert feed panel and `course-editor` WebSocket strip |
+| FR-152 | Active alerts visible on **`race-ui`** alert strip and `grafana-race` alert feed panel |
 | FR-153 | Helm can acknowledge alerts; repeat annunciation suppressed for configurable cooldown |
-| FR-154 | Optional TTS via Piper (espeak-ng fallback) to ALSA speaker when `channels.tts.enabled` |
+| FR-154 | Optional TTS via Piper (espeak-ng fallback) to **tactical speaker** (ALSA `speaker_device`) when `channels.tts.enabled` |
 | FR-155 | Voice rate limit (`max_per_10min`) and `min_severity` prevent alert fatigue |
-| FR-156 | Safety Grafana critical alarms preempt tactical TTS playback |
+| FR-156 | Safety alarms remain on **H5000 speaker only**; tactical TTS uses separate **tactical speaker** ([ADR-0018](./adr/0018-helm-ux-three-pi-dual-speaker.md)) |
 | FR-157 | `InsightAlertProfile` in `planning/tactical-alerts.yaml` per race; optional boat override |
 | FR-158 | Producers (`live-results`, `race-intelligence`, `wind-field-analyzer`, `sail-analysis-api`, `tactical-coach`) emit structured events with `message_short` for voice |
 | FR-159 | Alert history in Neo4j (`InsightAlert`) and Influx annotations for debrief |
@@ -4174,7 +4251,9 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 | FR-176 | Great-circle interpolation between resolved marks (default 0.5 NM step) |
 | FR-177 | `export_label` on routes for legacy file names (`RoutePwg.gpx`, etc.) |
 | FR-178 | Manifest records `unresolved_waypoints` when SI coords missing |
-| FR-179 | Same YAML source as `course-editor`, `live-results`, and Neo4j import |
+| FR-179 | `marine-map-gpx-export`, `race-import`, `live-results`, and Neo4j import **read** coordinates from `course-editor`-saved `WaypointList` YAML — editor is sole writer |
+| FR-187 | `course-editor` save persists to `courses/routes/*.yaml` and triggers optional marine-map GPX regeneration |
+| FR-188 | Hand-editing `waypoints[].lat/lon` in git is discouraged; `prep-status` phase 5 complete when all routes pass editor validation |
 | FR-180 | Documented import path for Navionics, PredictWind Marine, OpenCPN |
 
 ---
@@ -4324,7 +4403,7 @@ Runs onshore (laptop); can parallel Phase 1.
 - [x] ORC certificate collection skill (`orc-sailor-services`)
 - [x] MET GRIB, Oslofjord current plots, SMHI wind skills
 - [x] Marine map GPX export skill + Færder example
-- [ ] Complete waypoint lat/lon for all course variants
+- [ ] Complete waypoint lat/lon for all course variants — **via `course-editor`** (SoR); then re-export marine map
 - [ ] `prep-status.yaml` on all target races
 
 ### Phase 2B — Graph import & sync
@@ -4417,11 +4496,11 @@ Can start after Phase 1 stabilizes.
 
 | # | Question | Notes |
 |---|----------|-------|
-| OQ-1 | Primary GRIB model for region? | GFS global vs regional HARMONIE/AROME |
+| OQ-1 | Primary GRIB model for region? | **Resolved** — PredictWind multi-model ingest; finest resolution per model; onboard `grib-model-scorer` picks best fit per race/time ([ADR-0019](./adr/0019-predictwind-multi-model-grib.md)). MET Norway supplements current/waves. |
 | OQ-2 | VPP-lite model for derived polars? | ORC regression table vs custom neural VPP |
 | OQ-3 | AIS class B timeout handling? | Stale track grey-out after 5 min |
 | OQ-4 | Wind-zone weight tuning per class? | One-design vs ORC handicap fleet |
-| OQ-5 | GRIB spatial resolution on Pi? | 0.25° vs clipped high-res regional |
+| OQ-5 | GRIB spatial resolution on Pi? | **Resolved** — ingest best available PredictWind resolution; clip to race bbox; scorer selects model, not fixed grid ([ADR-0019](./adr/0019-predictwind-multi-model-grib.md)) |
 | OQ-6 | Include rig load cells in training labels? | If available on N2K |
 
 ---

@@ -43,7 +43,7 @@ Partition the system into **three SLA tiers**, each with:
 |---------|----------|
 | **Compact** | 1× Pi — all tiers with cgroup limits + tier-watchdog |
 | **Standard** | 2× Pi — SLA-1 isolated; SLA-2 + SLA-3 shared |
-| **Race** | 3× Pi — one tier per node (**recommended**) |
+| **Race** | 3× Pi — one tier per node (**chosen deployment for this project**) |
 
 ### Inter-tier rules
 

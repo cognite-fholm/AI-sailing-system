@@ -25,14 +25,14 @@ Today course YAML lives in git but there is **no standard export** for onboard c
 
 ## Decision
 
-1. **Generate** PredictWind-compatible GPX route files from race `WaypointList` YAML — shore-side via Cursor skill **`marine-map-gpx-export`** in AI-sailing-data.
+1. **Generate** PredictWind-compatible GPX route files from **`course-editor` saved** `WaypointList` YAML ([ADR-0020](./0020-course-editor-coordinate-system-of-record.md)) — shore skill **`marine-map-gpx-export`** or editor export button.
 2. **Store** per race under `export/marine-map/`:
    - One `.gpx` per route variant
    - Zip bundle `{slug}{year}.zip` (legacy profile) or `{year}-{slug}-marine-map.zip` (standard)
    - `manifest.yaml` (`kind: MarineMapExport`) with provenance and file index
 3. **Interpolate** great-circle segments between resolved mark coordinates (default **0.5 NM** step) so chart apps draw a continuous route — not just sparse marks.
-4. **Link** export to `CourseCatalog` — regenerate when routes or coordinates change.
-5. **Optional** `course-editor` / `course-parser` pipeline calls the same generator post-parse (Phase 2).
+4. **Link** export to `CourseCatalog` — regenerate when **course-editor** saves coordinates (not on SI bootstrap alone).
+5. **Optional** `course-editor` "Export marine map" calls the same generator ([ADR-0020](./0020-course-editor-coordinate-system-of-record.md)).
 
 ### GPX schema (v1)
 
@@ -69,7 +69,7 @@ Today course YAML lives in git but there is **no standard export** for onboard c
 ### Positive
 
 - One-click harbor export for all course variants (Færder §11.1–11.6, W/L baner, etc.)
-- Same source of truth as `course-editor` and `live-results`
+- Same source of truth as `course-editor` and `live-results` — GPX is a **derived** artifact ([ADR-0020](./0020-course-editor-coordinate-system-of-record.md))
 - Debrief can compare sailed track (Influx AIS) vs exported route GPX
 
 ### Negative

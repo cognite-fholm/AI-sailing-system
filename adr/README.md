@@ -18,14 +18,14 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | | [0011](./0011-bg-h5000-reference-model.md) | B&G H5000 instrument and race-display reference (ingest paths) |
 | **2A — Shore race prep** | [0009](./0009-dual-repository-race-data.md) | (data repo model — see Phase 0) |
 | | [0013](./0013-orc-certificate-fleet-collection.md) | Automated ORC certificate collection for race fleets |
-| | [0014](./0014-shore-weather-current-collection.md) | Shore weather and current collection (MET GRIB, Oslofjord plots, SMHI) |
+| | [0014](./0014-shore-weather-current-collection.md) | Shore weather and current collection (PredictWind GRIB, MET, SMHI) |
 | | [0017](./0017-marine-map-gpx-export.md) | Marine map GPX export bundle (PredictWind-compatible) |
+| | [0019](./0019-predictwind-multi-model-grib.md) | PredictWind multi-model GRIB shore workflow |
 | **2B — Graph import** | [0009](./0009-dual-repository-race-data.md) | (sync contract — see Phase 0) |
-| **2C — GRIB, polars, AIS** | [0004](./0004-grib-polars-ais-wind-analysis.md) | GRIB scheduling, polar fleet registry, AIS ingest, wind-on-course analysis |
-| **2D — Courses & results** | [0005](./0005-course-parsing-handicaps-live-results.md) | Course parsing from SI PDFs, multi-handicap scoring, live results |
+| **2C — GRIB, polars, AIS** | [0004](./0004-grib-polars-ais-wind-analysis.md), [0019](./0019-predictwind-multi-model-grib.md) | GRIB + PredictWind multi-model scoring, polars, AIS, wind analysis |
+| **2D — Courses & results** | [0005](./0005-course-parsing-handicaps-live-results.md), [0020](./0020-course-editor-coordinate-system-of-record.md) | Course parsing; **course-editor** SoR for coordinates |
 | | [0006](./0006-start-boat-course-flags.md) | Multiple courses per race and start-boat flag signaling |
-| **2E — Race UX** | [0010](./0010-iregatta-reference-model.md) | iRegatta v2.86 as functional reference for race UX |
-| | [0011](./0011-bg-h5000-reference-model.md) | B&G H5000 instrument and race-display reference (dashboards) |
+| **2E — Race UX** | [0010](./0010-iregatta-reference-model.md), [0011](./0011-bg-h5000-reference-model.md), [0018](./0018-helm-ux-three-pi-dual-speaker.md) | iRegatta/H5000 parity in `race-ui` + Grafana |
 | **2F — Analytics & alerts** | [0016](./0016-fleet-polar-performance-influx.md) | Fleet polar performance timeline stored in InfluxDB |
 | | [0015](./0015-tactical-insight-alerts-annunciation.md) | Tactical insight alerts, UX feed, and optional voice annunciation |
 | **2G — Laptop MCP** | [0012](./0012-race-side-mcp-laptop-cursor.md) | Race-side MCP for laptop Cursor and ad hoc analysis |
@@ -53,6 +53,9 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | [0015](./0015-tactical-insight-alerts-annunciation.md) | Tactical insight alerts, UX feed, and optional voice annunciation | 2F | Accepted |
 | [0016](./0016-fleet-polar-performance-influx.md) | Fleet polar performance timeline stored in InfluxDB | 2F | Accepted |
 | [0017](./0017-marine-map-gpx-export.md) | Marine map GPX export bundle (PredictWind-compatible) | 2A | Accepted |
+| [0018](./0018-helm-ux-three-pi-dual-speaker.md) | Helm UX — `race-ui`, Grafana scope, three-Pi, dual speaker, H5000-only safety | 0, 2E, 2F | Accepted |
+| [0019](./0019-predictwind-multi-model-grib.md) | PredictWind multi-model GRIB and onboard model scoring | 2A, 2C | Accepted |
+| [0020](./0020-course-editor-coordinate-system-of-record.md) | course-editor as coordinate system of record | 2A, 2D | Accepted |
 
 ## Format
 
@@ -64,4 +67,4 @@ Each ADR follows the structure:
 4. **Consequences** — positive, negative, risks
 5. **Alternatives considered**
 
-New decisions should use the next sequential number: `0018-short-title.md`.
+New decisions should use the next sequential number: `0021-short-title.md`.
