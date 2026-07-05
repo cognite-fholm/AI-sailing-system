@@ -1,7 +1,8 @@
 # AI Sailing System — Specification
 
-**Version:** 0.12.0-draft  
+**Version:** 0.13.0-draft  
 **Date:** 2026-07-05  
+**Changelog (0.13):** Automated ORC certificate fleet collection — shore skill pipeline, ADR-0013, §7.19.  
 **Changelog (0.12):** Race-side MCP gateway for laptop Cursor ad hoc analysis (ADR-0012, §7.18).  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
@@ -17,6 +18,8 @@ The platform is organized into **three SLA tiers**, each running in **dedicated 
 **Reference UX / instruments:** [iRegatta](https://zifigo.com/) (race phone app — [§7.16](#716-iregatta-reference-model--feature-traceability)) and [B&G H5000](https://www.bandg.com/bg/series/h5000/) (helm instruments — [§7.17](#717-bg-h5000-reference-model--integration)) define parity targets for start line, laylines, polars, and SailSteer displays.
 
 **Race laptop:** [§7.18](#718-race-side-mcp--laptop-cursor) — bring a laptop on boat Wi‑Fi; **Cursor** connects via **MCP** to `race-mcp-gateway` for live standings, telemetry, and ad hoc analysis.
+
+**ORC certificates:** [§7.19](#719-orc-certificate-collection--fleet-enrichment) — automate fleet cert metadata and PDF download on shore via **orc-sailor-services** skill in AI-sailing-data ([ADR-0013](./adr/0013-orc-certificate-fleet-collection.md)).
 
 | Tier | Domain | SLA priority |
 |------|--------|----------------|
@@ -81,6 +84,7 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G24 | **iRegatta-equivalent** race UX for start, laylines, polars, and navigation — see [§7.16](#716-iregatta-reference-model--feature-traceability) and [ADR-0010](./adr/0010-iregatta-reference-model.md) |
 | G25 | **B&G H5000-equivalent** instrument semantics, SailSteer/StartLine pages, calibration YAML — see [§7.17](#717-bg-h5000-reference-model--integration) and [ADR-0011](./adr/0011-bg-h5000-reference-model.md) |
 | G26 | **Race-side MCP** — laptop on boat LAN runs **Cursor** with live Neo4j, Influx, standings, and YAML context for ad hoc analysis — [§7.18](#718-race-side-mcp--laptop-cursor), [ADR-0012](./adr/0012-race-side-mcp-laptop-cursor.md) |
+| G27 | **Automated ORC certificate collection** for race-class fleets — metadata via `activecerts`, PDFs via authenticated download, `boats/` stubs — [§7.19](#719-orc-certificate-collection--fleet-enrichment), [ADR-0013](./adr/0013-orc-certificate-fleet-collection.md) |
 
 ### 3.2 Non-goals (v1)
 
@@ -2808,6 +2812,88 @@ spec:
   neo4j_uri: bolt://localhost:7687
 ```
 
+### 7.19 ORC certificate collection & fleet enrichment
+
+**ADR:** [0013 — ORC certificate fleet collection](./adr/0013-orc-certificate-fleet-collection.md)  
+**Skill:** [AI-sailing-data `.cursor/skills/orc-sailor-services`](https://github.com/cognite-fholm/AI-sailing-data/tree/main/.cursor/skills/orc-sailor-services)  
+**HAR reference:** `data.orc.org.har` — `ListCert` POST; `orc.org.har` — marketing site only
+
+Shore agents collect ORC certificate **metadata and PDFs** for all entrants in the relevant class after `fleet.yaml` exists from Manage2Sail or SailRace System.
+
+#### 7.19.1 Portal API (`data.orc.org/public/WPub.dll`)
+
+| Action | Method | Auth | Output |
+|--------|--------|------|--------|
+| `activecerts` | GET `?CountryId={cc}&Family={n}` | None | XML — all active certs in family |
+| `ListCert` | POST `SailNo`, `CountryId`, … | None | HTML — per-boat cert history |
+| `CC/{dxtID}` | GET | Session cookie | PDF certificate copy |
+
+**Family** filter for bulk fetch:
+
+| `Family` | Use |
+|----------|-----|
+| `1` | ORC Standard / Club |
+| `3` | Double Handed (DH Club, DH International) |
+| `5` | Non Spinnaker |
+
+Typical Norwegian Doublehanded regatta: **one** `activecerts` call matches full starter list; validate `orc_ref` from registration against live ORC.
+
+#### 7.19.2 Shore pipeline (three scripts)
+
+```mermaid
+flowchart LR
+  FLEET[fleet.yaml]
+  META[fetch_fleet_certs.py]
+  IDX[collected/orc/fleet-orc-index.yaml]
+  PDF[download_cert_pdfs.py]
+  MAT[materialize_boat_certs.py]
+  BOATS[boats/sail/year/certificates/]
+
+  FLEET --> META --> IDX
+  IDX --> PDF
+  IDX --> MAT
+  PDF --> MAT --> BOATS
+```
+
+| Step | Script | Lands in |
+|------|--------|----------|
+| 1. Metadata | `fetch_fleet_certs.py` | `collected/orc/{race}/`, ref validation |
+| 2. PDFs | `download_cert_pdfs.py` + cookie | `collected/orc/{race}/pdfs/` |
+| 3. Stubs | `materialize_boat_certs.py` | `boats/{sail}/{year}/certificates/{type}-{orc_ref}/` |
+
+**Provenance:** `schema/collected-sources.yaml` → `orc_sailor_services`.
+
+#### 7.19.3 PDF authentication
+
+`WPub.dll/CC/{id}` returns HTML without Sailor Services login. Shore workflow:
+
+1. User logs in via browser once.
+2. Export `Cookie` header to gitignored `_import/orc-cookie.txt` or `ORC_SESSION_COOKIE` env.
+3. `download_cert_pdfs.py` validates `%PDF` magic bytes.
+
+**Alternatives:** ORC måletall zip (own boat SLK), [crawl_web](https://github.com/cognite-fholm/crawl_web) bulk fetch, manual download.
+
+#### 7.19.4 Downstream consumers (onboard)
+
+| Service | Uses certificate assets |
+|---------|-------------------------|
+| `handicap-manager` | Ratings from PDF / `ratings.yaml` |
+| `polar-certificate-extractor` | Competitor polars from `assets/orc-certificate.pdf` |
+| `polar-manager` | Own-boat SLK from måletall |
+| `race-import` | `OrcCertificate` nodes from `certificate.yaml` |
+| `live-results` | Active handicap per `planning/course-preference.yaml` |
+
+No new SLA-2 container in v1 — collection is **shore-only** via Cursor skill. Optional future: `orc-cert-sync` in harbor (Phase 2+).
+
+#### 7.19.5 Integration with registration portals
+
+| Source | Provides | ORC skill adds |
+|--------|----------|----------------|
+| Manage2Sail `regattaentry` | `orc_ref`, `Hcp`, `OrcCertificateType` | Live validation, expiry, `dxt_id`, PDF |
+| SailRace System starters | Sail, name, sometimes ref | Fill missing refs via `activecerts` |
+
+**Ref mismatch** example: registration `03440004IHD` vs live ORC `03440004TID` — index flags before race day.
+
 ---
 
 ## 8. Technology matrix
@@ -3387,6 +3473,17 @@ flowchart LR
 | FR-131 | Gateway remains available when `RACE_MODE=true` |
 | FR-132 | [docs/race-laptop-mcp.md](./docs/race-laptop-mcp.md) documents laptop + Cursor setup |
 
+### 11.9 ORC certificate collection (shore)
+
+| ID | Requirement |
+|----|-------------|
+| FR-133 | Shore skill fetches ORC metadata for all `fleet.yaml` entrants via `activecerts` XML (family inferred from class) |
+| FR-134 | Per-boat `ListCert` fallback when entrant absent from bulk active list |
+| FR-135 | `fleet-orc-index.yaml` records ref mismatches vs registration `orc_ref` |
+| FR-136 | Authenticated `download_cert_pdfs.py` stores PDFs with `%PDF` validation; cookies never in git |
+| FR-137 | `materialize_boat_certs.py` creates `boats/{sail}/{year}/certificates/{type}-{orc_ref}/` with `manifest.yaml` |
+| FR-138 | `collected-sources.yaml` registers `orc_sailor_services` provenance |
+
 ---
 
 ## 12. Non-functional requirements
@@ -3503,9 +3600,9 @@ AI-sailing-system/
 
 - [x] Repository created; [spec.md](./spec.md) v0.11
 - [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
-- [x] ADR-0001 through ADR-0006, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012
+- [x] ADR-0001 through ADR-0006, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013
 - [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide
-- [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); schema + example YAML in data repo
+- [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); ORC collection skill (§7.19)
 - [x] Deploy scaffolding, workflow stubs, harbor scripts
 - [ ] Runtime containers (Phase 1+)
 
@@ -3528,6 +3625,7 @@ AI-sailing-system/
 - [ ] `race-intelligence` — start line, lift, steering (iRegatta + H5000 parity)
 - [ ] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
 - [ ] `race-mcp-gateway` — MCP for laptop Cursor on boat LAN ([ADR-0012](./adr/0012-race-side-mcp-laptop-cursor.md))
+- [ ] Shore ORC pipeline documented — runtime uses data repo assets ([ADR-0013](./adr/0013-orc-certificate-fleet-collection.md))
 - [ ] grafana-race dashboards (SailSteer, Start, WindPlot, Highway per §7.17)
 
 ### Phase 3 — SLA-3 GoPro sail vision

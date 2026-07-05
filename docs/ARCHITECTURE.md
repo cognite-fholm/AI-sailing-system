@@ -2,7 +2,7 @@
 
 Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, data stores, and reference products fit together. Normative detail remains in [spec.md](../spec.md) and [adr/](../adr/).
 
-**Last updated:** 2026-07-05 · **Spec version:** 0.12.0-draft
+**Last updated:** 2026-07-05 · **Spec version:** 0.13.0-draft
 
 ---
 
@@ -124,8 +124,36 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0010](../adr/0010-iregatta-reference-model.md) | iRegatta UX benchmark |
 | [0011](../adr/0011-bg-h5000-reference-model.md) | H5000 instrument benchmark |
 | [0012](../adr/0012-race-side-mcp-laptop-cursor.md) | Race-side MCP for laptop Cursor |
+| [0013](../adr/0013-orc-certificate-fleet-collection.md) | Automated ORC certificate fleet collection (shore skill) |
 
 Full index: [adr/README.md](../adr/README.md)
+
+---
+
+## Shore collection pipeline (race prep)
+
+Before a regatta, **AI-sailing-data** is populated on shore via Cursor skills:
+
+```mermaid
+flowchart LR
+  M2S[manage2sail / sailracesystem]
+  FLEET[fleet.yaml]
+  ORC[orc-sailor-services]
+  IDX[collected/orc/]
+  BOATS[boats/certificates/]
+  SYNC[race-data-sync]
+
+  M2S --> FLEET --> ORC --> IDX --> BOATS
+  BOATS --> SYNC
+```
+
+| Skill | Output |
+|-------|--------|
+| **sailracesystem** | Fleet, SI PDFs, `collected/sailracesystem/` |
+| **manage2sail** | Fleet, documents, `collected/manage2sail/` |
+| **orc-sailor-services** | ORC index, PDFs, `boats/{sail}/certificates/` |
+
+Detail: [spec §7.19](../spec.md#719-orc-certificate-collection--fleet-enrichment) · [data repo prep guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md#phase-3b--automate-fleet-orc-certificates)
 
 ---
 

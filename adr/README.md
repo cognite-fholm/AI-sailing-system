@@ -15,6 +15,7 @@ This directory contains [Architecture Decision Records](https://adr.github.io/) 
 | [0010](./0010-iregatta-reference-model.md) | iRegatta v2.86 as functional reference for race UX | Accepted |
 | [0011](./0011-bg-h5000-reference-model.md) | B&G H5000 instrument and race-display reference | Accepted |
 | [0012](./0012-race-side-mcp-laptop-cursor.md) | Race-side MCP for laptop Cursor and ad hoc analysis | Accepted |
+| [0013](./0013-orc-certificate-fleet-collection.md) | Automated ORC certificate collection for race fleets | Accepted |
 
 ## Format
 
@@ -26,4 +27,4 @@ Each ADR follows the structure:
 4. **Consequences** — positive, negative, risks
 5. **Alternatives considered**
 
-New decisions should use the next sequential number: `0013-short-title.md`.
+New decisions should use the next sequential number: `0014-short-title.md`.
