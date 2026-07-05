@@ -127,6 +127,7 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0013](../adr/0013-orc-certificate-fleet-collection.md) | Automated ORC certificate fleet collection (shore skill) |
 | [0014](../adr/0014-shore-weather-current-collection.md) | Shore weather/current — MET GRIB, Oslofjord plots, SMHI |
 | [0015](../adr/0015-tactical-insight-alerts-annunciation.md) | Tactical insight alerts, UX feed, optional voice (Piper TTS) |
+| [0016](../adr/0016-fleet-polar-performance-influx.md) | Fleet polar performance timeline in InfluxDB |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -190,6 +191,7 @@ Detail: [data repo schema/README.md](https://github.com/cognite-fholm/AI-sailing
 | `polar-manager` | SLK polars + H5000 CSV interop |
 | `race-intelligence` | Start line, lift, laylines, steering hints |
 | `live-results` | VMG, corrected-time fleet rank |
+| `fleet-performance-tracker` | Fleet polar % vs certificate — 30 s series in Influx `race` bucket |
 | `wind-field-analyzer` | GRIB + AIS + polar fusion |
 | `course-parser` / `course-editor` | SI → waypoints; manual edit + start flags |
 | `handicap-manager` | ORC multi-number + WRS TCF |

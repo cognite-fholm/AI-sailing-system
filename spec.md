@@ -1,7 +1,8 @@
 # AI Sailing System — Specification
 
-**Version:** 0.14.0-draft  
+**Version:** 0.15.0-draft  
 **Date:** 2026-07-05  
+**Changelog (0.15):** Fleet polar performance timeline for all boats in InfluxDB (ADR-0016, §7.22).  
 **Changelog (0.14):** Tactical insight alerts with UX feed and optional voice annunciation (ADR-0015, §7.21).  
 **Changelog (0.13):** Automated ORC certificate fleet collection (ADR-0013, §7.19); dedicated Neo4j/Influx MCP endpoints; shore weather/current collection (ADR-0014, §7.20).  
 **Changelog (0.12):** Race-side MCP gateway for laptop Cursor ad hoc analysis (ADR-0012, §7.18).  
@@ -25,6 +26,8 @@ The platform is organized into **three SLA tiers**, each running in **dedicated 
 **Weather & current:** [§7.20](#720-shore-weather--current-collection) — MET Norway GRIB, Oslofjord current plots, SMHI wind validation in **AI-sailing-data** ([ADR-0014](./adr/0014-shore-weather-current-collection.md)).
 
 **Tactical alerts:** [§7.21](#721-tactical-insight-alerts--annunciation) — proactive insight notifications (fleet position, course, trim) on helm UX and optional speaker read-out ([ADR-0015](./adr/0015-tactical-insight-alerts-annunciation.md)).
+
+**Fleet polar performance:** [§7.22](#722-fleet-polar-performance-timeline) — time- and location-indexed polar % for every boat, stored in **InfluxDB** ([ADR-0016](./adr/0016-fleet-polar-performance-influx.md)).
 
 | Tier | Domain | SLA priority |
 |------|--------|----------------|
@@ -92,6 +95,7 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G27 | **Automated ORC certificate collection** for race-class fleets — metadata via `activecerts`, PDFs via authenticated download, `boats/` stubs — [§7.19](#719-orc-certificate-collection--fleet-enrichment), [ADR-0013](./adr/0013-orc-certificate-fleet-collection.md) |
 | G28 | **Shore weather/current collection** for Oslofjord races — MET GRIB, current plot interpretation, SMHI validation — [§7.20](#720-shore-weather--current-collection), [ADR-0014](./adr/0014-shore-weather-current-collection.md) |
 | G29 | **Tactical insight alerts** — raise and display performance alerts (trim, course, fleet rank); optional voice annunciation — [§7.21](#721-tactical-insight-alerts--annunciation), [ADR-0015](./adr/0015-tactical-insight-alerts-annunciation.md) |
+| G30 | **Fleet polar performance timeline** — all boats vs certificate polar and active race handicap, stored in InfluxDB for Grafana/MCP — [§7.22](#722-fleet-polar-performance-timeline), [ADR-0016](./adr/0016-fleet-polar-performance-influx.md) |
 
 ### 3.2 Non-goals (v1)
 
@@ -327,6 +331,7 @@ flowchart TB
 | `race-import` | `ghcr.io/.../race-import` | Apply data repo `neo4j/*.yaml` → Neo4j MERGE |
 | `course-parser` | `ghcr.io/.../course-parser` | Extract courses/waypoints from SI/NOR PDFs |
 | `live-results` | `ghcr.io/.../live-results` | Corrected-time standings + VMG along course legs |
+| `fleet-performance-tracker` | `ghcr.io/.../fleet-performance-tracker` | Fleet polar % vs certificate; writes `fleet_polar_performance` to Influx |
 | `course-editor` | `ghcr.io/.../course-editor` | React/TS UX — waypoints + **start-line flag selection** |
 | `course-flag-detector` | `ghcr.io/.../course-flag-detector` | Optional vision: read start-boat flags from GoPro photo |
 | `crawl-agent` | `ghcr.io/.../crawl-agent` | NOR/SI crawl ([crawl_web](https://github.com/cognite-fholm/crawl_web) lineage) |
@@ -669,7 +674,8 @@ Signal K is the **single source of truth** for live marine data. It:
 
 **Schema strategy:**
 
-- **Bucket:** `signalk` (raw, 90-day retention); `race` (downsampled, long retention); `ais_tracks` (competitor + own-boat AIS positions, 30-day retention).
+- **Bucket:** `signalk` (raw, 90-day retention); `race` (downsampled, long retention — includes **`fleet_polar_performance`**); `ais_tracks` (competitor + own-boat AIS positions, 30-day retention).
+- **Write policy:** SLA-1 owns `signalk`; SLA-2 services (`ais-collector`, `fleet-performance-tracker`, `race-intelligence`) write to `race` and `ais_tracks` via **scoped write token** only.
 - **Measurement:** derived from Signal K path (e.g. `navigation_speedOverGround`).
 - **Tags:** `vessel`, `source`, `pgn` (N2K), `context`, `race_id` (when active).
 - **Fields:** numeric values; store strings in Neo4j instead.
@@ -1515,6 +1521,7 @@ MERGE (v)-[:HAS_POLAR {active: true}]->(p)
 
 - **Own boat (SLK):** `actual_VMG / target_VMG` → polar performance % — full confidence.
 - **Competitors (derived):** same formula; `wind-field-analyzer` weights fleet term by `polar.confidence`.
+- **`fleet-performance-tracker`:** persists fleet-wide `performance_pct` and `vmg_pct` every 30 s to Influx ([§7.22](#722-fleet-polar-performance-timeline)).
 - Low-confidence derived polars (&lt; 0.7) show warning badge on grafana-race.
 
 **File layout on dev machine:**
@@ -3047,6 +3054,7 @@ flowchart LR
 | Producer | Category | Example trigger |
 |----------|----------|-----------------|
 | `live-results` | `fleet_position` | Corrected rank drops ≥ N places in T minutes |
+| `fleet-performance-tracker` | `fleet_position` | `performance_pct` below threshold; `rank_delta_15m` from Influx |
 | `live-results` | `fleet_position` | Delta to leader widens beyond threshold on leg |
 | `race-intelligence` | `course` | XTE &gt; limit for &gt; 30 s while navigating |
 | `race-intelligence` | `course` | Favored tack / layline side changed |
@@ -3172,6 +3180,159 @@ Helm acknowledges via course-editor or Grafana → `POST /alerts/{id}/ack` → s
 | TTS disabled / no speaker | UI channels only |
 | `insight-alerts` down | Producers log locally; no alert UX (race continues) |
 | `RACE_MODE=true` | Service stays up; no container updates |
+
+---
+
+### 7.22 Fleet polar performance timeline
+
+**ADR:** [0016 — Fleet polar performance timeline in InfluxDB](./adr/0016-fleet-polar-performance-influx.md)  
+**Container:** `fleet-performance-tracker` (SLA-2)
+
+Continuously records how well **each boat in the fleet** sails relative to **its ORC certificate polar** and the **active race handicap number** — indexed by **time** and **location** for Grafana timelines, geo maps, and MCP Flux analysis.
+
+#### 7.22.1 Purpose
+
+| Question | Source |
+|----------|--------|
+| Who is sailing above/below polar right now? | Latest `fleet_polar_performance` point per `mmsi` |
+| How did polar % evolve over the race? | Influx time range query per vessel |
+| Where on the course was boat X slow? | Geo map coloured by `performance_pct` |
+| Fast on polar but losing on handicap? | Join `performance_pct` with `live-results` rank / `handicap_value` |
+
+Distinct from **corrected-time rank** ([§7.13.6](#7136-live-results-list-corrected-time-ordering)) — polar % measures **boat speed vs VPP**, not scoring.
+
+#### 7.22.2 Pipeline
+
+```mermaid
+flowchart TB
+  subgraph inputs [Inputs every 30 s]
+    SK[signalk bucket\nown BSP/SOG/TWS/TWA]
+    AIS[ais_tracks bucket\nfleet lat/lon/SOG]
+    PM[polar-manager\ntarget BSP/VMG]
+    HM[handicap-manager\nactive factor]
+    LR[live-results\nleg, rank, course_pct]
+  end
+
+  FPT[fleet-performance-tracker]
+  OUT["Influx race bucket\nfleet_polar_performance"]
+
+  SK --> FPT
+  AIS --> FPT
+  PM --> FPT
+  HM --> FPT
+  LR --> FPT
+  FPT --> OUT
+```
+
+**Cadence:** 30 s while `race_id` active; pause when no race session.
+
+#### 7.22.3 Influx schema — `fleet_polar_performance`
+
+**Bucket:** `race`  
+**Measurement:** `fleet_polar_performance`
+
+| Tags | Description |
+|------|-------------|
+| `race_id` | Active regatta |
+| `mmsi` | Vessel MMSI |
+| `sail_number` | e.g. `NOR-10133` |
+| `vessel_name` | Display name |
+| `is_own` | `true` \| `false` |
+| `leg_seq` | Current leg index from `live-results` |
+| `route_id` | Active course route |
+| `polar_ref` | ORC ref or polar node id |
+| `polar_source` | `slk` \| `derived` |
+| `polar_quality` | `high` \| `low` (derived confidence &lt; 0.7) |
+| `handicap_type` | Active scoring key — e.g. `scoring_aph`, `aph_tot`, `scoring_triple_medium` |
+| `certificate_type` | `club` \| `dh` \| `international` \| … |
+| `data_quality` | `ok` \| `stale` \| `estimated_wind` |
+
+| Fields | Unit | Description |
+|--------|------|-------------|
+| `lat` | ° | WGS-84 |
+| `lon` | ° | WGS-84 |
+| `sog` | kn | Speed over ground (AIS or GPS) |
+| `bsp` | kn | Speed through water (own boat only; null for AIS-only) |
+| `tws` | kn | True wind speed used for polar lookup |
+| `twa` | ° | True wind angle used for polar lookup |
+| `cog` | ° | Course over ground |
+| `bsp_target` | kn | Interpolated from polar at TWS/TWA |
+| `vmg_target` | kn | Interpolated polar VMG |
+| `vmg_actual` | kn | VMG to mark (navigating) or to wind |
+| `performance_pct` | % | `sog` (or `bsp`) / `bsp_target × 100` |
+| `vmg_pct` | % | `vmg_actual / vmg_target × 100` |
+| `handicap_value` | — | Active race handicap factor (e.g. 1.2082) |
+| `course_pct` | 0–1 | Fraction of course complete |
+| `rank` | int | Corrected-time rank snapshot |
+| `rank_delta_15m` | int | Rank change over 15 min (for alert rules) |
+
+**Example line protocol:**
+
+```
+fleet_polar_performance,race_id=faerderseilasen-2026,mmsi=257771000,sail_number=NOR-10133,is_own=true,leg_seq=2,polar_source=slk,handicap_type=scoring_aph,polar_quality=high,data_quality=ok lat=59.12,lon=10.45,sog=6.8,bsp=6.5,tws=8.2,twa=38.0,bsp_target=6.9,vmg_target=5.4,vmg_actual=5.1,performance_pct=98.6,vmg_pct=94.4,handicap_value=1.042,rank=4,course_pct=0.32 1717574400
+```
+
+#### 7.22.4 Leg rollups — `fleet_polar_leg_summary`
+
+Written once per leg per vessel when `live-results` advances `leg_seq`:
+
+| Tags | Fields |
+|------|--------|
+| `race_id`, `mmsi`, `leg_seq`, `handicap_type` | `performance_pct_mean`, `performance_pct_p50`, `vmg_pct_mean`, `distance_nm`, `duration_s` |
+
+Enables leg-by-leg comparison tables without downsampling raw 30 s points.
+
+#### 7.22.5 Polar and handicap resolution
+
+| Vessel | Polar | Wind for lookup | Speed actual |
+|--------|-------|-----------------|--------------|
+| **Own boat** | SLK from `polar-manager` | Instrument TWS/TWA (Influx `signalk`) | BSP preferred; SOG fallback |
+| **Competitor** | SLK or derived from ORC cert | Estimated TWA from COG − TWD; TWS from GRIB at lat/lon or fleet consensus | AIS SOG |
+
+**Handicap:** `handicap-manager` exposes active factor for the race — from `races/.../scoring.yaml` + certificate `ratings.yaml` (see [§7.14](#714-handicap-numbers--scoring)). WRS triple-number races switch `handicap_type` when TWS crosses band thresholds.
+
+#### 7.22.6 Grafana visualization
+
+New **`grafana-race` → Fleet Performance** dashboard:
+
+| Panel | Query / viz |
+|-------|-------------|
+| **Fleet polar %** | Time series — `performance_pct` by `sail_number` |
+| **VMG %** | Time series — `vmg_pct` by boat |
+| **Geo trail** | Map — path coloured by `performance_pct` (last 30 min slider) |
+| **Leaderboard** | Table — current `performance_pct`, `vmg_pct`, `rank`, `handicap_type` |
+| **Leg summary** | Bar chart from `fleet_polar_leg_summary` |
+
+Annotations: leg changes, wind band switches (WRS), tack/gybe events from `race-intelligence`.
+
+#### 7.22.7 Retention and downsampling
+
+| Stage | Resolution | Retention |
+|-------|------------|-----------|
+| Raw | 30 s | 14 days |
+| Downsampled (`fleet_polar_performance_5m`) | 5 min mean | 2 years |
+| Leg summary | per leg | race lifetime |
+
+Task runs on SLA-1 Influx; configured in `influxdb/tasks/fleet-performance-downsample.flux`.
+
+#### 7.22.8 Consumers
+
+| Consumer | Use |
+|----------|-----|
+| `grafana-race` | Timeline, map, tables |
+| `wind-field-analyzer` | Validate wind zones against fleet over-performance clusters |
+| `insight-alerts` | Rules on `performance_pct`, `rank_delta_15m` ([§7.21](#721-tactical-insight-alerts--annunciation)) |
+| `tactical-coach` | Debrief context — *"you were at 82% polar on leg 2"* |
+| `race-mcp-gateway` | Flux queries for laptop Cursor |
+| Post-race export | Harbor CSV/Parquet from Influx |
+
+#### 7.22.9 API (v1)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/fleet-performance/latest` | Snapshot all boats — current polar % |
+| `GET` | `/fleet-performance/{mmsi}/series` | Time range for one boat |
+| `GET` | `/fleet-performance/geo` | Points with lat/lon for map layer (last N min) |
 
 ---
 
@@ -3797,6 +3958,22 @@ flowchart LR
 | FR-160 | `insight-alerts` remains available when `RACE_MODE=true` |
 | FR-161 | Degrade gracefully when SLA-3 offline — fleet/course alerts continue without trim category |
 
+### 11.12 Fleet polar performance timeline (InfluxDB)
+
+| ID | Requirement |
+|----|-------------|
+| FR-162 | `fleet-performance-tracker` samples all roster vessels every 30 s during active `race_id` |
+| FR-163 | Writes `fleet_polar_performance` to Influx `race` bucket with lat/lon, polar %, VMG %, and handicap tags |
+| FR-164 | Own boat uses instrument BSP/TWS/TWA; competitors use AIS SOG + estimated TWA |
+| FR-165 | Polar targets from `polar-manager` per vessel certificate (SLK or derived) |
+| FR-166 | `handicap_type` and `handicap_value` reflect active race scoring from `handicap-manager` / `scoring.yaml` |
+| FR-167 | `fleet_polar_leg_summary` written on leg change with mean/median polar % per leg |
+| FR-168 | Grafana Fleet Performance dashboard — time series, geo map, leg table |
+| FR-169 | SLA-2 write token scoped to `race` and `ais_tracks` only — no writes to `signalk` |
+| FR-170 | Downsample 30 s → 5 min after 14 days; retain leg summaries for debrief |
+| FR-171 | `race-mcp-gateway` Flux examples query `fleet_polar_performance` by race and boat |
+| FR-172 | Vessels without polar skipped with logged gap; `polar_quality=low` for derived confidence &lt; 0.7 |
+
 ---
 
 ## 12. Non-functional requirements
@@ -3880,6 +4057,8 @@ AI-sailing-system/
 │   ├── grib/
 │   └── polars/                     # Canonical YAML (generated from SLK / derived)
 ├── tactical-coach/                 # SLA-2
+├── live-results/                   # SLA-2 standings
+├── fleet-performance-tracker/      # SLA-2 fleet polar % → Influx
 ├── insight-alerts/                 # SLA-2 tactical alert broker + TTS
 ├── gopro-orchestrator/           # SLA-3 Open GoPro fleet control
 ├── media-ingest/                   # SLA-3 GoPro HTTP download
@@ -3916,7 +4095,7 @@ AI-sailing-system/
 - [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
 - [x] ADR-0001 through ADR-0006, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013
 - [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide
-- [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); ORC collection skill (§7.19); weather/current skills (§7.20); tactical insight alerts (§7.21)
+- [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); ORC collection skill (§7.19); weather/current skills (§7.20); tactical insight alerts (§7.21); fleet polar performance Influx (§7.22)
 - [x] Deploy scaffolding, workflow stubs, harbor scripts
 - [ ] Runtime containers (Phase 1+)
 
@@ -3936,12 +4115,13 @@ AI-sailing-system/
 - [ ] `course-flag-detector` — optional start-boat flag vision
 - [ ] `handicap-manager` — ORC certificate + WRS TCF
 - [ ] `live-results` — corrected-time standings + VMG
+- [ ] `fleet-performance-tracker` — fleet polar % timeline → Influx ([ADR-0016](./adr/0016-fleet-polar-performance-influx.md))
 - [ ] `race-intelligence` — start line, lift, steering (iRegatta + H5000 parity)
 - [ ] `insight-alerts` — tactical alert broker, Grafana/course-editor UX, optional Piper TTS ([ADR-0015](./adr/0015-tactical-insight-alerts-annunciation.md))
 - [ ] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
 - [x] `race-mcp-gateway` scaffold — Neo4j + Influx MCP (`race-mcp-gateway/`)
 - [ ] Shore ORC pipeline documented — runtime uses data repo assets ([ADR-0013](./adr/0013-orc-certificate-fleet-collection.md))
-- [ ] grafana-race dashboards (SailSteer, Start, WindPlot, Highway per §7.17)
+- [ ] grafana-race dashboards (SailSteer, Start, WindPlot, Highway, **Alert feed** per §7.17, §7.21, **Fleet Performance** per §7.22)
 
 ### Phase 3 — SLA-3 GoPro sail vision
 - [ ] `docker-compose.sla-3.yml`
