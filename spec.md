@@ -2,7 +2,7 @@
 
 **Version:** 0.13.0-draft  
 **Date:** 2026-07-05  
-**Changelog (0.13):** Automated ORC certificate fleet collection (ADR-0013, §7.19); dedicated Neo4j/Influx MCP endpoints (`race-mcp-gateway`).  
+**Changelog (0.13):** Automated ORC certificate fleet collection (ADR-0013, §7.19); dedicated Neo4j/Influx MCP endpoints; shore weather/current collection (ADR-0014, §7.20).  
 **Changelog (0.12):** Race-side MCP gateway for laptop Cursor ad hoc analysis (ADR-0012, §7.18).  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
@@ -20,6 +20,8 @@ The platform is organized into **three SLA tiers**, each running in **dedicated 
 **Race laptop:** [§7.18](#718-race-side-mcp--laptop-cursor) — bring a laptop on boat Wi‑Fi; **Cursor** connects via **MCP** to `race-mcp-gateway` for live standings, telemetry, and ad hoc analysis.
 
 **ORC certificates:** [§7.19](#719-orc-certificate-collection--fleet-enrichment) — automate fleet cert metadata and PDF download on shore via **orc-sailor-services** skill in AI-sailing-data ([ADR-0013](./adr/0013-orc-certificate-fleet-collection.md)).
+
+**Weather & current:** [§7.20](#720-shore-weather--current-collection) — MET Norway GRIB, Oslofjord current plots, SMHI wind validation in **AI-sailing-data** ([ADR-0014](./adr/0014-shore-weather-current-collection.md)).
 
 | Tier | Domain | SLA priority |
 |------|--------|----------------|
@@ -85,6 +87,7 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G25 | **B&G H5000-equivalent** instrument semantics, SailSteer/StartLine pages, calibration YAML — see [§7.17](#717-bg-h5000-reference-model--integration) and [ADR-0011](./adr/0011-bg-h5000-reference-model.md) |
 | G26 | **Race-side MCP** — laptop on boat LAN runs **Cursor** with live Neo4j, Influx, standings, and YAML context for ad hoc analysis — [§7.18](#718-race-side-mcp--laptop-cursor), [ADR-0012](./adr/0012-race-side-mcp-laptop-cursor.md) |
 | G27 | **Automated ORC certificate collection** for race-class fleets — metadata via `activecerts`, PDFs via authenticated download, `boats/` stubs — [§7.19](#719-orc-certificate-collection--fleet-enrichment), [ADR-0013](./adr/0013-orc-certificate-fleet-collection.md) |
+| G28 | **Shore weather/current collection** for Oslofjord races — MET GRIB, current plot interpretation, SMHI validation — [§7.20](#720-shore-weather--current-collection), [ADR-0014](./adr/0014-shore-weather-current-collection.md) |
 
 ### 3.2 Non-goals (v1)
 
@@ -2911,6 +2914,93 @@ No new SLA-2 container in v1 — collection is **shore-only** via Cursor skill. 
 
 ---
 
+### 7.20 Shore weather & current collection
+
+**ADR:** [0014 — Shore weather and current collection](./adr/0014-shore-weather-current-collection.md)  
+**Data repo:** [AI-sailing-data weather skills](https://github.com/cognite-fholm/AI-sailing-data/tree/main/.cursor/skills)
+
+Oslofjord and Skagerrak regattas need **fjord-resolution** wind, wave, and tidal-current data linked to each race folder — not only coarse global models.
+
+#### 7.20.1 Sources
+
+| Source | API / URL | Content | Skill |
+|--------|-----------|---------|-------|
+| MET Norway GRIB | `api.met.no/weatherapi/gribfiles/1.1/?area=oslofjord&content={weather\|current\|waves}` | Wind, current (u/v −3 m), waves | `metno-oslofjord-weather` |
+| Oslofjord varsler | [projects.met.no/~nilsmk/oslofjord](https://projects.met.no/~nilsmk/oslofjord/) | Human portal → same GRIB + current PNGs | — |
+| YR GRIB help | [hjelp.yr.no GRIB article](https://hjelp.yr.no/hc/en-us/articles/360009342993-GRIB-weather-data) | Documentation for OpenCPN / local models | — |
+| Oslofjord current plots | `api.met.no/weatherapi/oslofjord/0.1/?area={ferder1..4\|drammen1}&hour={0..48}` | PNG forecast maps (arrows + color bar) | `oslofjord-current-plots` |
+| SMHI MetObs | `opendata-download-metobs.smhi.se/.../parameter/{3\|4\|24}/station/{id}/period/latest-hour/data.json` | Observed wind speed, gust, direction | `smhi-wind-observations` |
+
+**Default SMHI validation station:** Väderöarna **81350** — Skagerrak boundary wind for Færder approach ([table view](https://www.smhi.se/vader/observationer/observationer/station/81350/vind/tabell)).
+
+#### 7.20.2 Shore pipeline
+
+```mermaid
+flowchart LR
+  PLAN[planning/grib-plan.yaml]
+  GRIB[metno-oslofjord-weather]
+  PNG[oslofjord-current-plots]
+  SMHI[smhi-wind-observations]
+  MAN[collected/weather/manifest.yaml]
+  NOTES[planning/weather-notes.md]
+  BOAT["/data/grib/ on SLA-2"]
+
+  PLAN --> GRIB --> MAN
+  PLAN --> PNG --> MAN
+  PLAN --> SMHI --> MAN
+  MAN --> NOTES
+  GRIB --> BOAT
+```
+
+| Script | Output |
+|--------|--------|
+| `fetch_grib.py` | `collected/weather/grib/*.grb` + `WeatherCollection` manifest |
+| `fetch_current_plots.py` | `collected/weather/current-plots/*.png` + area index |
+| `fetch_smhi_wind.py` | `collected/weather/smhi-{station}.json` |
+
+GRIB binaries are **gitignored**; manifests and `grib-plan.yaml` are committed per race.
+
+#### 7.20.3 Current plot interpretation (agent skill)
+
+The `oslofjord-current-plots` skill includes a **reference guide** for reading PNG maps:
+
+- **Areas:** `ferder1`–`ferder4` (Færder approach tiers), `drammen1` (inner fjord)
+- **Color bar:** m/s current speed; arrows show direction **toward** which water moves
+- **Hour parameter:** forecast lead time from model run — align with race start in `Europe/Oslo`
+- **Cross-check:** compare qualitative PNG with GRIB `current_oslofjord.grb` u/v at same valid time
+
+No automated CV in v1 — agents and humans interpret images using `reference.md`, then record conclusions in `weather-notes.md`.
+
+#### 7.20.4 Downstream consumers (onboard)
+
+| Service | Uses weather assets |
+|---------|---------------------|
+| `grib-ingest` / `grib-parser` | GRIB files copied to `/data/grib/` at harbor |
+| `wind-field-analyzer` | GRIB + AIS + polar fusion |
+| `race-intelligence` | Start-line current bias hints from planning notes |
+| `tactical-coach` | OKF + `weather-notes.md` for advisory context |
+
+Collection is **shore-only** via Cursor skills (same pattern as ORC §7.19).
+
+#### 7.20.5 Race linkage
+
+Each Oslofjord race should have:
+
+```
+races/{year}/{race}/
+  planning/grib-plan.yaml      # models, schedule, MET area, SMHI stations
+  planning/weather-notes.md    # interpretation after collection
+  collected/weather/
+    manifest.yaml              # kind: WeatherCollection (merged entries)
+    grib/                      # gitignored *.grb
+    current-plots/
+    smhi-81350.json
+```
+
+`GribPlan.spec.sources` references collector skills and validation stations; `WeatherCollection` records provenance for harbor sync.
+
+---
+
 ## 8. Technology matrix
 
 | Concern | Choice | Language | Rationale |
@@ -3503,6 +3593,18 @@ flowchart LR
 | FR-137 | `materialize_boat_certs.py` creates `boats/{sail}/{year}/certificates/{type}-{orc_ref}/` with `manifest.yaml` |
 | FR-138 | `collected-sources.yaml` registers `orc_sailor_services` provenance |
 
+### 11.10 Shore weather & current collection
+
+| ID | Requirement |
+|----|-------------|
+| FR-143 | `metno-oslofjord-weather` skill downloads GRIB (`weather`, `current`, `waves`) for `oslofjord` (or race bbox area) and writes `WeatherCollection` manifest |
+| FR-144 | `oslofjord-current-plots` skill fetches PNG maps for race-relevant areas (`ferder4`, etc.) with interpretation guide in `reference.md` |
+| FR-145 | `smhi-wind-observations` skill fetches MetObs JSON for configured validation stations (default 81350) |
+| FR-146 | `grib-plan.yaml` documents MET area, refresh schedule, SMHI stations, and boat path `/data/grib/` |
+| FR-147 | GRIB binaries gitignored; only manifests and planning YAML committed |
+| FR-148 | `collected-sources.yaml` registers `metno_gribfiles`, `metno_oslofjord_plots`, `smhi_metobs` provenance |
+| FR-149 | `planning/weather-notes.md` records agent/human interpretation after collection |
+
 ---
 
 ## 12. Non-functional requirements
@@ -3621,7 +3723,7 @@ AI-sailing-system/
 - [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
 - [x] ADR-0001 through ADR-0006, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013
 - [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide
-- [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); ORC collection skill (§7.19)
+- [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); ORC collection skill (§7.19); weather/current skills (§7.20)
 - [x] Deploy scaffolding, workflow stubs, harbor scripts
 - [ ] Runtime containers (Phase 1+)
 

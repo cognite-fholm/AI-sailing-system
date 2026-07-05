@@ -125,6 +125,7 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0011](../adr/0011-bg-h5000-reference-model.md) | H5000 instrument benchmark |
 | [0012](../adr/0012-race-side-mcp-laptop-cursor.md) | Race-side MCP for laptop Cursor |
 | [0013](../adr/0013-orc-certificate-fleet-collection.md) | Automated ORC certificate fleet collection (shore skill) |
+| [0014](../adr/0014-shore-weather-current-collection.md) | Shore weather/current — MET GRIB, Oslofjord plots, SMHI |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -139,12 +140,16 @@ flowchart LR
   M2S[manage2sail / sailracesystem]
   FLEET[fleet.yaml]
   ORC[orc-sailor-services]
+  WX[weather skills]
   IDX[collected/orc/]
+  WIDX[collected/weather/]
   BOATS[boats/certificates/]
   SYNC[race-data-sync]
 
   M2S --> FLEET --> ORC --> IDX --> BOATS
+  FLEET --> WX --> WIDX
   BOATS --> SYNC
+  WIDX --> SYNC
 ```
 
 | Skill | Output |
@@ -152,8 +157,11 @@ flowchart LR
 | **sailracesystem** | Fleet, SI PDFs, `collected/sailracesystem/` |
 | **manage2sail** | Fleet, documents, `collected/manage2sail/` |
 | **orc-sailor-services** | ORC index, PDFs, `boats/{sail}/certificates/` |
+| **metno-oslofjord-weather** | GRIB manifests, `collected/weather/grib/` (binaries gitignored) |
+| **oslofjord-current-plots** | Current PNG maps + interpretation reference |
+| **smhi-wind-observations** | Skagerrak wind obs JSON for forecast validation |
 
-Detail: [spec §7.19](../spec.md#719-orc-certificate-collection--fleet-enrichment) · [data repo prep guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md#phase-3b--automate-fleet-orc-certificates)
+Detail: [spec §7.19](../spec.md#719-orc-certificate-collection--fleet-enrichment) · [spec §7.20](../spec.md#720-shore-weather--current-collection) · [data repo prep guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md#phase-6--weather-grib-and-current-collection)
 
 ---
 
@@ -164,7 +172,7 @@ Detail: [spec §7.19](../spec.md#719-orc-certificate-collection--fleet-enrichmen
 | `Boat`, `BoatSeason`, `OrcCertificate`, `PolarSource` | `boats/{sail_number}/` |
 | `InstrumentProfile`, `InstrumentCalibration` | `boats/{sail}/instrumentation/` |
 | `Race`, `Fleet`, `CourseCatalog`, `WaypointList` | `races/{year}/{race}/` |
-| `LaylinePreferences`, `StartLinePreferences`, `GribPlan` | `races/.../planning/` |
+| `LaylinePreferences`, `StartLinePreferences`, `GribPlan`, `WeatherCollection` | `races/.../planning/`, `collected/weather/` |
 | `H5000VariableMap` | `schema/h5000-variable-map.yaml` |
 
 Detail: [data repo schema/README.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/README.md)
