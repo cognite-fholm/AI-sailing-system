@@ -1,7 +1,8 @@
 # AI Sailing System — Specification
 
-**Version:** 0.17.0-draft  
+**Version:** 0.18.0-draft  
 **Date:** 2026-07-05  
+**Changelog (0.18):** Gherkin acceptance tests per implementation phase (`tests/bdd/features/`).  
 **Changelog (0.17):** Implementation map — spec §1.1, §7.0, §14 phases; ADR index reordered by build sequence.  
 **Changelog (0.16):** Marine map GPX export bundle for chartplotter import (ADR-0017, §7.23).  
 **Changelog (0.15):** Fleet polar performance timeline for all boats in InfluxDB (ADR-0016, §7.22).  
@@ -4293,9 +4294,11 @@ AI-sailing-system/
 
 Phases match [§1.1 Implementation map](#11-implementation-map). Checklists are ordered for execution; ADR numbers stay chronological.
 
+**Acceptance tests:** [tests/bdd/README.md](./tests/bdd/README.md) — Gherkin scenarios per phase (`tests/bdd/features/phase_*.feature`).
+
 ### Phase 0 — Foundation (current)
 
-- [x] Repository created; [spec.md](./spec.md) v0.17
+- [x] Repository created; [spec.md](./spec.md) v0.18
 - [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
 - [x] ADR-0001 through ADR-0017 (see [adr/README.md](./adr/README.md#implementation-order))
 - [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide + user guides

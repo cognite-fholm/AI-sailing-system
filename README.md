@@ -13,6 +13,7 @@ An edge-first, AI-assisted competitive sailing platform built on [Signal K](http
 | [docs/USER_GUIDE.md](./docs/USER_GUIDE.md) | **User guide** — shore prep links + onboard overview |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Architecture index — repos, tiers, ADRs |
 | [spec.md](./spec.md) | Full system specification |
+| [tests/bdd/](./tests/bdd/README.md) | Gherkin acceptance tests per implementation phase |
 | [docs/deployment-lifecycle.md](./docs/deployment-lifecycle.md) | GitHub + Docker CI/CD, Pi deploy, race freeze |
 | [docs/race-laptop-mcp.md](./docs/race-laptop-mcp.md) | Laptop + Cursor + MCP at the regatta |
 | [docs/mcp-neo4j-influx.md](./docs/mcp-neo4j-influx.md) | Neo4j & Influx MCP tool reference |

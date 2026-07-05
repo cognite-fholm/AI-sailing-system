@@ -2,7 +2,7 @@
 
 Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, data stores, and reference products fit together. Normative detail remains in [spec.md](../spec.md) and [adr/](../adr/).
 
-**Last updated:** 2026-07-05 · **Spec version:** 0.17.0-draft
+**Last updated:** 2026-07-05 · **Spec version:** 0.18.0-draft
 
 ---
 
@@ -235,7 +235,7 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 
 | Phase | Status |
 |-------|--------|
-| **0 — Foundation** | **Current** — spec v0.17, ADRs 0001–0017, deploy scaffolding |
+| **0 — Foundation** | **Current** — spec v0.18, ADRs 0001–0017, BDD phase tests, deploy scaffolding |
 | **1 — SLA-1 telemetry** | Not started |
 | **2A — Shore race prep** | **Partial** — data repo skills, Færder examples; waypoint gaps remain |
 | **2B — Graph import** | Not started |
@@ -248,7 +248,7 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 | **4 — CI/CD multi-Pi** | Workflow stubs only |
 | **5 — Shore training** | Spec only |
 
-Detail: [spec §14](../spec.md#14-implementation-phases)
+Detail: [spec §14](../spec.md#14-implementation-phases) · BDD: [tests/bdd/README.md](../tests/bdd/README.md)
 
 ---
 
