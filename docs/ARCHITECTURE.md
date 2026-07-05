@@ -2,7 +2,7 @@
 
 Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, data stores, and reference products fit together. Normative detail remains in [spec.md](../spec.md) and [adr/](../adr/).
 
-**Last updated:** 2026-07-05 · **Spec version:** 0.19.0-draft
+**Last updated:** 2026-07-05 · **Spec version:** 0.20.0-draft
 
 ---
 
@@ -235,10 +235,10 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 
 | Phase | Status |
 |-------|--------|
-| **0 — Foundation** | **Current** — spec v0.19, ADRs 0001–0019, three-Pi race profile, BDD tests |
-| **1 — SLA-1 telemetry** | Not started |
+| **0 — Foundation** | **Done** — spec v0.20, ADRs 0001–0020, BDD scaffold |
+| **1 — SLA-1 telemetry** | **Scaffold** — `docker-compose.sla-1.yml`, bridge, Grafana provisioning; PiCAN ingest pending |
 | **2A — Shore race prep** | **Partial** — data repo skills, Færder examples; waypoint gaps remain |
-| **2B — Graph import** | Not started |
+| **2B — Graph import** | **Scaffold** — `docker-compose.sla-2.yml`, `race-import`, `race-data-sync` |
 | **2C — GRIB, polars, AIS** | Not started |
 | **2D — Courses & results** | Not started |
 | **2E — Race UX** | Not started |
@@ -249,6 +249,17 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 | **5 — Shore training** | Spec only |
 
 Detail: [spec §14](../spec.md#14-implementation-phases) · BDD: [tests/bdd/README.md](../tests/bdd/README.md)
+
+### Onboard runtime (Phase 1 & 2B)
+
+| Compose | Services (v1) |
+|---------|-----------------|
+| `docker-compose.sla-1.yml` | `signalk-server`, `influxdb`, `signalk-influx-bridge`, `grafana-telemetry` |
+| `docker-compose.sla-2.yml` | `neo4j`, `race-import`, `race-data-sync`, `race-mcp-gateway` (profile `mcp`) |
+| `docker-compose.dev.yml` | Overlay for laptop dev — bridge network, sibling data-repo mount |
+| `docker-compose.harbor.yml` | Watchtower overlay (SLA-2/3 only) |
+
+Local dev: [deploy/README.md](../deploy/README.md#local-dev-single-machine).
 
 ---
 

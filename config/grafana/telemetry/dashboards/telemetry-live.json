@@ -1,0 +1,104 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "influxdb", "uid": "influx-signalk" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "velocityknots"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "list" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "query": "from(bucket: \"${INFLUX_BUCKET}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"navigation\")\n  |> filter(fn: (r) => r._field == \"sog\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "SOG",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "influx-signalk" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "degree"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "list" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "query": "from(bucket: \"${INFLUX_BUCKET}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"navigation\")\n  |> filter(fn: (r) => r._field == \"cog\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "COG",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "influx-signalk" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "velocityknots"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "list" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "query": "from(bucket: \"${INFLUX_BUCKET}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"environment\")\n  |> filter(fn: (r) => r._field == \"tws\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "TWS",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "influx-signalk" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "degree"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "list" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "query": "from(bucket: \"${INFLUX_BUCKET}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"environment\")\n  |> filter(fn: (r) => r._field == \"twd\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "TWD",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1s",
+  "schemaVersion": 39,
+  "tags": ["telemetry", "sla-1"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Telemetry Live",
+  "uid": "telemetry-live",
+  "version": 1
+}

@@ -18,17 +18,33 @@ Feature: Phase 0 — Foundation
 
   Scenario: Architecture documentation is linked from the spec
     Then file "docs/ARCHITECTURE.md" exists
-    And docs/ARCHITECTURE.md references spec version "0.18"
+    And docs/ARCHITECTURE.md references spec version "0.20"
 
   Scenario: Deploy and harbor scaffolding is present
     Then file "scripts/harbor-pull.sh" exists
     And file "scripts/harbor-sync.sh" exists
     And file "deploy/env/race.env.example" exists
+    And file "deploy/env/dev.env.example" exists
     And file ".github/workflows/release.yml" exists
+    And file "docker-compose.sla-1.yml" exists
+    And file "docker-compose.sla-2.yml" exists
+    And file "docker-compose.harbor.yml" exists
+    And file "docker-compose.dev.yml" exists
 
   Scenario: Dual-repository contract is documented
     Then spec.md documents AI-sailing-data as the race content repository
     And file "config/data-repo.yaml" exists
+
+  Scenario: Phase 1 SLA-1 runtime scaffolding is present
+    Then file "signalk-influx-bridge/signalk_influx_bridge/bridge.py" exists
+    And file "config/signalk/settings.json" exists
+    And directory "config/grafana/telemetry/provisioning" exists
+    And file ".github/workflows/publish-sla-1.yml" exists
+
+  Scenario: Phase 2B graph import scaffolding is present
+    Then file "race-import/race_import/importer.py" exists
+    And file "race-import/race_import/api.py" exists
+    And file "race-data-sync/race_data_sync/sync.py" exists
 
   Scenario: Race MCP gateway scaffold exists for Phase 2G
     Then directory "race-mcp-gateway" exists

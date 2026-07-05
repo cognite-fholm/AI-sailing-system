@@ -1,0 +1,55 @@
+# Dev overlay — single-machine testing (Windows/macOS/Linux laptop)
+# Overrides host networking so Signal K and bridge run on the compose network.
+#
+# Usage:
+#   copy deploy\env\dev.env.example deploy\env\dev.env
+#   docker compose -f docker-compose.sla-1.yml -f docker-compose.dev.yml --env-file deploy/env/dev.env up -d
+#   docker compose -f docker-compose.sla-2.yml --env-file deploy/env/dev.env up -d
+
+name: ai-sailing-dev
+
+services:
+  signalk-server:
+    network_mode: bridge
+    ports:
+      - "${SIGNALK_PORT:-3000}:3000"
+    volumes:
+      - signalk-config:/home/node/.signalk
+      - ./config/signalk:/signalk-settings:ro
+
+  signalk-influx-bridge:
+    network_mode: bridge
+    depends_on:
+      signalk-server:
+        condition: service_started
+      influxdb:
+        condition: service_healthy
+    environment:
+      SIGNALK_WS_URL: ws://signalk-server:3000/signalk/v1/stream?subscribe=all
+      INFLUX_URL: http://influxdb:8086
+
+  influxdb:
+    ports:
+      - "${INFLUX_PORT:-8086}:8086"
+
+  grafana-telemetry:
+    ports:
+      - "${GRAFANA_TELEMETRY_PORT:-3001}:3000"
+
+  neo4j:
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+
+  race-import:
+    volumes:
+      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
+      - ${DATA_REPO_HOST_PATH:-../AI-sailing-data}:/opt/ai-sailing-data:ro
+
+  race-data-sync:
+    volumes:
+      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
+      - ${DATA_REPO_HOST_PATH:-../AI-sailing-data}:/opt/ai-sailing-data
+    environment:
+      SYNC_AUTO_PULL: "false"
+      SYNC_AUTO_IMPORT: "true"

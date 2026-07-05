@@ -1,0 +1,19 @@
+{
+  "vessel": {
+    "name": "Xbox",
+    "mmsi": "257771000",
+    "uuid": "urn:mrn:signalk:uuid:vessel-own-boat"
+  },
+  "pipedProviders": [],
+  "interfaces": {
+    "applicationData": true,
+    "appstore": true,
+    "nmea-tcp": true
+  },
+  "security": {
+    "strategy": "./tokensecurity"
+  },
+  "resources": {
+    "requests": []
+  }
+}

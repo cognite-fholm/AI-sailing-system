@@ -11,6 +11,10 @@ on:
       - 'polar-manager/**'
       - 'live-results/**'
       - 'course-editor/**'
+      - 'race-import/**'
+      - 'race-data-sync/**'
+      - 'race-mcp-gateway/**'
+      - 'docker-compose.sla-2.yml'
       - '.github/workflows/publish-sla-2.yml'
   workflow_dispatch:
 
@@ -32,6 +36,15 @@ jobs:
           - service: polar-manager
             context: polar-manager
             dockerfile: polar-manager/Dockerfile
+          - service: race-import
+            context: race-import
+            dockerfile: race-import/Dockerfile
+          - service: race-data-sync
+            context: race-data-sync
+            dockerfile: race-data-sync/Dockerfile
+          - service: race-mcp-gateway
+            context: race-mcp-gateway
+            dockerfile: race-mcp-gateway/Dockerfile
     steps:
       - uses: actions/checkout@v4
 

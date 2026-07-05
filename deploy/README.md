@@ -17,13 +17,28 @@ This directory holds **environment templates**, **digest lock files**, and **top
 |-------|----------|------------|
 | Harbor (default) | `deploy/env/harbor.env` | SLA-2/3 via `docker-compose.harbor.yml` |
 | Racing | `deploy/env/race.env` | **Disabled** |
+| Dev / laptop | `deploy/env/dev.env` | **Disabled** — use `docker-compose.dev.yml` overlay |
 
 Copy examples:
 
 ```powershell
 copy deploy\env\harbor.env.example deploy\env\harbor.env
 copy deploy\env\race.env.example deploy\env\race.env
+copy deploy\env\dev.env.example deploy\env\dev.env
 ```
+
+## Local dev (single machine)
+
+```powershell
+# SLA-1 telemetry stack (bridge network — no PiCAN required)
+docker compose -f docker-compose.sla-1.yml -f docker-compose.dev.yml --env-file deploy/env/dev.env up -d --build
+
+# SLA-2 graph import (mount sibling AI-sailing-data clone)
+docker compose -f docker-compose.sla-2.yml --env-file deploy/env/dev.env up -d --build
+curl -X POST http://localhost:8080/import
+```
+
+Grafana telemetry: `http://localhost:3001` · Signal K: `http://localhost:3000` · Neo4j browser: `http://localhost:7474`
 
 ## Guardrails (summary)
 

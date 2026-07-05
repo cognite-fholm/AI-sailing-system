@@ -1,0 +1,20 @@
+# Harbor overlay — enables Watchtower on SLA-2/3 only (never SLA-1)
+# Spec §9 · ADR-0008 · GR-1, GR-2
+
+name: ai-sailing-harbor
+
+services:
+  watchtower-sla2:
+    image: containrrr/watchtower:1.7.1
+    container_name: watchtower-sla2
+    restart: unless-stopped
+    profiles:
+      - harbor
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-86400}
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_NO_PULL: ${WATCHTOWER_NO_PULL:-false}
+    command: --label-enable

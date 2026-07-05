@@ -26,6 +26,13 @@ jobs:
               print('OK', p)
           "
 
+      - name: Validate Docker Compose files
+        run: |
+          docker compose -f docker-compose.sla-1.yml config --quiet
+          docker compose -f docker-compose.sla-2.yml config --quiet
+          docker compose -f docker-compose.harbor.yml config --quiet
+          docker compose -f docker-compose.sla-1.yml -f docker-compose.dev.yml config --quiet
+
       - name: Check ADR index
         run: test -f adr/README.md
 

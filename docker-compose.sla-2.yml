@@ -1,0 +1,107 @@
+# SLA-2 — race tier (core Phase 2B services)
+# Spec §7.3, §7.15 · ADR-0009
+#
+# Additional Phase 2C–2F services are added incrementally; this stack
+# boots Neo4j, data sync, import, and the race MCP gateway.
+
+name: ai-sailing-sla2
+
+services:
+  neo4j:
+    image: ${NEO4J_IMAGE:-neo4j:5-community}
+    container_name: neo4j
+    restart: unless-stopped
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-change-me-neo4j}
+      NEO4J_server_memory_heap_initial__size: ${NEO4J_HEAP_INITIAL:-512m}
+      NEO4J_server_memory_heap_max__size: ${NEO4J_HEAP_MAX:-1G}
+      NEO4J_server_memory_pagecache_size: ${NEO4J_PAGECACHE:-512m}
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4JLABS_PLUGINS: '["apoc"]'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  race-import:
+    build:
+      context: ./race-import
+      dockerfile: Dockerfile
+    image: ${RACE_IMPORT_IMAGE:-ghcr.io/cognite-fholm/race-import:local}
+    container_name: race-import
+    restart: unless-stopped
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    ports:
+      - "${RACE_IMPORT_PORT:-8080}:8080"
+    volumes:
+      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
+      - ${DATA_REPO_HOST_PATH:-./data/ai-sailing-data}:/opt/ai-sailing-data
+    environment:
+      DATA_REPO_CONFIG: /config/data-repo.yaml
+      DATA_REPO_PATH: /opt/ai-sailing-data
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-change-me-neo4j}
+      RACE_IMPORT_PORT: "8080"
+
+  race-data-sync:
+    build:
+      context: ./race-data-sync
+      dockerfile: Dockerfile
+    image: ${RACE_DATA_SYNC_IMAGE:-ghcr.io/cognite-fholm/race-data-sync:local}
+    container_name: race-data-sync
+    restart: unless-stopped
+    depends_on:
+      race-import:
+        condition: service_started
+    volumes:
+      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
+      - ${DATA_REPO_HOST_PATH:-./data/ai-sailing-data}:/opt/ai-sailing-data
+      - sync-status:/var/lib/ai-sailing
+    environment:
+      DATA_REPO_CONFIG: /config/data-repo.yaml
+      DATA_REPO_PATH: /opt/ai-sailing-data
+      SYNC_AUTO_PULL: ${SYNC_AUTO_PULL:-true}
+      SYNC_AUTO_IMPORT: ${SYNC_AUTO_IMPORT:-true}
+      SYNC_POLL_MINUTES: ${SYNC_POLL_MINUTES:-60}
+      ONLINE_MODE: ${ONLINE_MODE:-true}
+      RACE_IMPORT_URL: http://race-import:8080/import
+
+  race-mcp-gateway:
+    build:
+      context: ./race-mcp-gateway
+      dockerfile: Dockerfile
+    image: ${RACE_MCP_GATEWAY_IMAGE:-ghcr.io/cognite-fholm/race-mcp-gateway:local}
+    container_name: race-mcp-gateway
+    restart: unless-stopped
+    profiles:
+      - mcp
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    ports:
+      - "${RACE_MCP_PORT:-3100}:3100"
+    volumes:
+      - ./config/mcp-gateway.yaml.example:/config/mcp-gateway.yaml:ro
+      - ${DATA_REPO_HOST_PATH:-./data/ai-sailing-data}:/opt/ai-sailing-data:ro
+    environment:
+      MCP_GATEWAY_CONFIG: /config/mcp-gateway.yaml
+      RACE_MCP_API_KEY: ${RACE_MCP_API_KEY:-change-me-mcp-key}
+      NEO4J_MCP_PASSWORD: ${NEO4J_MCP_PASSWORD:-change-me-mcp-neo4j}
+      INFLUX_READ_TOKEN: ${INFLUX_READ_TOKEN:-change-me-influx-read}
+      RACE_MCP_ENABLED: ${RACE_MCP_ENABLED:-true}
+
+volumes:
+  neo4j-data:
+  neo4j-logs:
+  sync-status:

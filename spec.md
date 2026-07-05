@@ -4382,16 +4382,16 @@ Phases match [§1.1 Implementation map](#11-implementation-map). Checklists are 
 - [x] ADR-0001 through ADR-0017 (see [adr/README.md](./adr/README.md#implementation-order))
 - [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide + user guides
 - [x] Deploy scaffolding, workflow stubs, harbor scripts
-- [ ] Runtime containers (Phase 1+)
+- [x] Runtime containers — Phase 1 & 2B core (compose + services)
 
 ### Phase 1 — SLA-1 telemetry (MVP)
 
 **ADR:** 0001, 0011 (ingest) · **§7:** 7.1, 7.2, 7.4 · **FR:** 11.1
 
 - [ ] Signal K on Pi with PiCAN-M
-- [ ] `docker-compose.sla-1.yml`
-- [ ] InfluxDB bridge
-- [ ] grafana-telemetry live dashboard
+- [x] `docker-compose.sla-1.yml`
+- [x] InfluxDB bridge (`signalk-influx-bridge`)
+- [x] grafana-telemetry live dashboard (provisioning scaffold)
 
 ### Phase 2A — Shore race prep (AI-sailing-data)
 
@@ -4411,8 +4411,8 @@ Runs onshore (laptop); can parallel Phase 1.
 **ADR:** 0009 · **§7:** 7.3, 7.15 · **FR:** 11.2 (import subset)
 
 - [ ] Neo4j schema (Vessel, Polar, GribModel, Waypoint, HandicapRating, …)
-- [ ] `docker-compose.sla-2.yml` (core services)
-- [ ] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
+- [x] `docker-compose.sla-2.yml` (core services)
+- [x] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
 
 ### Phase 2C — GRIB, polars, AIS, wind
 

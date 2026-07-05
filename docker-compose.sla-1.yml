@@ -1,0 +1,95 @@
+# SLA-1 — telemetry tier (Signal K, InfluxDB, Grafana)
+# Spec §7.1–7.2, §7.4 · ADR-0002
+#
+# Pi (race profile): signalk-server uses host network for PiCAN-M / serial.
+# Dev/laptop: use docker-compose.dev.yml overlay instead of host networking.
+
+name: ai-sailing-sla1
+
+services:
+  signalk-server:
+    image: ${SIGNALK_IMAGE:-signalk/signalk-server:latest}
+    container_name: signalk-server
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - signalk-config:/home/node/.signalk
+      - ./config/signalk:/signalk-settings:ro
+    environment:
+      - SIGNALK_NODE_SETTINGS=/signalk-settings/settings.json
+      - DEBUGSIGNALK=false
+    # Host network: no ports section — UI on :3000, stream on ws://<host>:3000
+
+  influxdb:
+    image: ${INFLUXDB_IMAGE:-influxdb:2.7}
+    container_name: influxdb
+    restart: unless-stopped
+    ports:
+      - "${INFLUX_PORT:-8086}:8086"
+    volumes:
+      - influx-data:/var/lib/influxdb2
+      - influx-config:/etc/influxdb2
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_ADMIN_USER:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_ADMIN_PASSWORD:-change-me-influx-admin}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG:-ai-sailing}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET:-signalk}
+      DOCKER_INFLUXDB_INIT_RETENTION: ${INFLUX_RETENTION:-90d}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN:-change-me-influx-token}
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  signalk-influx-bridge:
+    build:
+      context: ./signalk-influx-bridge
+      dockerfile: Dockerfile
+    image: ${SIGNALK_INFLUX_BRIDGE_IMAGE:-ghcr.io/cognite-fholm/signalk-influx-bridge:local}
+    container_name: signalk-influx-bridge
+    restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    network_mode: host
+    environment:
+      SIGNALK_WS_URL: ${SIGNALK_WS_URL:-ws://127.0.0.1:3000/signalk/v1/stream?subscribe=all}
+      INFLUX_URL: ${INFLUX_URL:-http://127.0.0.1:8086}
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-change-me-influx-token}
+      INFLUX_ORG: ${INFLUX_ORG:-ai-sailing}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-signalk}
+      VESSEL_ID: ${VESSEL_ID:-own-boat}
+      BRIDGE_BATCH_SIZE: ${BRIDGE_BATCH_SIZE:-100}
+      BRIDGE_FLUSH_INTERVAL_S: ${BRIDGE_FLUSH_INTERVAL_S:-1.0}
+
+  grafana-telemetry:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:11.4.0}
+    container_name: grafana-telemetry
+    restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    ports:
+      - "${GRAFANA_TELEMETRY_PORT:-3001}:3000"
+    volumes:
+      - grafana-telemetry-data:/var/lib/grafana
+      - ./config/grafana/telemetry/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/telemetry/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-grafana}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_TELEMETRY_ROOT_URL:-http://telemetry.local:3001}
+      GF_INSTALL_PLUGINS: ""
+      INFLUX_ORG: ${INFLUX_ORG:-ai-sailing}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-signalk}
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-change-me-influx-token}
+
+volumes:
+  signalk-config:
+  influx-data:
+  influx-config:
+  grafana-telemetry-data:
