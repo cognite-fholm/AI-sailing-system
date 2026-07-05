@@ -1,6 +1,6 @@
 # AI Sailing System — Specification
 
-**Version:** 0.9.0-draft  
+**Version:** 0.10.0-draft  
 **Date:** 2026-07-05  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
@@ -74,6 +74,7 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G22 | **AI-sailing-data** repo for temporal race/boat planning onshore |
 | G23 | Onboard **race-data-sync** pulls newer data from GitHub via Teltonika LTE when available |
 | G24 | **iRegatta-equivalent** race UX for start, laylines, polars, and navigation — see [§7.16](#716-iregatta-reference-model--feature-traceability) and [ADR-0010](./adr/0010-iregatta-reference-model.md) |
+| G25 | **B&G H5000-equivalent** instrument semantics, SailSteer/StartLine pages, calibration YAML — see [§7.17](#717-bg-h5000-reference-model--integration) and [ADR-0011](./adr/0011-bg-h5000-reference-model.md) |
 
 ### 3.2 Non-goals (v1)
 
@@ -129,6 +130,8 @@ I²C sensors (wind, env) ──► Qwiic (J4)
 - NMEA 2000: `canboatjs` or Signal K N2K plugin reading `can0` — includes **AIS PGNs** (129038, 129039, 129809, 129810) forwarded to SLA-2.
 - NMEA 0183: serial port plugin on `/dev/ttyS0` (4800/38400/115200 as appropriate).
 - I²C sensors: optional plugin or custom Python reader publishing Signal K deltas.
+
+**B&G H5000 coexistence:** On boats with H5000, N2K talkers on `can0` include wind, BSP, heel, GPS, and autopilot state. Signal K should **prefer H5000-corrected** true wind when present. See [§7.17](#717-bg-h5000-reference-model--integration) and [`h5000-variable-map.yaml`](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/h5000-variable-map.yaml).
 
 ### 4.3 Coral accelerator note
 
@@ -2449,6 +2452,207 @@ iRegatta consumes **NMEA 0183 over Wi‑Fi** (TCP/UDP). This system uses **Signa
 
 Full traceability table: [ADR-0010](./adr/0010-iregatta-reference-model.md).
 
+### 7.17 B&G H5000 reference model & integration
+
+**ADR:** [0011 — B&G H5000 reference model](./adr/0011-bg-h5000-reference-model.md)  
+**Manual:** [H5000 Operation Manual 988-10630-003](https://cxjdfr.files.cmp.optimizely.com/download/assets/en-us-H5000_OM_EN_988-10630-003_w.pdf/f9fdbcee044d11f0a251baecc01b2173)
+
+The **B&G H5000** is the **primary instrument and race-display reference** for own-boat sailing (Xbox, NOR-10133). H5000 CPU + Graphic/Race displays remain the helm UI; the Pi stack **ingests**, **records**, **extends** (fleet, handicaps, GRIB, coaching), and **mirrors** key pages on `grafana-race`.
+
+#### 7.17.1 Architecture — coexistence with H5000
+
+```mermaid
+flowchart LR
+  subgraph h5000["B&G H5000 network"]
+    CPU["H5000 CPU\nHydra/Hercules/Performance"]
+    GD["Graphic / Race Display"]
+    SENS["Wind, BSP, heel, GPS, 3D motion"]
+    PILOT["Pilot Computer"]
+  end
+
+  subgraph sla1["SLA-1 telemetry Pi"]
+    PICAN["PiCAN-M N2K"]
+    SK["Signal K Server"]
+  end
+
+  subgraph sla2["SLA-2 race Pi"]
+    RI["race-intelligence"]
+    PM["polar-manager"]
+    GF["grafana-race"]
+    CE["course-editor"]
+  end
+
+  SENS --> CPU
+  CPU -->|NMEA 2000| PICAN
+  PICAN --> SK
+  SK -->|WebSocket| RI
+  SK --> PM
+  RI --> GF
+  CE --> RI
+  GD -.->|helm primary| CREW["Crew"]
+  GF -.->|tactical big screen| CREW
+```
+
+**Rules:**
+
+1. **Do not recompute true wind** if H5000 already publishes corrected TWD/TWS on N2K — prefer talker data; fallback to SK derivation only when missing.
+2. **Bow offset** and **start-line geometry** follow H5000 semantics (perpendicular DTL, bias in degrees and **boat lengths**).
+3. **Autopilot:** ingest mode/rudder/setpoint; **no rudder commands** from Pi in v1.
+4. **Polar:** ORC **SLK** in `AI-sailing-data` is canonical; export H5000-compatible CSV for MFD import when needed.
+
+#### 7.17.2 Display page mapping (Graphic Display → Grafana)
+
+| H5000 page | Grafana dashboard / panel | Key metrics |
+|------------|---------------------------|-------------|
+| **SailSteer** | `race-sailsteer` | HDG/Course, BSP, tide set/rate, WP name, TWD, laylines, TWA, TWS |
+| **Speed/Depth** | `race-speed-depth` | BSP, depth, acceleration bargraph |
+| **WindPlot** | `race-windplot` | TWD/TWS + histogram (1–60 min) |
+| **Start line** | `race-start` + `course-editor` Start | DIST P/S, DTL⊥, BIAS°, BIAS ADV (lengths), timer, wind barb |
+| **Highway** | `race-highway` | BRG, COG, XTE, DTM, ETA, off-course limit |
+| **Tide** | `race-tide` | BSP, tide angle/rate vs hull, wind |
+| **Depth history** | `race-depth` | Depth trend histogram |
+| **Autopilot** | `race-pilot` (read-only) | Mode, set HDG/wind, rudder °, perf level |
+
+Race Display **dual-value + bargraph** layout → Grafana row `race-display-compact` (TV mode).
+
+#### 7.17.3 SailSteer, laylines, and tidal correction
+
+Configured via race `planning/layline-preferences.yaml` (`kind: LaylinePreferences`):
+
+| Setting | H5000 option | Our default |
+|---------|--------------|-------------|
+| `target_wind_angle_source` | Polar / Actual / Manual | `polar` (from active `PolarSource`) |
+| `tidal_flow_correction` | On/off layline offset | `true` when tide data available |
+| `layline_limit_minutes` | 5, 10, 15, 30 | `10` |
+
+`race-intelligence` computes laylines using:
+
+- Active waypoint from `CourseSelection`
+- TWA targets from `polar-manager` or manual angles
+- Tidal set/rate from instruments or harbor model → layline rotation
+
+#### 7.17.4 Start line (H5000 StartLine + BowPosition)
+
+**Containers:** `race-intelligence`, `course-editor`
+
+| H5000 field | Description | Neo4j / runtime |
+|-------------|-------------|-----------------|
+| DIST P / DIST S | Distance to port/starboard end | `StartLineState.dist_port_m`, `dist_starboard_m` |
+| DIST LINE | Perpendicular distance to line + extensions | `dist_line_m` (bow-adjusted) |
+| BIAS | Angle wind ⊥ line | `bias_deg` |
+| BIAS ADV | Advantage at favored end in **boat lengths** | `bias_boat_lengths` |
+| Line ends | Ping at bow on line; stale at midnight | `StartLineEnd` nodes with `pinged_at`, `stale_after` |
+| Timer | Race countdown | `RaceTimer` |
+
+```yaml
+# races/.../planning/start-line.yaml — kind: StartLinePreferences
+spec:
+  bow_offset_m: 4.5
+  sync_countdown_to_minute: true
+  show_bias_boat_lengths: true
+  line_ends_stale_at_midnight: true
+  assumes_upwind_first_leg: true
+```
+
+Aligns with iRegatta start metrics ([§7.16.5](#7165-start-view-parity)); H5000 adds **bias in boat lengths** and **tide direction** on start page.
+
+#### 7.17.5 Instrument profile & calibration (boat YAML)
+
+**Path:** `boats/{sail_number}/instrumentation/`
+
+| File | Kind | Content |
+|------|------|---------|
+| `profile.yaml` | `InstrumentProfile` | `cpu_tier`, `bow_offset_m`, `damping`, `measured_sources`, `motion_correction` |
+| `calibration.yaml` | `InstrumentCalibration` | Depth offset, BSP factor, MHU align, heel correction table |
+| `alarms.yaml` | `AlarmProfile` | Depth, BSP, wind thresholds |
+
+Example profile — see `AI-sailing-data/boats/NOR-10133/instrumentation/profile.yaml`.
+
+**Dual sensors (Hercules+):** `measured_sources.boat_speed.switch_policy`: `mwa` \| `heel` \| `mwa_heel` \| `port` \| `starboard` — documented in profile; switching executed on H5000 CPU; Pi logs active source from N2K if exposed.
+
+**3D motion wind correction:** requires `motion_correction.enabled`, `mast_height_m`, Hercules+ tier — reference only in v1; validate TWD against H5000 display in harbor.
+
+#### 7.17.6 Polars, VMG targets, and H5000 export
+
+| Format | Direction | Service |
+|--------|-----------|---------|
+| **SLK** (ORC) | Shore → Pi | `polar-manager` primary |
+| **H5000 polar CSV** | Pi ↔ MFD | `polar-manager` `h5000_csv` adapter (20 TWS × 360 TWA) |
+| **VMG targets** | Shore YAML → display | `PolarSource.spec.vmg_targets` |
+
+Certificate `polar.yaml` may include:
+
+```yaml
+spec:
+  h5000_export:
+    enabled: true
+    last_export_path: assets/h5000-polar.csv
+  vmg_targets:
+    upwind_source: polar
+    downwind_source: polar
+```
+
+#### 7.17.7 Damping and dynamic boat speed
+
+H5000 applies per-variable damping (0–9 s). Map to `InstrumentProfile.spec.damping`:
+
+```yaml
+damping:
+  boat_speed_s: 3
+  cog_s: 3
+  heading_s: 2
+  wind_speed_s: 3
+  dynamic_boat_speed: 5   # Hercules+ only; 0 = off
+```
+
+`race-intelligence` and Grafana apply damping before display — same role as iRegatta COG/SOG damping ([§7.16.3](#7163-lift-damping-and-steering-calculations)).
+
+#### 7.17.8 Alarms
+
+Mirror safety-critical H5000 alarms on Grafana alert rules driven from Signal K:
+
+| Alarm | Typical source |
+|-------|----------------|
+| Depth low | `environment.depth.belowTransducer` |
+| BSP high/low | `navigation.speedThroughWater` |
+| Wind high | `environment.wind.speedTrue` |
+| AIS proximity | SLA-2 `ais-collector` |
+
+Acknowledge flow documented for helm tablet; full network alarm groups deferred to v2.
+
+#### 7.17.9 Autopilot integration (read-only v1)
+
+Ingest via N2K / Signal K:
+
+| Field | Use |
+|-------|-----|
+| Pilot mode | Auto / Wind / Nav / Standby |
+| Set heading / wind angle | Coach context |
+| Rudder angle | Maneuver detection |
+| Performance level | Display on `race-pilot` panel |
+
+**No** `SET_RUDDER` or pilot engage commands from Pi services.
+
+#### 7.17.10 Signal K variable map
+
+H5000 operating variables map to Signal K paths in  
+[`AI-sailing-data/schema/h5000-variable-map.yaml`](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/h5000-variable-map.yaml).
+
+Key variables: **BSP**, **COG**, **SOG**, **HDG**, **Course** (HDG+leeway), **TWA/TWD/TWS**, **VMG**, **XTE**, **heel**, **trim**, **leeway**, **rudder**, **setpoint**.
+
+#### 7.17.11 Beyond H5000
+
+| Capability | Component |
+|------------|-----------|
+| Live ORC fleet standings | `live-results` + `handicap-manager` |
+| AIS wind-pressure map | `wind-field-analyzer` |
+| SI course import | `course-parser` |
+| Start-boat course flags | ADR-0006 |
+| LLM coach | `tactical-coach` |
+| GoPro trim | SLA-3 |
+
+Full traceability: [ADR-0011](./adr/0011-bg-h5000-reference-model.md).
+
 ---
 
 ## 8. Technology matrix
@@ -2991,6 +3195,28 @@ flowchart LR
 | FR-105 | Deploy uses **both** system image lock and data repo git ref at race freeze |
 | FR-106 | Teltonika LTE provides WAN for data sync and GRIB when marina Wi-Fi unavailable |
 
+### 11.7 B&G H5000 integration & display parity
+
+| ID | Requirement |
+|----|-------------|
+| FR-107 | Signal K ingests H5000 N2K wind, BSP, heel, GPS, depth without duplicate true-wind solver when CPU publishes TWD |
+| FR-108 | Grafana `race-sailsteer` mirrors H5000 SailSteer fields including laylines when navigating |
+| FR-109 | Start page shows DIST P/S, DTL⊥, BIAS°, BIAS ADV (boat lengths), favored end — H5000 semantics |
+| FR-110 | Grafana `race-windplot` provides TWD/TWS histograms (1–60 min windows) |
+| FR-111 | Grafana `race-highway` shows XTE, DTM, ETA, COG, off-course limit per active route leg |
+| FR-112 | `PolarSource` supports H5000 CSV export/import and `vmg_targets` configuration |
+| FR-113 | Layline computation supports tidal flow correction and 5/10/15/30 min layline limit bands |
+| FR-114 | Race Display-style compact row: two primary values + performance bargraph |
+| FR-115 | `InstrumentProfile` documents dual wind/BSP sensors and switch policy (read from H5000) |
+| FR-116 | `InstrumentProfile` documents 3D motion wind correction and mast height when equipped |
+| FR-117 | `InstrumentCalibration` persists BSP, depth, MHU align, heel correction table in data repo |
+| FR-118 | **Course** (HDG + leeway) available for layline/tack logic when leeway calibrated |
+| FR-119 | Per-variable damping 0–9 s configurable in `InstrumentProfile`; dynamic BSP damping when tier ≥ Hercules |
+| FR-120 | Race timer matches H5000: countdown, sync, stop, reset; line ping with midnight stale rule |
+| FR-121 | Critical alarms (depth, BSP, wind) configurable via `AlarmProfile` |
+| FR-122 | Harbor export slot for H5000 webserver calibration backup under `instrumentation/backup/` |
+| FR-123 | Autopilot mode, setpoint, rudder angle ingested read-only — no drive commands from Pi |
+
 ---
 
 ## 12. Non-functional requirements
@@ -3171,4 +3397,5 @@ AI-sailing-system/
 - [GoPro HERO13 Black](https://gopro.com/en/us/shop/cameras/hero13-black/CHDHX-131-master.html)
 - [CogSail Python (prior art)](https://github.com/cognite-fholm/cogsail-python)
 - [iRegatta User Manual v2.86](https://zifigo.com/sites/default/files/iRegattaUserManual.pdf) — functional reference for race/start/layline UX ([ADR-0010](./adr/0010-iregatta-reference-model.md), [§7.16](./spec.md#716-iregatta-reference-model--feature-traceability))
+- [B&G H5000 Operation Manual 988-10630-003](https://cxjdfr.files.cmp.optimizely.com/download/assets/en-us-H5000_OM_EN_988-10630-003_w.pdf/f9fdbcee044d11f0a251baecc01b2173) — instrument, SailSteer, StartLine, calibration ([ADR-0011](./adr/0011-bg-h5000-reference-model.md), [§7.17](./spec.md#717-bg-h5000-reference-model--integration))
 - [Zifigo / Let's Create — iRegatta](https://zifigo.com/)

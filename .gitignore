@@ -37,3 +37,7 @@ docker-compose.override.yml
 
 # Logs
 *.log
+
+# Reference PDFs (linked from docs/references/README.md)
+docs/references/*.pdf
+docs/references/*_extracted.txt

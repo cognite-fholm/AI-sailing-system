@@ -13,6 +13,7 @@ This directory contains [Architecture Decision Records](https://adr.github.io/) 
 | [0008](./0008-github-docker-deployment-lifecycle.md) | GitHub + Docker CI/CD, lifecycle, guardrails, gaming PC shore training | Accepted |
 | [0009](./0009-dual-repository-race-data.md) | Dual repo: AI-sailing-system + AI-sailing-data, Teltonika LTE sync | Accepted |
 | [0010](./0010-iregatta-reference-model.md) | iRegatta v2.86 as functional reference for race UX | Accepted |
+| [0011](./0011-bg-h5000-reference-model.md) | B&G H5000 instrument and race-display reference | Accepted |
 
 ## Format
 
@@ -24,4 +25,4 @@ Each ADR follows the structure:
 4. **Consequences** — positive, negative, risks
 5. **Alternatives considered**
 
-New decisions should use the next sequential number: `0011-short-title.md`.
+New decisions should use the next sequential number: `0012-short-title.md`.

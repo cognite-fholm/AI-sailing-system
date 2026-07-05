@@ -39,7 +39,9 @@ Each onboard tier has its own Docker Compose stack and may run on a **different 
 
 **Courses & results:** SI PDF course parsing (Færderseilasen §11; Høstcup Bane A/B + start-boat flags), React waypoint + **Start Line** course selection, optional vision flag detection, live corrected-time standings, multi-handicap ORC + WRS ([§7.13–7.14](./spec.md#713-race-courses-waypoints--live-results)).
 
-**Race UX reference:** [iRegatta](https://zifigo.com/) v2.86 manual mapped to Grafana + `course-editor` ([§7.16](./spec.md#716-iregatta-reference-model--feature-traceability), [ADR-0010](./adr/0010-iregatta-reference-model.md)).
+**Race UX reference:** [iRegatta](https://zifigo.com/) v2.86 ([§7.16](./spec.md#716-iregatta-reference-model--feature-traceability), [ADR-0010](./adr/0010-iregatta-reference-model.md)).
+
+**Instrument reference:** [B&G H5000](https://www.bandg.com/bg/series/h5000/) ([§7.17](./spec.md#717-bg-h5000-reference-model--integration), [ADR-0011](./adr/0011-bg-h5000-reference-model.md)).
 
 ## Quick stack
 
