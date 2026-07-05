@@ -32,6 +32,12 @@ jobs:
           docker compose -f docker-compose.sla-2.yml config --quiet
           docker compose -f docker-compose.harbor.yml config --quiet
           docker compose -f docker-compose.sla-1.yml -f docker-compose.dev.yml config --quiet
+          docker compose -f docker-compose.sla-2.yml -f docker-compose.dev-sla2.yml config --quiet
+
+      - name: Run Phase 0 BDD tests
+        run: |
+          pip install -r requirements-dev.txt
+          pytest tests/bdd/steps/test_phase_00_foundation.py -q
 
       - name: Check ADR index
         run: test -f adr/README.md

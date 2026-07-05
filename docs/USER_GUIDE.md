@@ -13,6 +13,8 @@ Deploy **both** to the boat.
 
 ## Shore preparation (start here)
 
+**New laptop?** Install WSL2 + Docker Desktop before running local stacks: [DEV-SETUP.md](./DEV-SETUP.md).
+
 All detailed user guides live in the **data repo**:
 
 | Guide | Topic |
@@ -32,7 +34,7 @@ Three **SLA tiers** on Raspberry Pi (may be separate devices):
 | Tier | What you see | Typical URL |
 |------|--------------|-------------|
 | **SLA-1** | Instruments, SOG, wind, depth | Grafana telemetry `:3001`, Signal K `:3000` |
-| **SLA-2** | Fleet map, standings, GRIB, polars, alerts | Grafana race `:3002` |
+| **SLA-2** | Fleet map, standings, GRIB, polars, alerts | `race-ui` (primary helm UX), Grafana race `:3002` |
 | **SLA-3** | Sail camera / trim analysis | Grafana sail (when deployed) |
 
 Hostname examples: `telemetry.local`, `race.local` (boat LAN).
@@ -41,7 +43,9 @@ Hostname examples: `telemetry.local`, `race.local` (boat LAN).
 
 1. **Shore:** Finish [race prep](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md); `git push`
 2. **Boat:** `cd /opt/ai-sailing-data && git pull`
-3. **Import:** `race-import --race <id> --dry-run` then import
+3. **Import:** confirm `config/data-repo.yaml` `active` section, then trigger `race-import` HTTP API:
+   - Pi/Linux: `curl -sS -X POST http://localhost:8080/import -H "Content-Type: application/json" -d "{}"`
+   - Windows laptop dev: `Invoke-RestMethod -Uri http://localhost:8080/import -Method Post -ContentType "application/json" -Body "{}"`
 4. **Copy:** GRIB to `/data/grib/`; GPX zip to phone/chartplotter
 5. **Verify:** Polar loads for `active_certificate_ref`
 
@@ -51,7 +55,8 @@ Detail: [deployment-lifecycle.md](./deployment-lifecycle.md) · [data repo: Harb
 
 | Tool | Use |
 |------|-----|
-| **Grafana race** | Start line, standings, fleet map, polar % |
+| **race-ui** | Primary interactive race optimization UI on boat LAN ([ADR-0018](./adr/0018-helm-ux-three-pi-dual-speaker.md)) |
+| **Grafana race** | Time-series, fleet map, polar %, debrief |
 | **course-editor** | Waypoints, start-line course selection (when deployed) |
 | **Laptop + Cursor MCP** | Ad hoc standings, Influx, Neo4j — [race-laptop-mcp.md](./race-laptop-mcp.md) |
 | **tactical-coach** | Onboard LLM advisory (Pi) |
@@ -78,6 +83,7 @@ Full setup: [race-laptop-mcp.md](./race-laptop-mcp.md) · [mcp-neo4j-influx.md](
 
 | Doc | Audience |
 |-----|----------|
+| [DEV-SETUP.md](./DEV-SETUP.md) | **New laptop** — WSL2, Docker, local compose |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Architecture index |
 | [spec.md](./spec.md) | Full specification |
 | [adr/README.md](../adr/README.md) | Architecture decisions |

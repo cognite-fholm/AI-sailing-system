@@ -12,9 +12,9 @@ Feature: Phase 0 — Foundation
     And spec.md contains section "7.0 Implementation order — section index"
     And spec.md contains section "14. Implementation phases"
 
-  Scenario: ADR index covers all accepted decisions through ADR-0017
+  Scenario: ADR index covers all accepted decisions through ADR-0020
     Then adr/README.md exists with implementation order section
-    And accepted ADR files exist from "0001" through "0017"
+    And accepted ADR files exist from "0001" through "0020"
 
   Scenario: Architecture documentation is linked from the spec
     Then file "docs/ARCHITECTURE.md" exists
@@ -30,6 +30,7 @@ Feature: Phase 0 — Foundation
     And file "docker-compose.sla-2.yml" exists
     And file "docker-compose.harbor.yml" exists
     And file "docker-compose.dev.yml" exists
+    And file "docker-compose.dev-sla2.yml" exists
 
   Scenario: Dual-repository contract is documented
     Then spec.md documents AI-sailing-data as the race content repository
@@ -40,6 +41,8 @@ Feature: Phase 0 — Foundation
     And file "config/signalk/settings.json" exists
     And directory "config/grafana/telemetry/provisioning" exists
     And file ".github/workflows/publish-sla-1.yml" exists
+    And file "docs/DEV-SETUP.md" exists
+    And file ".cursor/rules/dev-prerequisites.mdc" exists
 
   Scenario: Phase 2B graph import scaffolding is present
     Then file "race-import/race_import/importer.py" exists

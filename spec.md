@@ -4375,14 +4375,15 @@ Phases match [§1.1 Implementation map](#11-implementation-map). Checklists are 
 
 **Acceptance tests:** [tests/bdd/README.md](./tests/bdd/README.md) — Gherkin scenarios per phase (`tests/bdd/features/phase_*.feature`).
 
-### Phase 0 — Foundation (current)
+### Phase 0 — Foundation
 
-- [x] Repository created; [spec.md](./spec.md) v0.18
+- [x] Repository created; [spec.md](./spec.md) v0.20
 - [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
-- [x] ADR-0001 through ADR-0017 (see [adr/README.md](./adr/README.md#implementation-order))
+- [x] ADR-0001 through ADR-0020 (see [adr/README.md](./adr/README.md#implementation-order))
 - [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide + user guides
 - [x] Deploy scaffolding, workflow stubs, harbor scripts
 - [x] Runtime containers — Phase 1 & 2B core (compose + services)
+- [x] [docs/DEV-SETUP.md](./docs/DEV-SETUP.md) — laptop Docker/WSL prerequisites
 
 ### Phase 1 — SLA-1 telemetry (MVP)
 
@@ -4472,11 +4473,13 @@ Runs onshore (laptop); can parallel Phase 1.
 
 Can start after Phase 1 stabilizes.
 
-- [ ] `.github/workflows/ci.yml` — lint + test on PR
-- [ ] `publish-sla-{1,2,3}.yml` — arm64 build → GHCR
-- [ ] `release.yml` — tag → `deploy/locks/{version}.env`
-- [ ] `docker-compose.harbor.yml` + Watchtower (SLA-2/3 only)
-- [ ] `scripts/harbor-sync.sh` + `harbor-pull.sh`
+- [x] `.github/workflows/ci.yml` — YAML + compose validation + Phase 0 BDD on PR/main
+- [x] `publish-sla-1.yml` — arm64 build → GHCR (`signalk-influx-bridge`)
+- [x] `publish-sla-2.yml` — arm64 build → GHCR (partial matrix; skips missing Dockerfiles)
+- [ ] `publish-sla-3.yml` — arm64 build → GHCR
+- [x] `release.yml` — tag → `deploy/locks/{version}.env`
+- [x] `docker-compose.harbor.yml` + Watchtower (SLA-2/3 only)
+- [x] `scripts/harbor-sync.sh` + `harbor-pull.sh`
 - [ ] Race profile (3-node) deployment guide + systemd units
 - [ ] Migrate `cogsail-python` mapping utilities
 

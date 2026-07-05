@@ -1,0 +1,31 @@
+---
+description: Docker + WSL2 required on new Windows laptops before running compose stacks
+alwaysApply: true
+---
+
+# Dev machine prerequisites (AI-sailing-system)
+
+Before running `docker compose`, building images, or debugging onboard services on a **new laptop or workstation**, verify host tooling. **`git clone` does not install Docker.**
+
+## Required on Windows
+
+1. **WSL2** with a Linux distro (e.g. Ubuntu): `wsl --install` — restart if prompted; complete Ubuntu user setup.
+2. **Docker Desktop** — install, start, confirm **Engine running**; WSL2 backend enabled in Settings.
+3. **Both repos** cloned as siblings: `AI-sailing-system` + `AI-sailing-data`.
+
+Canonical guide: [docs/DEV-SETUP.md](../../docs/DEV-SETUP.md)
+
+## Agent behavior
+
+- If the user asks to run Docker, `docker compose`, or local SLA-1/SLA-2 stacks and `docker` is missing or the daemon is down, **stop and point them to [docs/DEV-SETUP.md](../../docs/DEV-SETUP.md)** — do not assume Docker is installed.
+- On Windows, check WSL2 (`wsl --list --verbose`) when Docker fails to start.
+- For local dev, ensure `deploy/env/dev.env` exists (copy from `deploy/env/dev.env.example`) and `DATA_REPO_HOST_PATH` points at the **AI-sailing-data** clone.
+- **Pi deployment** uses Docker on the Pi, not WSL — see [deploy/README.md](../../deploy/README.md).
+
+## Quick local dev commands
+
+```powershell
+copy deploy\env\dev.env.example deploy\env\dev.env
+docker compose -f docker-compose.sla-1.yml -f docker-compose.dev.yml --env-file deploy/env/dev.env up -d --build
+docker compose -f docker-compose.sla-2.yml -f docker-compose.dev-sla2.yml --env-file deploy/env/dev.env up -d --build
+```

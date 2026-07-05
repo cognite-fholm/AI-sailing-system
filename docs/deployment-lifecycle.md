@@ -11,6 +11,7 @@ Operational guide for **GitHub Actions → GHCR → Docker Compose** on Raspberr
 - [ADR-0012 — Race-side MCP](../adr/0012-race-side-mcp-laptop-cursor.md) — laptop Cursor at regatta
 - [race-laptop-mcp.md](./race-laptop-mcp.md) — setup guide
 - [deploy/README.md](../deploy/README.md) — env files, lock files, race freeze checklist
+- [DEV-SETUP.md](./DEV-SETUP.md) — laptop Docker/WSL prerequisites (not installed by `git clone`)
 
 ## Quick reference
 

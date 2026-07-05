@@ -245,7 +245,7 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 | **2F — Analytics & alerts** | Not started |
 | **2G — Laptop MCP** | Scaffold only (`race-mcp-gateway/`) |
 | **3 — SLA-3 vision** | Not started |
-| **4 — CI/CD multi-Pi** | Workflow stubs only |
+| **4 — CI/CD multi-Pi** | **Partial** — CI + publish-sla-1/2 + release; publish-sla-3 pending |
 | **5 — Shore training** | Spec only |
 
 Detail: [spec §14](../spec.md#14-implementation-phases) · BDD: [tests/bdd/README.md](../tests/bdd/README.md)
@@ -256,7 +256,8 @@ Detail: [spec §14](../spec.md#14-implementation-phases) · BDD: [tests/bdd/READ
 |---------|-----------------|
 | `docker-compose.sla-1.yml` | `signalk-server`, `influxdb`, `signalk-influx-bridge`, `grafana-telemetry` |
 | `docker-compose.sla-2.yml` | `neo4j`, `race-import`, `race-data-sync`, `race-mcp-gateway` (profile `mcp`) |
-| `docker-compose.dev.yml` | Overlay for laptop dev — bridge network, sibling data-repo mount |
+| `docker-compose.dev.yml` | SLA-1 laptop overlay — bridge network |
+| `docker-compose.dev-sla2.yml` | SLA-2 laptop overlay — data-repo mount, sync policy |
 | `docker-compose.harbor.yml` | Watchtower overlay (SLA-2/3 only) |
 
 Local dev: [deploy/README.md](../deploy/README.md#local-dev-single-machine).

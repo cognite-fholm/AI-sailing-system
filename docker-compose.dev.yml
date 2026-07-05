@@ -1,10 +1,9 @@
-# Dev overlay — single-machine testing (Windows/macOS/Linux laptop)
+# Dev overlay — SLA-1 laptop testing (Windows/macOS/Linux)
 # Overrides host networking so Signal K and bridge run on the compose network.
 #
-# Usage:
+# Usage (from repo root):
 #   copy deploy\env\dev.env.example deploy\env\dev.env
-#   docker compose -f docker-compose.sla-1.yml -f docker-compose.dev.yml --env-file deploy/env/dev.env up -d
-#   docker compose -f docker-compose.sla-2.yml --env-file deploy/env/dev.env up -d
+#   docker compose -f docker-compose.sla-1.yml -f docker-compose.dev.yml --env-file deploy/env/dev.env up -d --build
 
 name: ai-sailing-dev
 
@@ -35,21 +34,3 @@ services:
   grafana-telemetry:
     ports:
       - "${GRAFANA_TELEMETRY_PORT:-3001}:3000"
-
-  neo4j:
-    ports:
-      - "${NEO4J_HTTP_PORT:-7474}:7474"
-      - "${NEO4J_BOLT_PORT:-7687}:7687"
-
-  race-import:
-    volumes:
-      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
-      - ${DATA_REPO_HOST_PATH:-../AI-sailing-data}:/opt/ai-sailing-data:ro
-
-  race-data-sync:
-    volumes:
-      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
-      - ${DATA_REPO_HOST_PATH:-../AI-sailing-data}:/opt/ai-sailing-data
-    environment:
-      SYNC_AUTO_PULL: "false"
-      SYNC_AUTO_IMPORT: "true"

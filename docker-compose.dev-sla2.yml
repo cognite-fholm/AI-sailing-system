@@ -1,0 +1,26 @@
+# Dev overlay — SLA-2 laptop testing
+# Mounts sibling AI-sailing-data clone; disables git auto-pull for offline dev.
+#
+# Usage (from repo root):
+#   docker compose -f docker-compose.sla-2.yml -f docker-compose.dev-sla2.yml --env-file deploy/env/dev.env up -d --build
+
+name: ai-sailing-dev
+
+services:
+  neo4j:
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+
+  race-import:
+    volumes:
+      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
+      - ${DATA_REPO_HOST_PATH:-../AI-sailing-data}:/opt/ai-sailing-data:ro
+
+  race-data-sync:
+    volumes:
+      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
+      - ${DATA_REPO_HOST_PATH:-../AI-sailing-data}:/opt/ai-sailing-data
+    environment:
+      SYNC_AUTO_PULL: "false"
+      SYNC_AUTO_IMPORT: "true"

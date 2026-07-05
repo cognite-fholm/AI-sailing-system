@@ -2,6 +2,17 @@
 
 This directory holds **environment templates**, **digest lock files**, and **topology overrides** for Raspberry Pi deployment. Full specification: [spec.md §9](../spec.md#9-deployment-architecture). ADR: [0008](../adr/0008-github-docker-deployment-lifecycle.md).
 
+## Prerequisites (new machine)
+
+**`git clone` does not install Docker.** Before running compose on a laptop:
+
+| Platform | Install |
+|----------|---------|
+| **Windows** | [WSL2 + Ubuntu](https://learn.microsoft.com/en-us/windows/wsl/install), then [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/) |
+| **macOS / Linux** | [Docker Desktop](https://docs.docker.com/desktop/) or Docker Engine + Compose |
+
+Full checklist: **[docs/DEV-SETUP.md](../docs/DEV-SETUP.md)**. Clone **[AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)** as a sibling directory for SLA-2 import.
+
 ## Platform
 
 | Piece | Location |
@@ -34,8 +45,9 @@ copy deploy\env\dev.env.example deploy\env\dev.env
 docker compose -f docker-compose.sla-1.yml -f docker-compose.dev.yml --env-file deploy/env/dev.env up -d --build
 
 # SLA-2 graph import (mount sibling AI-sailing-data clone)
-docker compose -f docker-compose.sla-2.yml --env-file deploy/env/dev.env up -d --build
-curl -X POST http://localhost:8080/import
+docker compose -f docker-compose.sla-2.yml -f docker-compose.dev-sla2.yml --env-file deploy/env/dev.env up -d --build
+# Import graph from mounted data repo (PowerShell — curl is an alias and breaks -X)
+Invoke-RestMethod -Uri http://localhost:8080/import -Method Post -ContentType "application/json" -Body "{}"
 ```
 
 Grafana telemetry: `http://localhost:3001` · Signal K: `http://localhost:3000` · Neo4j browser: `http://localhost:7474`

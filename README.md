@@ -4,12 +4,21 @@ An edge-first, AI-assisted competitive sailing platform built on [Signal K](http
 
 ## Status
 
-**Phase 0 — Foundation.** Architecture, ADRs, deploy scaffolding, and GitHub Actions workflow stubs. **Build order:** [spec §1.1](./spec.md#11-implementation-map) · [adr/README](./adr/README.md#implementation-order).
+**Phase 1 & 2B scaffold** — compose stacks, bridge, import/sync, Grafana provisioning. PiCAN ingest and full SLA-2 services still in progress. **Build order:** [spec §1.1](./spec.md#11-implementation-map) · [adr/README](./adr/README.md#implementation-order).
+
+## New laptop?
+
+**Docker and WSL2 are not in git.** On a fresh Windows machine, install prerequisites before `docker compose`:
+
+→ **[docs/DEV-SETUP.md](./docs/DEV-SETUP.md)** — WSL2, Docker Desktop, clone both repos, run local stacks.
+
+Cursor reads [`.cursor/rules/dev-prerequisites.mdc`](./.cursor/rules/dev-prerequisites.mdc) automatically.
 
 ## Documentation
 
 | Document | Purpose |
 |----------|---------|
+| **[docs/DEV-SETUP.md](./docs/DEV-SETUP.md)** | **New laptop** — WSL2, Docker Desktop, local `docker compose` |
 | [docs/USER_GUIDE.md](./docs/USER_GUIDE.md) | **User guide** — shore prep links + onboard overview |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Architecture index — repos, tiers, ADRs |
 | [spec.md](./spec.md) | Full system specification |
