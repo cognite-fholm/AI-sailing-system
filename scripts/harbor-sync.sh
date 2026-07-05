@@ -10,7 +10,21 @@ MODELS_DIR="${MODELS_DIR:-/opt/models}"
 KNOWLEDGE_DIR="${KNOWLEDGE_DIR:-/opt/knowledge/sailing-system}"
 CONFIG_DIR="${CONFIG_DIR:-/opt/ai-sailing-system/config}"
 
+DATA_REPO_DIR="${DATA_REPO_DIR:-/opt/ai-sailing-data}"
+
 echo "=== Harbor sync (artifacts only) ==="
+
+if [[ -d "$DATA_REPO_DIR/.git" ]] || [[ -f "$REPO_ROOT/../AI-sailing-data/.git" ]]; then
+  DATA_SRC="${DATA_REPO_DIR}"
+  [[ -d "$REPO_ROOT/../AI-sailing-data/.git" ]] && DATA_SRC="$REPO_ROOT/../AI-sailing-data"
+  echo "AI-sailing-data → $DATA_REPO_DIR"
+  if command -v git &>/dev/null && [[ -d "$DATA_SRC/.git" ]]; then
+    git -C "$DATA_SRC" pull --ff-only 2>/dev/null || echo "Note: data repo pull skipped (offline or RACE_MODE)"
+  fi
+  mkdir -p "$DATA_REPO_DIR"
+  rsync -av --delete --exclude .git "$DATA_SRC/" "$DATA_REPO_DIR/" 2>/dev/null || \
+    cp -r "$DATA_SRC/." "$DATA_REPO_DIR/" || true
+fi
 
 if [[ -d knowledge/sailing-system ]]; then
   echo "OKF bundle → $KNOWLEDGE_DIR"

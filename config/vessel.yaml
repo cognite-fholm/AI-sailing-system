@@ -16,11 +16,14 @@ regatta:
 
 polar:
   source_type: slk
-  path: "../AI-sailing-data/boats/NOR-10133/2026/assets/7710.slk"
-  # path: "/opt/ai-sailing-data/boats/NOR-10133/2026/assets/7710.slk"
+  # Matched to OrcCertificate cert-international-034400038T6 (2024 International)
+  path: "../AI-sailing-data/boats/NOR-10133/2024/certificates/international-034400038T6/assets/7710.slk"
   slk_id: "7710"
-  certificate_path: "../AI-sailing-data/boats/NOR-10133/2026/assets/ORC Certificate for Xbox.pdf"
+  certificate_ref: cert-international-034400038T6
+  orc_ref: "034400038T6"
   auto_reload: true
 
 data_repo:
   boat_path: boats/NOR-10133
+  active_certificate_ref: cert-international-034400038T6
+  certificate_year: 2024

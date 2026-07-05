@@ -17,4 +17,6 @@ active:
   regatta_id: faerderseilasen-2026
   race_path: races/2026/2026-06-faerderseilasen
   own_boat_path: boats/NOR-10133
+  active_certificate_ref: cert-international-034400038T6
+  certificate_year: 2024
   index_file: index.yaml

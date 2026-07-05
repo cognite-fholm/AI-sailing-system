@@ -672,7 +672,8 @@ Signal K is the **single source of truth** for live marine data. It:
 | `SupplementarySignal` | Modifies rounding (e.g. flag **T** → first mark starboard) |
 | `CourseSelection` | Active course for current race + selection source |
 | `Waypoint` | Mark/gate with lat/lon, rounding rule, optional distance |
-| `HandicapRating` | ORC ToT/ToD/APH or WRS TCF for a vessel |
+| `OrcCertificate` | ORC cert variant (Club/DH/NS/Intl) per year; each has matched SLK |
+| `HandicapRating` | ORC ToT/ToD/APH or WRS TCF — linked to certificate |
 | `LiveStanding` | Current corrected-time position in fleet |
 | `Mark` | Physical or virtual marks |
 | `Leg` | Between marks |
@@ -2156,24 +2157,20 @@ All regatta preparation happens in **git** before leaving harbor:
 
 #### 7.15.2 Boat organization
 
+One boat may hold **multiple ORC certificates per year** (Club, DH, NS, International). Each certificate has a **unique ORC Ref** and a **matched SLK** — never share polars across certificate types.
+
 ```
-boats/
-  NOR-10133/                    # Xbox — sail NOR 10133
-    boat.yaml                   # stable identity (MMSI, is_own)
-    wiki/notes.md
-    2026/
-      season.yaml
-      ratings.yaml
-      polar.yaml
-      neo4j/
-      okf/
-      assets/7710.slk
-  NOR-15788/
-    boat.yaml
-    2026/
-      ratings.yaml              # ORC 667232, APH 1.2082
-      ...
+boats/NOR-10133/                 # Xbox
+  2024/season.yaml
+  2024/certificates/
+    international-034400038T6/   # SLK from own boat 2024.zip
+    dh-international-03440003A8L/
+    ns-international-034400038UH/
+  2023/certificates/club-03440002JNA/
+  2021/certificates/dh-club-03440001K3L/
 ```
+
+Race planning sets `active_certificate_ref` in `planning/course-preference.yaml`.
 
 Each **year** folder captures rating changes. Competitors the own boat has raced are retained for fleet analysis across seasons.
 

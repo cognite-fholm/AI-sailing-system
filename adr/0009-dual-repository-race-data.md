@@ -33,7 +33,7 @@ The user needs:
 ### Data repository layout
 
 ```
-boats/{sail_number}/{year}/     # ratings, polar, neo4j, okf, assets
+boats/{sail_number}/{year}/certificates/{type}-{orc_ref}/   # ratings, polar, neo4j, okf, assets
 races/{year}/{year}-{month}-{slug}/
   race.yaml                     # manifest
   planning/                     # grib-plan, course-preference, weather notes
@@ -46,7 +46,7 @@ races/{year}/{year}-{month}-{slug}/
   assets/                       # SI PDF, polars (Git LFS optional)
 ```
 
-Sail number directories: `7710`, `NOR-15788` (normalize spaces to hyphens).
+Sail number directories use racing number (e.g. `NOR-10133`). Under each `{year}/certificates/` folder, one subdirectory per **ORC Ref + type** (e.g. `club-03440002JNA`, `dh-club-03440001K3L`). Each holds matched `certificate.yaml`, `polar.yaml`, and `assets/*.slk`.
 
 ### Three knowledge roles
 
