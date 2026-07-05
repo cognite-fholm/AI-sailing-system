@@ -126,6 +126,7 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0012](../adr/0012-race-side-mcp-laptop-cursor.md) | Race-side MCP for laptop Cursor |
 | [0013](../adr/0013-orc-certificate-fleet-collection.md) | Automated ORC certificate fleet collection (shore skill) |
 | [0014](../adr/0014-shore-weather-current-collection.md) | Shore weather/current — MET GRIB, Oslofjord plots, SMHI |
+| [0015](../adr/0015-tactical-insight-alerts-annunciation.md) | Tactical insight alerts, UX feed, optional voice (Piper TTS) |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -160,8 +161,9 @@ flowchart LR
 | **metno-oslofjord-weather** | GRIB manifests, `collected/weather/grib/` (binaries gitignored) |
 | **oslofjord-current-plots** | Current PNG maps + interpretation reference |
 | **smhi-wind-observations** | Skagerrak wind obs JSON for forecast validation |
+| **insight-alerts** | Tactical alert broker — Grafana + course-editor + optional speaker TTS |
 
-Detail: [spec §7.19](../spec.md#719-orc-certificate-collection--fleet-enrichment) · [spec §7.20](../spec.md#720-shore-weather--current-collection) · [data repo prep guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md#phase-6--weather-grib-and-current-collection)
+Detail: [spec §7.19](../spec.md#719-orc-certificate-collection--fleet-enrichment) · [spec §7.20](../spec.md#720-shore-weather--current-collection) · [spec §7.21](../spec.md#721-tactical-insight-alerts--annunciation) · [data repo prep guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md#phase-6--weather-grib-and-current-collection)
 
 ---
 
@@ -172,7 +174,7 @@ Detail: [spec §7.19](../spec.md#719-orc-certificate-collection--fleet-enrichmen
 | `Boat`, `BoatSeason`, `OrcCertificate`, `PolarSource` | `boats/{sail_number}/` |
 | `InstrumentProfile`, `InstrumentCalibration` | `boats/{sail}/instrumentation/` |
 | `Race`, `Fleet`, `CourseCatalog`, `WaypointList` | `races/{year}/{race}/` |
-| `LaylinePreferences`, `StartLinePreferences`, `GribPlan`, `WeatherCollection` | `races/.../planning/`, `collected/weather/` |
+| `LaylinePreferences`, `StartLinePreferences`, `GribPlan`, `WeatherCollection`, `InsightAlertProfile` | `races/.../planning/`, `collected/weather/` |
 | `H5000VariableMap` | `schema/h5000-variable-map.yaml` |
 
 Detail: [data repo schema/README.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/README.md)
@@ -193,6 +195,7 @@ Detail: [data repo schema/README.md](https://github.com/cognite-fholm/AI-sailing
 | `handicap-manager` | ORC multi-number + WRS TCF |
 | `ais-collector` | Fleet AIS from Signal K |
 | `tactical-coach` | Local LLM advisory |
+| `insight-alerts` | Tactical alert broker — UI feed, ack, Piper TTS to speaker |
 | `race-mcp-gateway` | MCP tools for laptop Cursor — **Neo4j** (`/mcp/neo4j`) + **Influx** (`/mcp/influx`) ([guide](./race-laptop-mcp.md), [tools](./mcp-neo4j-influx.md)) |
 
 ---

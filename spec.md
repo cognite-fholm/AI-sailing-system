@@ -1,7 +1,8 @@
 # AI Sailing System — Specification
 
-**Version:** 0.13.0-draft  
+**Version:** 0.14.0-draft  
 **Date:** 2026-07-05  
+**Changelog (0.14):** Tactical insight alerts with UX feed and optional voice annunciation (ADR-0015, §7.21).  
 **Changelog (0.13):** Automated ORC certificate fleet collection (ADR-0013, §7.19); dedicated Neo4j/Influx MCP endpoints; shore weather/current collection (ADR-0014, §7.20).  
 **Changelog (0.12):** Race-side MCP gateway for laptop Cursor ad hoc analysis (ADR-0012, §7.18).  
 **Author:** cognite-fholm  
@@ -22,6 +23,8 @@ The platform is organized into **three SLA tiers**, each running in **dedicated 
 **ORC certificates:** [§7.19](#719-orc-certificate-collection--fleet-enrichment) — automate fleet cert metadata and PDF download on shore via **orc-sailor-services** skill in AI-sailing-data ([ADR-0013](./adr/0013-orc-certificate-fleet-collection.md)).
 
 **Weather & current:** [§7.20](#720-shore-weather--current-collection) — MET Norway GRIB, Oslofjord current plots, SMHI wind validation in **AI-sailing-data** ([ADR-0014](./adr/0014-shore-weather-current-collection.md)).
+
+**Tactical alerts:** [§7.21](#721-tactical-insight-alerts--annunciation) — proactive insight notifications (fleet position, course, trim) on helm UX and optional speaker read-out ([ADR-0015](./adr/0015-tactical-insight-alerts-annunciation.md)).
 
 | Tier | Domain | SLA priority |
 |------|--------|----------------|
@@ -88,6 +91,7 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G26 | **Race-side MCP** — laptop on boat LAN runs **Cursor** with live Neo4j, Influx, standings, and YAML context for ad hoc analysis — [§7.18](#718-race-side-mcp--laptop-cursor), [ADR-0012](./adr/0012-race-side-mcp-laptop-cursor.md) |
 | G27 | **Automated ORC certificate collection** for race-class fleets — metadata via `activecerts`, PDFs via authenticated download, `boats/` stubs — [§7.19](#719-orc-certificate-collection--fleet-enrichment), [ADR-0013](./adr/0013-orc-certificate-fleet-collection.md) |
 | G28 | **Shore weather/current collection** for Oslofjord races — MET GRIB, current plot interpretation, SMHI validation — [§7.20](#720-shore-weather--current-collection), [ADR-0014](./adr/0014-shore-weather-current-collection.md) |
+| G29 | **Tactical insight alerts** — raise and display performance alerts (trim, course, fleet rank); optional voice annunciation — [§7.21](#721-tactical-insight-alerts--annunciation), [ADR-0015](./adr/0015-tactical-insight-alerts-annunciation.md) |
 
 ### 3.2 Non-goals (v1)
 
@@ -328,7 +332,8 @@ flowchart TB
 | `crawl-agent` | `ghcr.io/.../crawl-agent` | NOR/SI crawl ([crawl_web](https://github.com/cognite-fholm/crawl_web) lineage) |
 | `llama-tactical` | `ghcr.io/.../llama-cpp` | Text LLM — debrief, tactical Q&A |
 | `tactical-coach` | `ghcr.io/.../tactical-coach` | FastAPI RAG over Neo4j + Influx + wind zones |
-| `grafana-race` | `grafana/grafana` | Fleet map, polars, GRIB overlay, wind-advantage heatmap |
+| `insight-alerts` | `ghcr.io/.../insight-alerts` | Tactical alert broker — UI feed, ack, optional Piper TTS |
+| `grafana-race` | `grafana/grafana` | Fleet map, polars, GRIB overlay, wind-advantage heatmap, **alert feed** |
 
 **Reads from SLA-1:** InfluxDB (telemetry + AIS-derived paths), Signal K WebSocket (`navigation`, `environment.wind`, AIS deltas). **Never writes to SLA-1 storage.**
 
@@ -2637,6 +2642,8 @@ Mirror safety-critical H5000 alarms on Grafana alert rules driven from Signal K:
 
 Acknowledge flow documented for helm tablet; full network alarm groups deferred to v2.
 
+**Tactical insight alerts** (fleet rank, course, trim, wind tactics) are a **separate system** — see [§7.21](#721-tactical-insight-alerts--annunciation). Do not route performance alerts through H5000 safety alarm groups.
+
 #### 7.17.9 Autopilot integration (read-only v1)
 
 Ingest via N2K / Signal K:
@@ -3001,6 +3008,173 @@ races/{year}/{race}/
 
 ---
 
+### 7.21 Tactical insight alerts & annunciation
+
+**ADR:** [0015 — Tactical insight alerts and voice annunciation](./adr/0015-tactical-insight-alerts-annunciation.md)
+
+Analysis services produce insights continuously; the helm needs **proactive notification** when something actionable happens — not only passive Grafana panels or on-demand coach queries.
+
+#### 7.21.1 Scope vs safety alarms
+
+| | Safety alarms ([§7.17.8](#7178-alarms)) | Tactical insight alerts (this section) |
+|---|----------------------------------------|----------------------------------------|
+| Purpose | Boat/instrument limits, collision risk | Performance, tactics, fleet position |
+| Source | Signal K / H5000 thresholds | SLA-2/3 analysis services |
+| Severity | info / warning / **critical** | info / warning / **urgent** |
+| Voice | H5000 alarm module (if fitted) | Optional Piper TTS on Pi speaker |
+| Config | `AlarmProfile` (`alarms.yaml`) | `InsightAlertProfile` (`tactical-alerts.yaml`) |
+
+#### 7.21.2 Alert broker — `insight-alerts`
+
+Central **SLA-2** service (`:8095`) that:
+
+1. Receives **`InsightEvent`** JSON from producers
+2. Evaluates rules from active `InsightAlertProfile`
+3. Deduplicates (same `rule_id` + context within cooldown)
+4. Routes to enabled **channels**
+5. Persists to Neo4j (`InsightAlert`) and Influx annotations
+
+```mermaid
+flowchart LR
+  P[Producers] -->|POST /events| IA[insight-alerts]
+  IA --> UI[Grafana + course-editor]
+  IA --> TTS[Piper → speaker]
+  IA --> NEO[Neo4j history]
+```
+
+#### 7.21.3 Producers and example triggers
+
+| Producer | Category | Example trigger |
+|----------|----------|-----------------|
+| `live-results` | `fleet_position` | Corrected rank drops ≥ N places in T minutes |
+| `live-results` | `fleet_position` | Delta to leader widens beyond threshold on leg |
+| `race-intelligence` | `course` | XTE &gt; limit for &gt; 30 s while navigating |
+| `race-intelligence` | `course` | Favored tack / layline side changed |
+| `race-intelligence` | `start_line` | TTL &lt; burn window; bias end shift |
+| `wind-field-analyzer` | `wind_tactics` | Persistent header on unfavored side (GRIB + AIS) |
+| `sail-analysis-api` | `sail_trim` | Trim score below polar target for &gt; 2 min |
+| `tactical-coach` | `coach` | High-confidence LLM insight (structured payload) |
+
+Producers emit events; **thresholds live in YAML**, not hard-coded per service.
+
+#### 7.21.4 `InsightEvent` payload (v1)
+
+```yaml
+event_id: "uuid"
+timestamp: "2026-07-05T10:15:00Z"
+race_id: faerderseilasen-2026
+category: fleet_position
+rule_id: rank_drop_15min
+severity: warning
+title: "Fleet position"
+message: "Dropped 3 places in 15 minutes — VMG 0.4 kt below polar"
+message_short: "Three places lost — check VMG"
+data:
+  rank_before: 5
+  rank_after: 8
+  vmg_delta_kt: -0.4
+source_service: live-results
+ttl_s: 600
+```
+
+`message_short` is used for TTS (≤ 12 words).
+
+#### 7.21.5 Configuration — `InsightAlertProfile`
+
+Per race: `races/{year}/{race}/planning/tactical-alerts.yaml`  
+Optional boat override: `boats/{sail}/instrumentation/tactical-alerts.yaml`
+
+```yaml
+apiVersion: sailing.cognite-fholm/v1
+kind: InsightAlertProfile
+metadata:
+  race_id: faerderseilasen-2026
+spec:
+  channels:
+    ui: true
+    grafana_panel: race-alerts
+    course_editor: true
+    tts:
+      enabled: true
+      min_severity: warning
+      locale: nb-NO
+      speaker_device: alsa:plughw:1,0
+      max_per_10min: 6
+  rules:
+    - id: rank_drop_15min
+      category: fleet_position
+      enabled: true
+      severity: warning
+      params:
+        places: 3
+        window_min: 15
+    - id: xte_off_course
+      category: course
+      enabled: true
+      severity: warning
+      params:
+        xte_m: 50
+        persist_s: 30
+    - id: trim_under_target
+      category: sail_trim
+      enabled: true
+      severity: info
+      params:
+        polar_pct_below: 85
+        persist_s: 120
+      channels:
+        tts: false   # visual only
+  ack:
+    cooldown_min: 30
+```
+
+#### 7.21.6 UX channels
+
+| Channel | Component | Behavior |
+|---------|-----------|----------|
+| **Grafana** | `grafana-race` → **Alert feed** panel | Scrollable list; severity color; ack button links to API |
+| **course-editor** | Alert strip + history drawer | WebSocket from `insight-alerts`; toast for `warning`+ |
+| **Race Display row** | Optional compact alert icon | Mirrors H5000 severity icon pattern ([§7.17.7](#7177-race-display-parity)) |
+
+Unacknowledged `urgent` alerts pulse on UI until ack or TTL expiry.
+
+#### 7.21.7 Voice annunciation
+
+When `spec.channels.tts.enabled`:
+
+1. Broker enqueues `message_short` if severity ≥ `min_severity`
+2. **Piper** synthesizes WAV (offline arm64 model in harbor bundle)
+3. Playback via **ALSA** to USB or Bluetooth speaker (`speaker_device`)
+4. **espeak-ng** fallback if Piper model missing
+5. **Safety yield:** incoming safety Grafana alert cancels current TTS and clears queue
+
+Helm acknowledges via course-editor or Grafana → `POST /alerts/{id}/ack` → suppresses repeat voice for `ack.cooldown_min`.
+
+**Hardware:** Standard USB speaker or marine Bluetooth receiver on boat LAN; no cloud TTS.
+
+#### 7.21.8 API surface (v1)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/events` | Producers submit `InsightEvent` |
+| `GET` | `/alerts/active` | Active alerts for UI |
+| `GET` | `/alerts/history` | Recent alerts (query params: race_id, category) |
+| `POST` | `/alerts/{id}/ack` | Acknowledge; start cooldown |
+| `WS` | `/alerts/stream` | Push to course-editor / Grafana live |
+
+`race-mcp-gateway` (planned): `get_active_alerts`, `ack_alert` tools for laptop Cursor.
+
+#### 7.21.9 Degradation
+
+| Condition | Behavior |
+|-----------|----------|
+| SLA-3 offline | No `sail_trim` events; other categories continue |
+| TTS disabled / no speaker | UI channels only |
+| `insight-alerts` down | Producers log locally; no alert UX (race continues) |
+| `RACE_MODE=true` | Service stays up; no container updates |
+
+---
+
 ## 8. Technology matrix
 
 | Concern | Choice | Language | Rationale |
@@ -3030,6 +3204,7 @@ races/{year}/{race}/
 | Data sync | `race-data-sync` | Python | Git pull data repo via LTE/Wi-Fi |
 | Graph import | `race-import` | Python | MERGE neo4j YAML bundles |
 | Race MCP | `race-mcp-gateway` + MCP SDK | Python | Laptop Cursor → live Neo4j/Influx/YAML on boat LAN |
+| TTS (alerts) | Piper + espeak-ng | C++ / CLI | Offline voice annunciation for tactical alerts |
 | API / coach | FastAPI | Python | Async, typed, small footprint |
 | Containers | Docker Compose | YAML | Repeatable; works on Pi arm64 |
 | CI/CD | **GitHub Actions** | YAML | Lint, test, build arm64, push GHCR |
@@ -3605,6 +3780,23 @@ flowchart LR
 | FR-148 | `collected-sources.yaml` registers `metno_gribfiles`, `metno_oslofjord_plots`, `smhi_metobs` provenance |
 | FR-149 | `planning/weather-notes.md` records agent/human interpretation after collection |
 
+### 11.11 Tactical insight alerts & annunciation
+
+| ID | Requirement |
+|----|-------------|
+| FR-150 | `insight-alerts` service on SLA-2 ingests `InsightEvent` from analysis producers and evaluates `InsightAlertProfile` rules |
+| FR-151 | Alert categories: `fleet_position`, `course`, `sail_trim`, `wind_tactics`, `start_line`, `coach` — separate from safety alarms (FR-121) |
+| FR-152 | Active alerts visible on `grafana-race` alert feed panel and `course-editor` WebSocket strip |
+| FR-153 | Helm can acknowledge alerts; repeat annunciation suppressed for configurable cooldown |
+| FR-154 | Optional TTS via Piper (espeak-ng fallback) to ALSA speaker when `channels.tts.enabled` |
+| FR-155 | Voice rate limit (`max_per_10min`) and `min_severity` prevent alert fatigue |
+| FR-156 | Safety Grafana critical alarms preempt tactical TTS playback |
+| FR-157 | `InsightAlertProfile` in `planning/tactical-alerts.yaml` per race; optional boat override |
+| FR-158 | Producers (`live-results`, `race-intelligence`, `wind-field-analyzer`, `sail-analysis-api`, `tactical-coach`) emit structured events with `message_short` for voice |
+| FR-159 | Alert history in Neo4j (`InsightAlert`) and Influx annotations for debrief |
+| FR-160 | `insight-alerts` remains available when `RACE_MODE=true` |
+| FR-161 | Degrade gracefully when SLA-3 offline — fleet/course alerts continue without trim category |
+
 ---
 
 ## 12. Non-functional requirements
@@ -3688,6 +3880,7 @@ AI-sailing-system/
 │   ├── grib/
 │   └── polars/                     # Canonical YAML (generated from SLK / derived)
 ├── tactical-coach/                 # SLA-2
+├── insight-alerts/                 # SLA-2 tactical alert broker + TTS
 ├── gopro-orchestrator/           # SLA-3 Open GoPro fleet control
 ├── media-ingest/                   # SLA-3 GoPro HTTP download
 ├── sail-geometry/                  # SLA-3 angle & shape metrics
@@ -3723,7 +3916,7 @@ AI-sailing-system/
 - [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
 - [x] ADR-0001 through ADR-0006, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013
 - [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide
-- [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); ORC collection skill (§7.19); weather/current skills (§7.20)
+- [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); ORC collection skill (§7.19); weather/current skills (§7.20); tactical insight alerts (§7.21)
 - [x] Deploy scaffolding, workflow stubs, harbor scripts
 - [ ] Runtime containers (Phase 1+)
 
@@ -3744,6 +3937,7 @@ AI-sailing-system/
 - [ ] `handicap-manager` — ORC certificate + WRS TCF
 - [ ] `live-results` — corrected-time standings + VMG
 - [ ] `race-intelligence` — start line, lift, steering (iRegatta + H5000 parity)
+- [ ] `insight-alerts` — tactical alert broker, Grafana/course-editor UX, optional Piper TTS ([ADR-0015](./adr/0015-tactical-insight-alerts-annunciation.md))
 - [ ] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
 - [x] `race-mcp-gateway` scaffold — Neo4j + Influx MCP (`race-mcp-gateway/`)
 - [ ] Shore ORC pipeline documented — runtime uses data repo assets ([ADR-0013](./adr/0013-orc-certificate-fleet-collection.md))
