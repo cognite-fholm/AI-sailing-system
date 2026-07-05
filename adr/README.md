@@ -11,6 +11,7 @@ This directory contains [Architecture Decision Records](https://adr.github.io/) 
 | [0005](./0005-course-parsing-handicaps-live-results.md) | Course parsing from SI PDFs, multi-handicap scoring, live results | Accepted |
 | [0006](./0006-start-boat-course-flags.md) | Multiple courses per race and start-boat flag signaling | Accepted |
 | [0008](./0008-github-docker-deployment-lifecycle.md) | GitHub + Docker CI/CD, lifecycle, guardrails, gaming PC shore training | Accepted |
+| [0009](./0009-dual-repository-race-data.md) | Dual repo: AI-sailing-system + AI-sailing-data, Teltonika LTE sync | Accepted |
 
 ## Format
 
