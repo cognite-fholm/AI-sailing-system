@@ -19,6 +19,7 @@ This directory contains [Architecture Decision Records](https://adr.github.io/) 
 | [0014](./0014-shore-weather-current-collection.md) | Shore weather and current collection (MET GRIB, Oslofjord plots, SMHI) | Accepted |
 | [0015](./0015-tactical-insight-alerts-annunciation.md) | Tactical insight alerts, UX feed, and optional voice annunciation | Accepted |
 | [0016](./0016-fleet-polar-performance-influx.md) | Fleet polar performance timeline stored in InfluxDB | Accepted |
+| [0017](./0017-marine-map-gpx-export.md) | Marine map GPX export bundle (PredictWind-compatible) | Accepted |
 
 ## Format
 
@@ -30,4 +31,4 @@ Each ADR follows the structure:
 4. **Consequences** — positive, negative, risks
 5. **Alternatives considered**
 
-New decisions should use the next sequential number: `0017-short-title.md`.
+New decisions should use the next sequential number: `0018-short-title.md`.

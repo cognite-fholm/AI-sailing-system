@@ -1,7 +1,8 @@
 # AI Sailing System — Specification
 
-**Version:** 0.15.0-draft  
+**Version:** 0.16.0-draft  
 **Date:** 2026-07-05  
+**Changelog (0.16):** Marine map GPX export bundle for chartplotter import (ADR-0017, §7.23).  
 **Changelog (0.15):** Fleet polar performance timeline for all boats in InfluxDB (ADR-0016, §7.22).  
 **Changelog (0.14):** Tactical insight alerts with UX feed and optional voice annunciation (ADR-0015, §7.21).  
 **Changelog (0.13):** Automated ORC certificate fleet collection (ADR-0013, §7.19); dedicated Neo4j/Influx MCP endpoints; shore weather/current collection (ADR-0014, §7.20).  
@@ -28,6 +29,8 @@ The platform is organized into **three SLA tiers**, each running in **dedicated 
 **Tactical alerts:** [§7.21](#721-tactical-insight-alerts--annunciation) — proactive insight notifications (fleet position, course, trim) on helm UX and optional speaker read-out ([ADR-0015](./adr/0015-tactical-insight-alerts-annunciation.md)).
 
 **Fleet polar performance:** [§7.22](#722-fleet-polar-performance-timeline) — time- and location-indexed polar % for every boat, stored in **InfluxDB** ([ADR-0016](./adr/0016-fleet-polar-performance-influx.md)).
+
+**Marine map export:** [§7.23](#723-marine-map-gpx-export) — PredictWind-compatible GPX route zip per race for Navionics/chartplotter import ([ADR-0017](./adr/0017-marine-map-gpx-export.md)).
 
 | Tier | Domain | SLA priority |
 |------|--------|----------------|
@@ -96,6 +99,7 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G28 | **Shore weather/current collection** for Oslofjord races — MET GRIB, current plot interpretation, SMHI validation — [§7.20](#720-shore-weather--current-collection), [ADR-0014](./adr/0014-shore-weather-current-collection.md) |
 | G29 | **Tactical insight alerts** — raise and display performance alerts (trim, course, fleet rank); optional voice annunciation — [§7.21](#721-tactical-insight-alerts--annunciation), [ADR-0015](./adr/0015-tactical-insight-alerts-annunciation.md) |
 | G30 | **Fleet polar performance timeline** — all boats vs certificate polar and active race handicap, stored in InfluxDB for Grafana/MCP — [§7.22](#722-fleet-polar-performance-timeline), [ADR-0016](./adr/0016-fleet-polar-performance-influx.md) |
+| G31 | **Marine map GPX export** — chartplotter-ready route zip from race course YAML — [§7.23](#723-marine-map-gpx-export), [ADR-0017](./adr/0017-marine-map-gpx-export.md) |
 
 ### 3.2 Non-goals (v1)
 
@@ -3336,6 +3340,89 @@ Task runs on SLA-1 Influx; configured in `influxdb/tasks/fleet-performance-downs
 
 ---
 
+### 7.23 Marine map GPX export
+
+**ADR:** [0017 — Marine map GPX export bundle](./adr/0017-marine-map-gpx-export.md)  
+**Skill:** `marine-map-gpx-export` in **AI-sailing-data**
+
+Helm crews import regatta routes into **marine chart apps** (Navionics, PredictWind Marine, OpenCPN, B&G/VRM). The reference format is a **zip folder** of GPX 1.1 **route** files — e.g. `Hollenderen2018/RoutePwg.gpx` with dense `<rtept>` points (PredictWind export).
+
+#### 7.23.1 Race folder artifact
+
+Each prepared regatta includes:
+
+```
+races/{year}/{race}/
+  courses/
+    regatta.yaml              # CourseCatalog
+    routes/*.yaml             # WaypointList per route
+  export/
+    marine-map/
+      Route*.gpx              # one per course variant
+      manifest.yaml           # kind: MarineMapExport
+      {RaceName}{Year}.zip    # optional import bundle
+```
+
+Generated on **shore** after coordinates are complete; committed to **AI-sailing-data** git; synced to boat via `race-data-sync`.
+
+#### 7.23.2 GPX format
+
+| Element | Value |
+|---------|-------|
+| Version | GPX 1.1 |
+| Structure | Single `<rte>` with `<rtept lat lon>` polyline |
+| `creator` | `www.predictwind.com` when `--predictwind-compat` (default) |
+| `<name>` | Route display name (`WaypointList.spec.name`) |
+| `<src>` | `route_id` (e.g. `11.1`, `PWG`) |
+| Point density | Great-circle interpolation every **0.5 NM** between resolved marks |
+
+Routes with fewer than two resolved `lat`/`lon` waypoints are **skipped**; `manifest.yaml` lists `unresolved_waypoints`.
+
+#### 7.23.3 Zip profiles
+
+| Profile | Folder in zip | File names | Example |
+|---------|---------------|------------|---------|
+| `predictwind_legacy` | `{Name}{Year}` | `Route{label}.gpx` | `Hollenderen2018/RoutePwg.gpx` |
+| `standard` | `{year}-{slug}` | `route-{id}.gpx` | `2026-06-faerderseilasen/route-11-1.gpx` |
+
+Set `export_label` on `CourseCatalog.routes[]` or `WaypointList.spec` for legacy names (`Blue`, `pwe`, `pwg`).
+
+#### 7.23.4 Shore pipeline
+
+```mermaid
+flowchart LR
+  SI[SI PDF / course-parser]
+  YAML[WaypointList YAML]
+  SKILL[marine-map-gpx-export]
+  GPX[export/marine-map/]
+  CHART[Navionics / PredictWind / OpenCPN]
+
+  SI --> YAML --> SKILL --> GPX
+  GPX -->|SD card / phone| CHART
+```
+
+```bash
+python .cursor/skills/marine-map-gpx-export/scripts/export_marine_map.py \
+  races/2026/2026-06-faerderseilasen --profile predictwind_legacy --zip
+```
+
+#### 7.23.5 Relation to onboard navigation
+
+| Layer | Source |
+|-------|--------|
+| Chartplotter route | Static GPX export (this section) |
+| Live leg / XTE | `race-intelligence` + Neo4j `CourseRoute` |
+| Fleet progress | `live-results` + Influx `course_progress` |
+
+GPX is the **harbor handoff** to MFD apps; Neo4j remains runtime truth on the boat.
+
+#### 7.23.6 Follow-up (system)
+
+- `course-parser` auto-invokes export after SI coordinate extraction
+- `course-editor` "Export marine map" action (harbor API)
+
+---
+
 ## 8. Technology matrix
 
 | Concern | Choice | Language | Rationale |
@@ -3974,6 +4061,19 @@ flowchart LR
 | FR-171 | `race-mcp-gateway` Flux examples query `fleet_polar_performance` by race and boat |
 | FR-172 | Vessels without polar skipped with logged gap; `polar_quality=low` for derived confidence &lt; 0.7 |
 
+### 11.13 Marine map GPX export
+
+| ID | Requirement |
+|----|-------------|
+| FR-173 | Shore skill generates GPX 1.1 `<rte>` files from `CourseCatalog` + `WaypointList` YAML |
+| FR-174 | Output in `races/.../export/marine-map/` with `MarineMapExport` manifest |
+| FR-175 | Zip bundle matches `predictwind_legacy` profile (`{Name}{Year}/Route*.gpx`) for chart import |
+| FR-176 | Great-circle interpolation between resolved marks (default 0.5 NM step) |
+| FR-177 | `export_label` on routes for legacy file names (`RoutePwg.gpx`, etc.) |
+| FR-178 | Manifest records `unresolved_waypoints` when SI coords missing |
+| FR-179 | Same YAML source as `course-editor`, `live-results`, and Neo4j import |
+| FR-180 | Documented import path for Navionics, PredictWind Marine, OpenCPN |
+
 ---
 
 ## 12. Non-functional requirements
@@ -4095,7 +4195,7 @@ AI-sailing-system/
 - [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
 - [x] ADR-0001 through ADR-0006, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013
 - [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide
-- [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); ORC collection skill (§7.19); weather/current skills (§7.20); tactical insight alerts (§7.21); fleet polar performance Influx (§7.22)
+- [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); ORC collection skill (§7.19); weather/current skills (§7.20); tactical insight alerts (§7.21); fleet polar performance Influx (§7.22); marine map GPX export (§7.23)
 - [x] Deploy scaffolding, workflow stubs, harbor scripts
 - [ ] Runtime containers (Phase 1+)
 

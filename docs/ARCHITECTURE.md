@@ -128,6 +128,7 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0014](../adr/0014-shore-weather-current-collection.md) | Shore weather/current — MET GRIB, Oslofjord plots, SMHI |
 | [0015](../adr/0015-tactical-insight-alerts-annunciation.md) | Tactical insight alerts, UX feed, optional voice (Piper TTS) |
 | [0016](../adr/0016-fleet-polar-performance-influx.md) | Fleet polar performance timeline in InfluxDB |
+| [0017](../adr/0017-marine-map-gpx-export.md) | Marine map GPX export (PredictWind-compatible zip) |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -162,9 +163,10 @@ flowchart LR
 | **metno-oslofjord-weather** | GRIB manifests, `collected/weather/grib/` (binaries gitignored) |
 | **oslofjord-current-plots** | Current PNG maps + interpretation reference |
 | **smhi-wind-observations** | Skagerrak wind obs JSON for forecast validation |
+| **marine-map-gpx-export** | GPX route zip → `export/marine-map/` for chartplotter import |
 | **insight-alerts** | Tactical alert broker — Grafana + course-editor + optional speaker TTS |
 
-Detail: [spec §7.19](../spec.md#719-orc-certificate-collection--fleet-enrichment) · [spec §7.20](../spec.md#720-shore-weather--current-collection) · [spec §7.21](../spec.md#721-tactical-insight-alerts--annunciation) · [data repo prep guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md#phase-6--weather-grib-and-current-collection)
+Detail: [spec §7.19](../spec.md#719-orc-certificate-collection--fleet-enrichment) · [spec §7.20](../spec.md#720-shore-weather--current-collection) · [spec §7.21](../spec.md#721-tactical-insight-alerts--annunciation) · [spec §7.23](../spec.md#723-marine-map-gpx-export) · [data repo prep guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md)
 
 ---
 
@@ -175,7 +177,7 @@ Detail: [spec §7.19](../spec.md#719-orc-certificate-collection--fleet-enrichmen
 | `Boat`, `BoatSeason`, `OrcCertificate`, `PolarSource` | `boats/{sail_number}/` |
 | `InstrumentProfile`, `InstrumentCalibration` | `boats/{sail}/instrumentation/` |
 | `Race`, `Fleet`, `CourseCatalog`, `WaypointList` | `races/{year}/{race}/` |
-| `LaylinePreferences`, `StartLinePreferences`, `GribPlan`, `WeatherCollection`, `InsightAlertProfile` | `races/.../planning/`, `collected/weather/` |
+| `LaylinePreferences`, `StartLinePreferences`, `GribPlan`, `WeatherCollection`, `InsightAlertProfile`, `MarineMapExport` | `races/.../planning/`, `collected/weather/`, `export/marine-map/` |
 | `H5000VariableMap` | `schema/h5000-variable-map.yaml` |
 
 Detail: [data repo schema/README.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/README.md)
