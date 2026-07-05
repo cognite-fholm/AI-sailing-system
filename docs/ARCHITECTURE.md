@@ -1,0 +1,183 @@
+# Architecture overview
+
+Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, data stores, and reference products fit together. Normative detail remains in [spec.md](../spec.md) and [adr/](../adr/).
+
+**Last updated:** 2026-07-05 · **Spec version:** 0.11.0-draft
+
+---
+
+## Repositories
+
+| Repository | Role | Onboard path |
+|------------|------|--------------|
+| **[AI-sailing-system](https://github.com/cognite-fholm/AI-sailing-system)** (this repo) | Code, Docker images, CI/CD, ADRs, spec | `/opt/ai-sailing-system/` |
+| **[AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)** | Races, boats, ORC certs, planning YAML, Neo4j templates | `/opt/ai-sailing-data/` |
+
+**Rule:** Prepare regattas in **AI-sailing-data** on shore (Cursor + Git). Freeze **both** git refs and system image digests before a race ([ADR-0009](../adr/0009-dual-repository-race-data.md)).
+
+**User guide:** [Race preparation guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md) (data repo).
+
+---
+
+## SLA tiers
+
+| Tier | Priority | Hardware | Compose file |
+|------|----------|----------|--------------|
+| **SLA-1** | Critical | Pi 5 + PiCAN-M | `docker-compose.sla-1.yml` |
+| **SLA-2** | Important | Pi 5 (8 GB) | `docker-compose.sla-2.yml` |
+| **SLA-3** | Best-effort | Pi 5 + Coral + GoPro | `docker-compose.sla-3.yml` |
+| **SLA-S** | Harbor only | Gaming PC (CUDA) | `shore/docker-compose.sla-shore.yml` |
+
+**Golden rule:** SLA-1 telemetry survives SLA-2/SLA-3 failure ([ADR-0002](../adr/0002-three-tier-sla-architecture.md)).
+
+```mermaid
+flowchart TB
+  subgraph sla1 [SLA-1 Telemetry]
+    N2K[NMEA 2000 / 0183 + H5000]
+    SK[Signal K]
+    IFX[InfluxDB]
+    N2K --> SK --> IFX
+  end
+
+  subgraph sla2 [SLA-2 Race]
+    NEO[Neo4j]
+    RI[race-intelligence]
+    LR[live-results]
+    PM[polar-manager]
+    GF[grafana-race]
+    SK --> RI
+    SK --> PM
+    RI --> GF
+    LR --> GF
+    NEO --> LR
+  end
+
+  subgraph data [AI-sailing-data Git]
+    YAML[YAML + OKF]
+    YAML -->|race-import| NEO
+  end
+
+  subgraph shore [Shore / LTE]
+    GIT[GitHub]
+    GIT -->|race-data-sync| data
+  end
+```
+
+Spec: [§5 Three-tier SLA](../spec.md#5-three-tier-sla-architecture) · [§6 Data flow](../spec.md#6-system-context-and-data-flow)
+
+---
+
+## Data stores
+
+| Store | SLA | Holds |
+|-------|-----|-------|
+| **Signal K** | 1 | Live marine deltas (canonical) |
+| **InfluxDB** | 1 | High-frequency telemetry |
+| **Neo4j** | 2 | Races, vessels, courses, runtime standings |
+| **Grafana** | 1–3 | Dashboards per tier |
+| **Git (data repo)** | Shore → boat | Plans, certificates, static graph templates |
+| **OKF bundles** | 2–3 | LLM concept context |
+
+**Not in git:** Live AIS tracks, `LiveStanding`, `CourseSelection`, GRIB binaries (metadata only in YAML).
+
+---
+
+## Reference products (parity targets)
+
+The Pi stack **extends** familiar sailing tools; it does not replace helm instruments in v1.
+
+| Product | ADR | Spec | Our surfaces |
+|---------|-----|------|--------------|
+| **[iRegatta](https://zifigo.com/)** v2.86 | [0010](../adr/0010-iregatta-reference-model.md) | [§7.16](../spec.md#716-iregatta-reference-model--feature-traceability) | `grafana-race`, `course-editor`, `race-intelligence` |
+| **[B&G H5000](https://www.bandg.com/bg/series/h5000/)** | [0011](../adr/0011-bg-h5000-reference-model.md) | [§7.17](../spec.md#717-bg-h5000-reference-model--integration) | Signal K ingest, SailSteer/Start Grafana pages, `InstrumentProfile` YAML |
+
+**Beyond both:** AIS fleet, live ORC corrected standings, GRIB wind zones, SI PDF courses, start-boat flags, LLM coach, GoPro trim vision.
+
+Manuals: [docs/references/README.md](./references/README.md)
+
+---
+
+## Architecture Decision Records
+
+| ADR | Topic |
+|-----|-------|
+| [0001](../adr/0001-system-architecture-and-technology-choices.md) | Core stack (Signal K, Influx, Neo4j, Grafana, LLaMA) |
+| [0002](../adr/0002-three-tier-sla-architecture.md) | Three isolated SLA tiers |
+| [0003](../adr/0003-gopro-capture-and-shore-training.md) | GoPro HERO13 + TrimTransformer |
+| [0004](../adr/0004-grib-polars-ais-wind-analysis.md) | GRIB, polars, AIS, wind-on-course |
+| [0005](../adr/0005-course-parsing-handicaps-live-results.md) | SI parse, handicaps, live results |
+| [0006](../adr/0006-start-boat-course-flags.md) | Multi-course / start-boat flags |
+| [0008](../adr/0008-github-docker-deployment-lifecycle.md) | GitHub Actions, GHCR, race freeze |
+| [0009](../adr/0009-dual-repository-race-data.md) | Dual repo + Teltonika sync |
+| [0010](../adr/0010-iregatta-reference-model.md) | iRegatta UX benchmark |
+| [0011](../adr/0011-bg-h5000-reference-model.md) | H5000 instrument benchmark |
+
+Full index: [adr/README.md](../adr/README.md)
+
+---
+
+## AI-sailing-data schema (summary)
+
+| Kind | Typical path |
+|------|----------------|
+| `Boat`, `BoatSeason`, `OrcCertificate`, `PolarSource` | `boats/{sail_number}/` |
+| `InstrumentProfile`, `InstrumentCalibration` | `boats/{sail}/instrumentation/` |
+| `Race`, `Fleet`, `CourseCatalog`, `WaypointList` | `races/{year}/{race}/` |
+| `LaylinePreferences`, `StartLinePreferences`, `GribPlan` | `races/.../planning/` |
+| `H5000VariableMap` | `schema/h5000-variable-map.yaml` |
+
+Detail: [data repo schema/README.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/README.md)
+
+---
+
+## Key services (SLA-2)
+
+| Service | Responsibility |
+|---------|----------------|
+| `race-data-sync` | `git pull` data repo via LTE/Wi‑Fi |
+| `race-import` | MERGE `neo4j/*.yaml` bundles |
+| `polar-manager` | SLK polars + H5000 CSV interop |
+| `race-intelligence` | Start line, lift, laylines, steering hints |
+| `live-results` | VMG, corrected-time fleet rank |
+| `wind-field-analyzer` | GRIB + AIS + polar fusion |
+| `course-parser` / `course-editor` | SI → waypoints; manual edit + start flags |
+| `handicap-manager` | ORC multi-number + WRS TCF |
+| `ais-collector` | Fleet AIS from Signal K |
+| `tactical-coach` | Local LLM advisory |
+
+---
+
+## Deployment & lifecycle
+
+| Doc | Content |
+|-----|---------|
+| [deployment-lifecycle.md](./deployment-lifecycle.md) | Harbor vs race mode, scripts |
+| [deploy/README.md](../deploy/README.md) | Env templates, digest locks |
+| [spec §9](../spec.md#9-deployment-architecture) | Full deployment architecture |
+
+**Harbor:** `harbor-pull.sh` (images) + `harbor-sync.sh` (models, OKF, data repo).  
+**Race:** `RACE_MODE=true` — no Watchtower, no auto-pull.
+
+---
+
+## Implementation status
+
+| Phase | Status |
+|-------|--------|
+| **0 — Specification** | **Current** — spec, ADRs, data repo examples, skills |
+| **1 — SLA-1 telemetry** | Not started |
+| **2 — SLA-2 race** | Not started |
+| **3 — SLA-3 vision** | Not started |
+| **4 — CI/CD multi-Pi** | Workflow stubs only |
+| **5 — Shore training** | Spec only |
+
+Detail: [spec §14](../spec.md#14-implementation-phases)
+
+---
+
+## Related links
+
+- [spec.md](../spec.md) — full specification
+- [README.md](../README.md) — project entry point
+- [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) — race/boat content
+- [cogsail-python](https://github.com/cognite-fholm/cogsail-python) — prior art

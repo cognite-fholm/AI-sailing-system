@@ -10,11 +10,12 @@ An edge-first, AI-assisted competitive sailing platform built on [Signal K](http
 
 | Document | Purpose |
 |----------|---------|
-| [spec.md](./spec.md) | System specification, architecture, technology choices, and lineage from prior CogSail work |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | **Architecture index** — repos, tiers, ADRs, data schema summary |
+| [spec.md](./spec.md) | Full system specification (v0.11) |
 | [docs/deployment-lifecycle.md](./docs/deployment-lifecycle.md) | GitHub + Docker CI/CD, Pi deploy, race freeze, shore PC |
+| [docs/references/README.md](./docs/references/README.md) | iRegatta + H5000 manual links |
 | [deploy/README.md](./deploy/README.md) | Env templates, digest locks, guardrails checklist |
-| [adr/0001-system-architecture-and-technology-choices.md](./adr/0001-system-architecture-and-technology-choices.md) | Architecture Decision Record for core platform choices |
-| [adr/0008-github-docker-deployment-lifecycle.md](./adr/0008-github-docker-deployment-lifecycle.md) | CI/CD, GHCR, Compose, Watchtower, gaming PC SLA-S |
+| [adr/README.md](./adr/README.md) | All Architecture Decision Records |
 
 ## Goal
 
@@ -29,7 +30,9 @@ Help sailors **win races** by combining real-time onboard sensor data, historica
 | **SLA-3** | Sail performance vision (GoPro HERO13, Coral, vision LLM) | Separate Pi with Coral dongle |
 | **SLA-S** | Onshore TrimTransformer training (gaming PC + CUDA) | Home — harbor only |
 
-Each onboard tier has its own Docker Compose stack and may run on a **different Raspberry Pi**. See [spec.md §5](./spec.md#5-three-tier-sla-architecture).
+Each onboard tier has its own Docker Compose stack and may run on a **different Raspberry Pi**. See [spec.md §5](./spec.md#5-three-tier-sla-architecture) and [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+
+**Data repo:** Race and boat YAML live in [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) — synced onboard via `race-data-sync`.
 
 **GoPro + ML loop:** HERO13 cameras → onboard geometry → harbor export → **TrimTransformer on gaming PC** → GHCR → boat. See [spec.md §7.9–7.11](./spec.md#79-gopro-hero13-black-fleet).
 

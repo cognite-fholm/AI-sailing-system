@@ -215,7 +215,11 @@ RabbitMQ is heavier for Pi resource budgets; we defer unless load testing proves
 ## Related documents
 
 - [spec.md](../spec.md) — full system specification
+- [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) — consolidated architecture index
+- [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) — race/boat content repo ([ADR-0009](./0009-dual-repository-race-data.md))
 - [cogsail-python](https://github.com/cognite-fholm/cogsail-python) — prior Signal K → CDF pipeline
+- [ADR-0010](./0010-iregatta-reference-model.md) — iRegatta race UX reference
+- [ADR-0011](./0011-bg-h5000-reference-model.md) — B&G H5000 instrument reference
 - [ADR template](https://adr.github.io/) — format reference
 
 ---
@@ -225,3 +229,4 @@ RabbitMQ is heavier for Pi resource budgets; we defer unless load testing proves
 | Version | Date | Change |
 |---------|------|--------|
 | 1.0 | 2026-07-04 | Initial accepted decision |
+| 1.1 | 2026-07-05 | Related docs: dual repo, iRegatta, H5000 ADRs |

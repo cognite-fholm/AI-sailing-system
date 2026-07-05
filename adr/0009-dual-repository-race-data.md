@@ -3,7 +3,7 @@
 **Status:** Accepted  
 **Date:** 2026-07-05  
 **Deciders:** cognite-fholm  
-**Related:** [ADR-0008](./0008-github-docker-deployment-lifecycle.md), [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
+**Related:** [ADR-0008](./0008-github-docker-deployment-lifecycle.md), [ADR-0010](./0010-iregatta-reference-model.md), [ADR-0011](./0011-bg-h5000-reference-model.md), [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md), [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
 
 ---
 
@@ -33,10 +33,12 @@ The user needs:
 ### Data repository layout
 
 ```
-boats/{sail_number}/{year}/certificates/{type}-{orc_ref}/   # ratings, polar, neo4j, okf, assets
+boats/{sail_number}/
+  instrumentation/              # B&G H5000 profile + calibration (ADR-0011)
+  {year}/certificates/{type}-{orc_ref}/   # ratings, polar, neo4j, okf, assets
 races/{year}/{year}-{month}-{slug}/
   race.yaml                     # manifest
-  planning/                     # grib-plan, course-preference, weather notes
+  planning/                     # grib-plan, course-preference, layline/start-line prefs
   courses/                      # routes & waypoints
   fleet.yaml
   scoring.yaml

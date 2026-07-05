@@ -1,7 +1,8 @@
 # AI Sailing System — Specification
 
-**Version:** 0.10.0-draft  
+**Version:** 0.11.0-draft  
 **Date:** 2026-07-05  
+**Changelog (0.11):** Restored §5/§6 headings; consolidated architecture index; dual-repo + iRegatta + H5000 reference models (ADR-0009–0011); FR-42–123.  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
 
@@ -11,7 +12,9 @@
 
 The **AI Sailing System** is an onboard edge platform for **competitive sailing**. It ingests marine sensor data over NMEA 0183 and NMEA 2000, normalizes it through **Signal K**, stores high-frequency telemetry in **InfluxDB**, models boats, races, courses, and tactics in **Neo4j**, visualizes performance in **Grafana**, and provides **local AI coaching** using **LLaMA** models.
 
-The platform is organized into **three SLA tiers**, each running in **dedicated containers** and optionally on **separate Raspberry Pi devices**:
+The platform is organized into **three SLA tiers**, each running in **dedicated containers** and optionally on **separate Raspberry Pi devices**. Race and boat **content** lives in the companion **[AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)** repository; **code and containers** live here.
+
+**Reference UX / instruments:** [iRegatta](https://zifigo.com/) (race phone app — [§7.16](#716-iregatta-reference-model--feature-traceability)) and [B&G H5000](https://www.bandg.com/bg/series/h5000/) (helm instruments — [§7.17](#717-bg-h5000-reference-model--integration)) define parity targets for start line, laylines, polars, and SailSteer displays.
 
 | Tier | Domain | SLA priority |
 |------|--------|----------------|
@@ -180,6 +183,8 @@ flowchart LR
 **Guardrails:** Router credentials and RMS tokens are **not** stored in git. Document AP SSID/VLAN in harbor runbook only.
 
 ---
+
+## 5. Three-tier SLA architecture
 
 The system is partitioned into **three independent SLA tiers**. Each tier:
 
@@ -516,6 +521,8 @@ flowchart TB
 **Deploy rule:** Version **both** repos at race freeze — system digest lock + data git tag/ref.
 
 ---
+
+## 6. System context and data flow
 
 ### 6.1 High-level context
 
@@ -3238,6 +3245,10 @@ flowchart LR
 ```
 AI-sailing-system/
 ├── spec.md
+├── docs/
+│   ├── ARCHITECTURE.md           # Architecture index (repos, tiers, ADRs)
+│   ├── deployment-lifecycle.md
+│   └── references/README.md      # iRegatta + H5000 manual links
 ├── adr/
 ├── docker-compose.sla-1.yml    # Telemetry tier
 ├── docker-compose.sla-2.yml    # Race & competitor tier
@@ -3267,7 +3278,9 @@ AI-sailing-system/
 │   ├── race/                     # SLA-2 dashboards
 │   └── sail/                     # SLA-3 dashboards
 ├── neo4j/                        # SLA-2
-├── race-intelligence/            # SLA-2
+├── race-intelligence/            # SLA-2 start line, lift, steering
+├── race-data-sync/               # SLA-2 git pull AI-sailing-data
+├── race-import/                  # SLA-2 Neo4j YAML MERGE
 ├── competitor-sync/                # SLA-2 fleet roster
 ├── ais-collector/                  # SLA-2 AIS ingest from Signal K
 ├── grib-ingest/                    # SLA-2 scheduled GRIB fetch + upload
@@ -3310,9 +3323,11 @@ AI-sailing-system/
 │   └── sla-3/                      # Vision GGUF manifests
 ├── knowledge/                      # OKF bundle (advisory agent context)
 └── docs/
+    ├── ARCHITECTURE.md             # Architecture index
     ├── hardware-setup.md
     ├── sla-tiers.md
-    └── deployment-lifecycle.md
+    ├── deployment-lifecycle.md
+    └── references/README.md
 ```
 
 ---
@@ -3320,10 +3335,14 @@ AI-sailing-system/
 ## 14. Implementation phases
 
 ### Phase 0 — Specification (current)
-- [x] Repository created
-- [x] spec.md
-- [x] ADR-0001
-- [x] ADR-0002 (three-tier SLA)
+
+- [x] Repository created; [spec.md](./spec.md) v0.11
+- [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
+- [x] ADR-0001 through ADR-0006, ADR-0008, ADR-0009, ADR-0010, ADR-0011
+- [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide
+- [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); schema + example YAML in data repo
+- [x] Deploy scaffolding, workflow stubs, harbor scripts
+- [ ] Runtime containers (Phase 1+)
 
 ### Phase 1 — SLA-1 telemetry (MVP)
 - [ ] Signal K on Pi with PiCAN-M
@@ -3341,7 +3360,9 @@ AI-sailing-system/
 - [ ] `course-flag-detector` — optional start-boat flag vision
 - [ ] `handicap-manager` — ORC certificate + WRS TCF
 - [ ] `live-results` — corrected-time standings + VMG
-- [ ] grafana-race dashboards
+- [ ] `race-intelligence` — start line, lift, steering (iRegatta + H5000 parity)
+- [ ] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
+- [ ] grafana-race dashboards (SailSteer, Start, WindPlot, Highway per §7.17)
 
 ### Phase 3 — SLA-3 GoPro sail vision
 - [ ] `docker-compose.sla-3.yml`
