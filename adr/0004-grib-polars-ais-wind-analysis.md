@@ -3,7 +3,7 @@
 **Status:** Accepted  
 **Date:** 2026-07-04  
 **Deciders:** cognite-fholm  
-**Related:** [ADR-0002](./0002-three-tier-sla-architecture.md), [spec.md §7.12](../spec.md#712-grib-polars-ais--wind-on-course-analysis)
+**Related:** [ADR-0002](./0002-three-tier-sla-architecture.md), [ADR-0010](./0010-iregatta-reference-model.md), [spec.md §7.12](../spec.md#712-grib-polars-ais--wind-on-course-analysis), [spec.md §7.16](../spec.md#716-iregatta-reference-model--feature-traceability)
 
 ---
 

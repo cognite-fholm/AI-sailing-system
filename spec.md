@@ -1,6 +1,6 @@
 # AI Sailing System — Specification
 
-**Version:** 0.8.0-draft  
+**Version:** 0.9.0-draft  
 **Date:** 2026-07-05  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
@@ -73,12 +73,14 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G21 | Shore **TrimTransformer** training on **own gaming PC** (SLA-S), not paid cloud GPU |
 | G22 | **AI-sailing-data** repo for temporal race/boat planning onshore |
 | G23 | Onboard **race-data-sync** pulls newer data from GitHub via Teltonika LTE when available |
+| G24 | **iRegatta-equivalent** race UX for start, laylines, polars, and navigation — see [§7.16](#716-iregatta-reference-model--feature-traceability) and [ADR-0010](./adr/0010-iregatta-reference-model.md) |
 
 ### 3.2 Non-goals (v1)
 
 - Autonomous vessel control or autopilot override.
 - Class rule enforcement or protest filing automation.
 - Replacing dedicated race tracking services (e.g. YB Tracking) — integration may come later.
+- Replacing the **iRegatta** iOS app as a personal phone UI — our stack is boat-LAN Grafana + `course-editor`; iRegatta may run in parallel on the same NMEA Wi‑Fi feed.
 - Training large models onboard — only **inference** of pre-quantized models.
 - Full cloud SaaS replacement — optional sync/export may be added later.
 
@@ -291,7 +293,7 @@ flowchart TB
 | Container | Image | Responsibility |
 |-----------|-------|----------------|
 | `neo4j` | `neo4j:5-community` | Race graph, vessels, marks, polars, wind zones |
-| `race-intelligence` | `ghcr.io/.../race-intelligence` | Session control, tack/gybe detection, leg timing |
+| `race-intelligence` | `ghcr.io/.../race-intelligence` | Start line (DTL/TTL/burn-gain), lift, steering hints, leg timing |
 | `ais-collector` | `ghcr.io/.../ais-collector` | Own-boat + competitor AIS from SLA-1 Signal K stream |
 | `competitor-sync` | `ghcr.io/.../competitor-sync` | MMSI registry, fleet roster, polar linkage |
 | `grib-ingest` | `ghcr.io/.../grib-ingest` | Scheduled download, manual upload, GRIB validation |
@@ -856,15 +858,20 @@ flowchart LR
 
 ### 7.6 Race intelligence service — **SLA-2 only**
 
-**Language:** Python 3.11+
+**Language:** Python 3.11+  
+**ADR:** [0010 — iRegatta reference model](./adr/0010-iregatta-reference-model.md)
 
-Responsibilities:
+Responsibilities (aligned with **iRegatta** start/race/layline logic — see [§7.16](#716-iregatta-reference-model--feature-traceability)):
 
-- Start sequence helper (time-to-start, line bias from headings).
-- Polar comparison for **own boat and competitors** via `polar-manager`.
-- Wind shift detection (statistical + graph persistence).
+- **Start sequence** — countdown sync-to-minute, pause/reset, burn-or-gain vs time-to-line, favored end from wind⊥line geometry.
+- **Line metrics** — distance to line perpendicular to line and extensions; time-to-line at current COG/SOG; bow/GPS antenna offset.
+- **Lift / wind shift** — heading vs 10 s rolling average; configurable threshold (iRegatta “lift indicator”).
+- **Steering guidance** — optimum VMG tack/jibe angles from `polar-manager` (or manual angles in degraded mode).
+- Polar comparison for **own boat and competitors** via `polar-manager` (performance %).
 - Trigger `wind-field-analyzer` on leg changes.
 - Debrief generation post-race (LLaMA + structured data + wind-zone summary).
+
+Publishes computed fields to InfluxDB (`start_line`, `lift`, `steering_hint`) for `grafana-race` panels.
 
 This replaces implicit analytics that were previously envisioned in CDF tools / future Java apps.
 
@@ -2243,6 +2250,205 @@ Loads boats referenced in `fleet.yaml`, then race `neo4j/import-order.yaml`. Val
 | Sync script | `harbor-pull.sh` | `harbor-sync.sh` → `race-data-sync pull` |
 | Race freeze | GHCR image lock | `git checkout race-faerder-2026` |
 
+### 7.16 iRegatta reference model & feature traceability
+
+**ADR:** [0010 — iRegatta reference model](./adr/0010-iregatta-reference-model.md)  
+**Manual:** [iRegatta User Manual v2.86](https://zifigo.com/sites/default/files/iRegattaUserManual.pdf) (Let's Create / Zifigo)
+
+**iRegatta** is the **functional reference** for crew-facing race UX: start line, laylines, polar steering, waypoint navigation, and wind presentation. The AI Sailing System **extends** iRegatta with AIS fleet, ORC handicap live results, GRIB wind zones, SI PDF course import, and Neo4j/LLM coaching — but **must not regress** the tactical features sailors expect from iRegatta.
+
+#### 7.16.1 View mapping — iRegatta → our surfaces
+
+| iRegatta view | Primary surface | Container / service |
+|---------------|-----------------|---------------------|
+| Race | `grafana-race` — Race dashboard | `grafana-race`, `polar-manager`, `race-intelligence` |
+| Layline | `grafana-race` map overlay | `race-intelligence`, `polar-manager` |
+| Start | `course-editor` Start panel + Grafana Start row | `race-intelligence`, `course-editor` |
+| Wind | `course-editor` Wind panel (manual override) | Signal K + `race-intelligence` |
+| Wind history | Grafana wind panel | InfluxDB (SLA-1 wind paths) |
+| Navigation | `course-editor` Navigation tab | `live-results`, Neo4j `Waypoint` |
+| Waypoints / routes | `course-editor` + `AI-sailing-data` YAML | `course-parser`, `race-import` |
+| Statistics | Grafana + optional map tile | InfluxDB, `grafana-race` |
+| Polar | `polar-manager` API + Grafana polar panel | `polar-manager` (SLK primary) |
+| NMEA / wind instrument | Grafana instrument row | Signal K (SLA-1) |
+| Settings | Grafana preferences + `deploy/env/race.env` | Compose env, user prefs store |
+
+On **iPhone**, iRegatta uses horizontal swipe between views. On the boat we use **Grafana dashboards** (read-mostly, big screen) plus **`course-editor`** at `race.local:3010` for setup actions (line ends, waypoints, course flags, manual wind).
+
+#### 7.16.2 Race view parity
+
+| iRegatta feature | Implementation |
+|------------------|----------------|
+| Four configurable readouts | Grafana stat panels; datasource Signal K + `race-intelligence` |
+| BIG-mode (focus 1–2 readouts) | Dashboard row collapse / TV mode profile |
+| GPS freshness dot + accuracy | Panel from `navigation.position` timestamp + `navigation.gnss.type` / accuracy meta |
+| COG/SOG damping 0/3/5/10 s | `race-intelligence` rolling window before display |
+| Lift indicator | `lift_deg = heading_now − avg_heading_10s`; threshold from config |
+| Speed / VMG history bars | Grafana bar gauge or custom panel; timeframe 2/4/10/20 min |
+| Performance bar | `performance_pct = SOG / polar_target_bsp × 100` at current TWS/TWA |
+| Steering bars (VMG optimum) | Compare COG to polar optimum upwind/downwind angles; arrow hints |
+
+**Configurable readout catalog** (minimum): SOG, COG, STW, HDG (mag/true), AWA, AWS, TWD, TWS, VMG-to-mark, VMG-to-wind, DTM, BTM, performance %.
+
+#### 7.16.3 Lift, damping, and steering calculations
+
+Formulas match iRegatta manual §Calculations:
+
+```
+damped_cog = mean(COG over last N seconds)     # N ∈ {0,3,5,10}
+lift_deg   = COG_now − mean(COG over 10 s)
+performance_pct = SOG / polar_bsp(TWS, TWA) × 100
+
+# Steering: when polar "tack/jibe from polar" enabled
+twa_opt_up   = argmax VMG_upwind(polar, TWS)
+twa_opt_down = argmax VMG_downwind(polar, TWS)
+steer_hint   = signed_delta(COG, recommended_cog_for_optimum_VMG)
+```
+
+When **NMEA wind** is available (Signal K `environment.wind`), manual wind entry is disabled — same rule as iRegatta Wind view.
+
+#### 7.16.4 Layline view parity
+
+Requires active **navigation target** (`CourseSelection` + current `Waypoint`):
+
+1. Determine **upwind vs downwind** from TWD vs bearing to mark.
+2. Fetch optimum tack/jibe angles from `polar-manager` (`GET /polars/{id}/target?tws=&twa=`) or manual angles from Wind panel.
+3. Render laylines on `grafana-race` map: red tack/jibe lines, grey bearing line, grey heading arrow.
+
+On distance races (Færderseilasen §11), laylines apply per **leg** after `live-results` advances leg index.
+
+#### 7.16.5 Start view parity
+
+**Container:** `race-intelligence` + `course-editor` Start panel
+
+| iRegatta feature | Behavior |
+|------------------|----------|
+| Countdown | `Start` / `Pause` / `Sync` — sync rounds to nearest minute |
+| Paused + Sync | Reset to pre-sync value (not round) |
+| Timer beep | Optional audio on vision/helm tablet — configurable milestones |
+| Gun at 0:00 | Emit `race_started` event; switch Grafana to Race dashboard |
+| Line ends | Mark **Pin** and **Boat** by position capture or select preloaded waypoints from `AI-sailing-data` |
+| Favored end | Green/red ends from wind angle to line normal (assumes upwind first leg) |
+| Wind arrow | Exaggerated TWD relative to line for quick visual bias |
+| Distance to line (DTL) | Perpendicular from bow (with offset) to line **and extensions** |
+| Time to line (TTL) | `DTL / (SOG × cos(angle(COG, line_normal)))` — `X:XX` if diverging |
+| Over early | TTL &lt; countdown → red styling |
+| Burn or gain bar | Early: red from top proportional to `(countdown − TTL) / countdown`; late: green from bottom; on target: yellow |
+
+```yaml
+# config/start-line.yaml (reference)
+bow_offset_m: 4.5          # GPS antenna → bow, or phone → bow if no NMEA GPS
+countdown_initial_s: 300
+sync_rounds_to_minute: true
+timer_beep: true
+beep_at: [60, 30, 10, 5, 4, 3, 2, 1]
+assumes_upwind_first_leg: true
+```
+
+**Note:** Høstcup-style **course flags** (ADR-0006) layer on top — favored end uses selected route’s first leg bearing when known.
+
+#### 7.16.6 Wind view and wind history
+
+| Mode | Source |
+|------|--------|
+| **NMEA / Signal K** | `environment.wind.angleApparent`, `speedApparent`, derived true wind |
+| **Manual** | `course-editor` Wind panel: type direction, compass shoot, or two-tack bisection |
+| **Tack/jibe angles** | From polar (`polar.use_tack_jibe_from_polar: true`) or manual |
+
+**True wind derivation** (when only apparent available — iRegatta NMEA rules):
+
+1. Prefer compass heading + STW from instruments.
+2. Else use COG + SOG from GPS.
+
+**Wind history:** Influx continuous query — 30 min window, 30 s `mean()` samples of TWD/TWS → Grafana time series (iRegatta Wind History graph).
+
+#### 7.16.7 Navigation, waypoints, and routes
+
+| iRegatta feature | Our implementation |
+|------------------|-------------------|
+| Start / pause nav | `CourseSelection.nav_active` in Neo4j; API `POST /navigation/start` |
+| Bearing + distance to WP | `live-results` leg metrics (§7.13.5) |
+| Route prev/next | `course-editor` or REST `POST /navigation/route/{id}/step` |
+| Auto-advance | When `distance_to_wp < auto_advance_m` (default from env) |
+| Next leg preview | Bearing, leg length, estimated TWA from GRIB or last TWD |
+| Add waypoint | Editor or commit to `AI-sailing-data` `courses/routes/*.yaml` |
+| Temp WP — bearing & distance | Editor dialog from current AIS/GPS position |
+| Temp WP — cross-bearing | Editor: two positions + bearings; flag low confidence |
+| Delete / delete all | Editor with confirm; git commit for persistent routes |
+
+**VMG basis:** When navigating, VMG uses **bearing to mark** (iRegatta rule). When not navigating, VMG uses **wind direction** — `race-intelligence` publishes both.
+
+#### 7.16.8 GPX interchange
+
+| Direction | Path |
+|-----------|------|
+| Export | `course-editor` → `waypointExport.gpx` (USB or download) |
+| Import | Append waypoints/routes to Neo4j + optional merge into data repo (no silent overwrite) |
+
+GPX supplements — does not replace — structured YAML in `AI-sailing-data` (rounding rules, class flags).
+
+#### 7.16.9 Polar formats and trim
+
+| Format | Role |
+|--------|------|
+| **SLK** (ORC måletall) | **Primary** own-boat polar — `polar-manager` |
+| **CSV 20×360** (iRegatta export) | Interop import/export via `polar-manager` `csv_polar` adapter |
+| **ORC certificate image** | Competitor derived polar — `polar-certificate-extractor` |
+
+**iRegatta Trim pipeline** (for sparse CSV or derived polars):
+
+1. Mirror port/starboard (take max of paired angles).
+2. Interpolate missing TWA columns.
+3. Smooth over 10° spans.
+4. Interpolate across TWS rows.
+5. Smooth over 4 kt TWS spans.
+
+**Onboard polar recording** (iRegatta Statistics → record) is **not** v1 — polars come from ORC SLK and shore preparation ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) certificate folders).
+
+#### 7.16.10 NMEA and instrument presentation
+
+iRegatta consumes **NMEA 0183 over Wi‑Fi** (TCP/UDP). This system uses **Signal K on SLA-1** as the single decoder:
+
+| iRegatta | AI Sailing System |
+|----------|-------------------|
+| NMEA Wi‑Fi to phone | NMEA 0183 + N2K → PiCAN-M → Signal K |
+| Ignore checksum option | Signal K plugin `strictChecksum: false` per talker |
+| Magnetic vs true HDG | `environment.wind` / `navigation.headingMagnetic` paths |
+| Wind instrument view | Grafana dual gauge: true vs apparent |
+| Send RMB target (beta) | Optional Signal K → NMEA 0183 outbound plugin when `nav_active` |
+
+**Compatibility:** A phone running **iRegatta** may connect to the same Wi‑Fi NMEA bridge as the Pi — both can coexist during transition.
+
+#### 7.16.11 Global UI settings mapping
+
+| iRegatta setting | Our config |
+|------------------|------------|
+| White/black theme | Grafana theme + `course-editor` CSS |
+| Speed/distance units | Grafana unit prefs; Signal K meta |
+| Screen lock | Kiosk mode / Grafana playlist lock (helm tablet) |
+| Auto-lock idle | Browser/Grafana idle timeout |
+| Waypoint format DMS vs DDM | `course-editor` display pref |
+| Graph timeframe | Grafana dashboard variable `$graph_window` |
+| Show performance bar | `RACE_SHOW_PERFORMANCE_BAR` |
+| Show steering bars | `RACE_SHOW_STEERING_BARS` |
+| Lift threshold | `RACE_LIFT_THRESHOLD_DEG` |
+| COG/SOG damping | `RACE_DAMPING_SECONDS` |
+
+#### 7.16.12 Beyond iRegatta (explicit scope expansion)
+
+| Capability | Why outside iRegatta |
+|------------|---------------------|
+| AIS fleet tracks | Requires N2K AIS + `ais-collector` |
+| Live ORC corrected standings | `handicap-manager` + `live-results` |
+| GRIB wind zones | `wind-field-analyzer` |
+| SI PDF §11 parse | `course-parser` |
+| Start-boat course flags | ADR-0006 |
+| Multi-certificate ORC | `AI-sailing-data` per-cert SLK |
+| LLM tactical coach | SLA-2 `tactical-coach` |
+| GoPro trim vision | SLA-3 |
+
+Full traceability table: [ADR-0010](./adr/0010-iregatta-reference-model.md).
+
 ---
 
 ## 8. Technology matrix
@@ -2705,34 +2911,52 @@ flowchart LR
 | FR-39 | User **confirms** active course at start; stored as `CourseSelection` |
 | FR-40 | Optional `course-flag-detector` suggests course from start-boat photo; user may override |
 | FR-41 | Supplementary signals (e.g. flag **T**) modify waypoint rounding rules |
+| FR-42 | **iRegatta parity:** Grafana race dashboard with configurable readouts (SOG, COG, VMG, wind, DTM, performance %) |
+| FR-43 | **iRegatta parity:** COG/SOG damping selectable 0/3/5/10 s before display |
+| FR-44 | **iRegatta parity:** Lift indicator — heading vs 10 s average; threshold configurable |
+| FR-45 | **iRegatta parity:** Speed and VMG history graphs with 2/4/10/20 min window |
+| FR-46 | **iRegatta parity:** Performance bar — actual vs polar BSP as percentage |
+| FR-47 | **iRegatta parity:** Steering bars toward optimum VMG from polar tack/jibe angles |
+| FR-48 | **iRegatta parity:** Layline overlay on map when navigating to active waypoint |
+| FR-49 | **iRegatta parity:** Start countdown with sync-to-minute, pause, optional timer beeps |
+| FR-50 | **iRegatta parity:** Start line pin/boat ends; favored end; DTL perpendicular to line + extensions |
+| FR-51 | **iRegatta parity:** Time-to-line at current COG/SOG; burn-or-gain bar vs countdown |
+| FR-52 | **iRegatta parity:** Bow/GPS antenna offset applied to distance-to-line |
+| FR-53 | **iRegatta parity:** Manual wind entry (type, compass, two-tack) when instruments unavailable |
+| FR-54 | **iRegatta parity:** Wind history — 30 min rolling, 30 s samples |
+| FR-55 | **iRegatta parity:** Route auto-advance when within configurable distance of waypoint |
+| FR-56 | **iRegatta parity:** Temporary waypoints by bearing+distance and cross-bearing |
+| FR-57 | **iRegatta parity:** GPX import/export for waypoints and routes |
+| FR-58 | **iRegatta parity:** Polar trim (mirror, interpolate, smooth) for CSV/derived polars |
+| FR-59 | **iRegatta parity:** Optional NMEA RMB outbound when navigating (autopilot target) |
 
 ### 11.3 SLA-3 — Sail performance vision (GoPro HERO13)
 
 | ID | Requirement |
 |----|-------------|
-| FR-50 | Orchestrate 3–5 GoPro HERO13 cameras via Open GoPro BLE/Wi-Fi |
-| FR-51 | Synchronized multi-camera still burst within ±200 ms |
-| FR-52 | Coral preprocess extracts sail/boom ROI before geometry + LLM |
-| FR-53 | `sail-geometry` computes boom angle, mast heel, draft, twist, luff metrics |
-| FR-54 | Each capture aligned to SLA-1 telemetry (`t_influx` ±100 ms) |
-| FR-55 | `condition-matcher` finds best `BestTrimSnapshot` in similar conditions |
-| FR-56 | Crew sees current vs best Δ for boom, heel, draft on grafana-sail |
-| FR-57 | Vision LLM produces qualitative trim narrative per capture burst |
-| FR-58 | Results published to SLA-2 Neo4j as `SailGeometry`, `TrimDelta`, `SailAnalysis` |
-| FR-59 | SLA-3 pausable without affecting SLA-1 or SLA-2 |
-| FR-60 | GoPro capture at start may feed `course-flag-detector` (user confirms course) |
+| FR-61 | Orchestrate 3–5 GoPro HERO13 cameras via Open GoPro BLE/Wi-Fi |
+| FR-62 | Synchronized multi-camera still burst within ±200 ms |
+| FR-63 | Coral preprocess extracts sail/boom ROI before geometry + LLM |
+| FR-64 | `sail-geometry` computes boom angle, mast heel, draft, twist, luff metrics |
+| FR-65 | Each capture aligned to SLA-1 telemetry (`t_influx` ±100 ms) |
+| FR-66 | `condition-matcher` finds best `BestTrimSnapshot` in similar conditions |
+| FR-67 | Crew sees current vs best Δ for boom, heel, draft on grafana-sail |
+| FR-68 | Vision LLM produces qualitative trim narrative per capture burst |
+| FR-69 | Results published to SLA-2 Neo4j as `SailGeometry`, `TrimDelta`, `SailAnalysis` |
+| FR-70 | SLA-3 pausable without affecting SLA-1 or SLA-2 |
+| FR-71 | GoPro capture at start may feed `course-flag-detector` (user confirms course) |
 
 ### 11.4 Onshore training (SLA-S)
 
 | ID | Requirement |
 |----|-------------|
-| FR-70 | `training-export` builds multimodal bundles (telemetry + images + geometry) in harbor |
-| FR-71 | Export requires explicit `TRAINING_EXPORT_CONSENT` per session |
-| FR-72 | Shore pipeline trains TrimTransformer on GPU machines (PyTorch) |
-| FR-73 | Model predicts optimal boom angle, mast heel, sail shape for condition vector |
-| FR-74 | Evaluator holds out full regatta sessions — no random frame leakage |
-| FR-75 | Quantized `trim-predictor` artifact deployable to SLA-3 via GHCR |
-| FR-76 | `BestTrimSnapshot` sets sync from shore to boat Neo4j after training round |
+| FR-72 | `training-export` builds multimodal bundles (telemetry + images + geometry) in harbor |
+| FR-73 | Export requires explicit `TRAINING_EXPORT_CONSENT` per session |
+| FR-74 | Shore pipeline trains TrimTransformer on GPU machines (PyTorch) |
+| FR-75 | Model predicts optimal boom angle, mast heel, sail shape for condition vector |
+| FR-76 | Evaluator holds out full regatta sessions — no random frame leakage |
+| FR-77 | Quantized `trim-predictor` artifact deployable to SLA-3 via GHCR |
+| FR-78 | `BestTrimSnapshot` sets sync from shore to boat Neo4j after training round |
 
 ### 11.5 AI coaching (cross-tier)
 
@@ -2946,3 +3170,5 @@ AI-sailing-system/
 - [pyais](https://github.com/M0r13n/pyais)
 - [GoPro HERO13 Black](https://gopro.com/en/us/shop/cameras/hero13-black/CHDHX-131-master.html)
 - [CogSail Python (prior art)](https://github.com/cognite-fholm/cogsail-python)
+- [iRegatta User Manual v2.86](https://zifigo.com/sites/default/files/iRegattaUserManual.pdf) — functional reference for race/start/layline UX ([ADR-0010](./adr/0010-iregatta-reference-model.md), [§7.16](./spec.md#716-iregatta-reference-model--feature-traceability))
+- [Zifigo / Let's Create — iRegatta](https://zifigo.com/)

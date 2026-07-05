@@ -3,7 +3,7 @@
 **Status:** Accepted  
 **Date:** 2026-07-05  
 **Deciders:** cognite-fholm  
-**Related:** [ADR-0004](./0004-grib-polars-ais-wind-analysis.md), [spec.md §7.13–7.14](../spec.md#713-race-courses-waypoints--live-results)
+**Related:** [ADR-0004](./0004-grib-polars-ais-wind-analysis.md), [ADR-0010](./0010-iregatta-reference-model.md), [spec.md §7.13–7.14](../spec.md#713-race-courses-waypoints--live-results)
 
 ---
 
