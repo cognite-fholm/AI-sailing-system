@@ -1,0 +1,16 @@
+---
+description: Pydantic v2 for Python service config, HTTP, and YAML contracts
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Python — Pydantic-first
+
+Read [.agents/skills/pydantic-first-coding/SKILL.md](../../.agents/skills/pydantic-first-coding/SKILL.md) before changing Python under service directories.
+
+- **Config:** `pydantic_settings.BaseSettings`, not `@dataclass`
+- **YAML from AI-sailing-data:** typed `BaseModel` per `kind`
+- **HTTP JSON:** request/response models; `model_dump(mode="json")`
+- **Exceptions:** dynamic Signal K deltas, raw Influx/Neo4j query rows
+
+Compliance snapshot: [.agents/skills/pydantic-first-coding/ADHERENCE.md](../../.agents/skills/pydantic-first-coding/ADHERENCE.md)

@@ -17,3 +17,7 @@ Runtime code, Docker Compose, CI/CD, and ADRs for the AI Sailing System.
 ## Local runtime (laptop)
 
 Requires Docker — see [docs/DEV-SETUP.md](docs/DEV-SETUP.md). Uses `docker-compose.dev.yml` overlay + `deploy/env/dev.env`.
+
+## Python conventions
+
+When editing Python services, follow [.agents/skills/pydantic-first-coding/SKILL.md](.agents/skills/pydantic-first-coding/SKILL.md) — Pydantic v2 for config, HTTP, and AI-sailing-data YAML kinds. Current compliance: [ADHERENCE.md](.agents/skills/pydantic-first-coding/ADHERENCE.md).
