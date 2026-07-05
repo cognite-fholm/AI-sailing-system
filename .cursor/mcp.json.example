@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "race-boat": {
+      "url": "http://race.local:3100/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_RACE_MCP_API_KEY"
+      }
+    },
+    "race-neo4j": {
+      "url": "http://race.local:3100/mcp/neo4j",
+      "headers": {
+        "Authorization": "Bearer YOUR_RACE_MCP_API_KEY"
+      }
+    },
+    "race-influx": {
+      "url": "http://race.local:3100/mcp/influx",
+      "headers": {
+        "Authorization": "Bearer YOUR_RACE_MCP_API_KEY"
+      }
+    }
+  }
+}

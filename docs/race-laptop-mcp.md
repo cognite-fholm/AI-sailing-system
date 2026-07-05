@@ -35,20 +35,36 @@ MCP is **not** exposed on LTE/internet — boat LAN only.
 
 ## Cursor MCP configuration
 
-Add to your **user** or **project** MCP config (`.cursor/mcp.json` in the repo root, or Cursor Settings → MCP):
+Copy [`.cursor/mcp.json.example`](../.cursor/mcp.json.example) to `.cursor/mcp.json` (gitignored) or add to Cursor Settings → MCP.
+
+**At the regatta (boat LAN HTTP):**
 
 ```json
 {
   "mcpServers": {
     "race-boat": {
       "url": "http://race.local:3100/mcp",
-      "headers": {
-        "Authorization": "Bearer YOUR_RACE_MCP_API_KEY"
-      }
+      "headers": { "Authorization": "Bearer YOUR_RACE_MCP_API_KEY" }
+    },
+    "race-neo4j": {
+      "url": "http://race.local:3100/mcp/neo4j",
+      "headers": { "Authorization": "Bearer YOUR_RACE_MCP_API_KEY" }
+    },
+    "race-influx": {
+      "url": "http://race.local:3100/mcp/influx",
+      "headers": { "Authorization": "Bearer YOUR_RACE_MCP_API_KEY" }
     }
   }
 }
 ```
+
+| Server | Data |
+|--------|------|
+| **race-neo4j** | Live standings, Cypher, fleet positions, course selection |
+| **race-influx** | Flux queries, instrument snapshots, wind history |
+| **race-boat** | Both Neo4j and Influx in one connection |
+
+**Harbor dev (local Docker):** use [`.cursor/mcp.harbor.json.example`](../.cursor/mcp.harbor.json.example) with stdio servers against `localhost` Neo4j/Influx.
 
 Replace the API key with the value from the boat’s `race.env` (navigator copy, not committed to git).
 
@@ -99,11 +115,14 @@ Cross-check with start-line.yaml in planning/.
 
 | Server | What you can ask |
 |--------|------------------|
-| **race-graph** | Standings, course selection, fleet positions, ad hoc Cypher (read-only) |
-| **race-telemetry** | Flux queries, latest instruments, time series |
-| **race-context** | YAML, wiki, OKF concepts from onboard data repo |
-| **race-tactical** | Wind zones, polar targets, start-line state |
-| **signalk-snapshot** | Current wind, SOG, COG from Signal K |
+| **race-neo4j** | `cypher_query`, live standings, course selection, fleet positions, graph schema |
+| **race-influx** | `flux_query`, latest instruments, wind history, list buckets |
+| **race-boat** | All Neo4j + Influx tools above (combined endpoint) |
+| **race-context** | YAML, wiki, OKF concepts from onboard data repo *(planned)* |
+| **race-tactical** | Wind zones, polar targets, start-line state *(planned)* |
+| **signalk-snapshot** | Current wind, SOG, COG from Signal K *(planned)* |
+
+Tool reference: [mcp-neo4j-influx.md](./mcp-neo4j-influx.md)
 
 ---
 

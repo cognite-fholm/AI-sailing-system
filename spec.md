@@ -2,7 +2,7 @@
 
 **Version:** 0.13.0-draft  
 **Date:** 2026-07-05  
-**Changelog (0.13):** Automated ORC certificate fleet collection — shore skill pipeline, ADR-0013, §7.19.  
+**Changelog (0.13):** Automated ORC certificate fleet collection (ADR-0013, §7.19); dedicated Neo4j/Influx MCP endpoints (`race-mcp-gateway`).  
 **Changelog (0.12):** Race-side MCP gateway for laptop Cursor ad hoc analysis (ADR-0012, §7.18).  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
@@ -2723,17 +2723,20 @@ flowchart LR
   GW --> DATA
 ```
 
-#### 7.18.3 MCP server bundles
+#### 7.18.3 MCP server endpoints
 
-Configured in `config/mcp-gateway.yaml`:
+Configured in `config/mcp-gateway.yaml`. Implementation: `race-mcp-gateway/`.
 
-| Server id | Tools | Backend |
-|-----------|-------|---------|
-| `race-graph` | `cypher_query`, `get_live_standings`, `get_course_selection`, `get_fleet_by_class` | Neo4j read role |
-| `race-telemetry` | `flux_query`, `get_latest_instruments`, `get_series` | Influx read token (SLA-1) |
-| `race-context` | `read_yaml`, `read_wiki`, `search_okf`, `get_fleet_yaml` | `/opt/ai-sailing-data` |
-| `race-tactical` | `get_wind_zones`, `get_polar_target`, `get_start_line_state` | SLA-2 REST |
-| `signalk-snapshot` | `get_wind_now`, `get_navigation` | Signal K HTTP |
+| Endpoint | Server id | Tools | Backend |
+|----------|-----------|-------|---------|
+| `/mcp/neo4j` | `race-neo4j` | `cypher_query`, `get_live_standings`, `get_course_selection`, `get_fleet_positions`, `get_graph_schema` | Neo4j read role |
+| `/mcp/influx` | `race-influx` | `flux_query`, `get_latest_instruments`, `get_wind_history`, `list_buckets` | Influx read token (SLA-1) |
+| `/mcp` | `race-boat` | All Neo4j + Influx tools above | Combined |
+| *(planned)* | `race-context` | `read_yaml`, `read_wiki`, `search_okf`, `get_fleet_yaml` | `/opt/ai-sailing-data` |
+| *(planned)* | `race-tactical` | `get_wind_zones`, `get_polar_target`, `get_start_line_state` | SLA-2 REST |
+| *(planned)* | `signalk-snapshot` | `get_wind_now`, `get_navigation` | Signal K HTTP |
+
+Detail: [docs/mcp-neo4j-influx.md](./docs/mcp-neo4j-influx.md)
 
 **v1:** all tools **read-only**.  
 **v2 (optional):** `append_race_note` → `wiki/race-day.md` with explicit enable flag.
@@ -2749,6 +2752,18 @@ Configured in `config/mcp-gateway.yaml`:
   "mcpServers": {
     "race-boat": {
       "url": "http://race.local:3100/mcp",
+      "headers": {
+        "Authorization": "Bearer ${RACE_MCP_API_KEY}"
+      }
+    },
+    "race-neo4j": {
+      "url": "http://race.local:3100/mcp/neo4j",
+      "headers": {
+        "Authorization": "Bearer ${RACE_MCP_API_KEY}"
+      }
+    },
+    "race-influx": {
+      "url": "http://race.local:3100/mcp/influx",
       "headers": {
         "Authorization": "Bearer ${RACE_MCP_API_KEY}"
       }
@@ -3472,6 +3487,10 @@ flowchart LR
 | FR-130 | Rate limits protect SLA-2 CPU during ad hoc agent queries |
 | FR-131 | Gateway remains available when `RACE_MODE=true` |
 | FR-132 | [docs/race-laptop-mcp.md](./docs/race-laptop-mcp.md) documents laptop + Cursor setup |
+| FR-139 | Dedicated MCP endpoint `/mcp/neo4j` with read-only Cypher and curated standing queries |
+| FR-140 | Dedicated MCP endpoint `/mcp/influx` with bounded Flux and instrument snapshot tools |
+| FR-141 | Combined `/mcp` endpoint exposes both Neo4j and Influx tool sets |
+| FR-142 | [docs/mcp-neo4j-influx.md](./docs/mcp-neo4j-influx.md) documents tools, buckets, and example queries |
 
 ### 11.9 ORC certificate collection (shore)
 
@@ -3624,7 +3643,7 @@ AI-sailing-system/
 - [ ] `live-results` — corrected-time standings + VMG
 - [ ] `race-intelligence` — start line, lift, steering (iRegatta + H5000 parity)
 - [ ] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
-- [ ] `race-mcp-gateway` — MCP for laptop Cursor on boat LAN ([ADR-0012](./adr/0012-race-side-mcp-laptop-cursor.md))
+- [x] `race-mcp-gateway` scaffold — Neo4j + Influx MCP (`race-mcp-gateway/`)
 - [ ] Shore ORC pipeline documented — runtime uses data repo assets ([ADR-0013](./adr/0013-orc-certificate-fleet-collection.md))
 - [ ] grafana-race dashboards (SailSteer, Start, WindPlot, Highway per §7.17)
 

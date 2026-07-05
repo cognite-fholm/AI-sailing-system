@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "race-neo4j-local": {
+      "command": "python",
+      "args": ["-m", "race_mcp_gateway.servers.neo4j"],
+      "cwd": "../AI-sailing-system/race-mcp-gateway",
+      "env": {
+        "NEO4J_URI": "bolt://localhost:7687",
+        "NEO4J_USER": "neo4j",
+        "NEO4J_PASSWORD": "change-me",
+        "PYTHONPATH": "."
+      }
+    },
+    "race-influx-local": {
+      "command": "python",
+      "args": ["-m", "race_mcp_gateway.servers.influx"],
+      "cwd": "../AI-sailing-system/race-mcp-gateway",
+      "env": {
+        "INFLUX_URL": "http://localhost:8086",
+        "INFLUX_READ_TOKEN": "change-me",
+        "INFLUX_ORG": "ai-sailing",
+        "INFLUX_BUCKET": "signalk",
+        "PYTHONPATH": "."
+      }
+    }
+  }
+}

@@ -47,13 +47,14 @@ flowchart LR
 
 ### MCP server bundles (v1)
 
-| MCP server | Tools (examples) | Data source |
-|------------|------------------|-------------|
-| **race-graph** | `cypher_query`, `get_live_standings`, `get_course_selection`, `get_fleet_positions` | Neo4j (read-only role) |
-| **race-telemetry** | `flux_query`, `get_latest_instruments`, `get_wind_history` | InfluxDB via SLA-1 read token |
-| **race-context** | `read_yaml`, `read_wiki`, `list_race_assets`, `get_okf_concept` | `AI-sailing-data` mount + OKF |
-| **race-tactical** | `get_wind_zones`, `get_polar_target`, `get_start_line_state`, `get_recommendation` | SLA-2 REST services |
-| **signalk-snapshot** | `get_vessel_delta`, `get_wind_now` | Signal K HTTP/WS one-shot |
+| MCP server | Endpoint | Tools (examples) | Data source |
+|------------|----------|------------------|-------------|
+| **race-neo4j** | `/mcp/neo4j` | `cypher_query`, `get_live_standings`, `get_course_selection`, `get_fleet_positions` | Neo4j (read-only role) |
+| **race-influx** | `/mcp/influx` | `flux_query`, `get_latest_instruments`, `get_wind_history`, `list_buckets` | InfluxDB via SLA-1 read token |
+| **race-boat** | `/mcp` | All Neo4j + Influx tools | Combined |
+| **race-context** | *(planned)* | `read_yaml`, `read_wiki`, `list_race_assets`, `get_okf_concept` | `AI-sailing-data` mount + OKF |
+| **race-tactical** | *(planned)* | `get_wind_zones`, `get_polar_target`, `get_start_line_state` | SLA-2 REST services |
+| **signalk-snapshot** | *(planned)* | `get_vessel_delta`, `get_wind_now` | Signal K HTTP/WS one-shot |
 
 Optional v2: **race-notes** write tool → append to `wiki/race-day.md` on data repo (harbor sync only, explicit enable).
 
@@ -156,4 +157,5 @@ Offline requirement during races; boat LAN latency is lower; no data leaves the 
 
 | Version | Date | Change |
 |---------|------|--------|
+| 1.1 | 2026-07-05 | Dedicated `/mcp/neo4j` and `/mcp/influx` endpoints; `race-mcp-gateway` implementation |
 | 1.0 | 2026-07-05 | Initial accepted decision |

@@ -185,7 +185,7 @@ Detail: [data repo schema/README.md](https://github.com/cognite-fholm/AI-sailing
 | `handicap-manager` | ORC multi-number + WRS TCF |
 | `ais-collector` | Fleet AIS from Signal K |
 | `tactical-coach` | Local LLM advisory |
-| `race-mcp-gateway` | MCP tools for laptop Cursor on boat LAN ([guide](./race-laptop-mcp.md)) |
+| `race-mcp-gateway` | MCP tools for laptop Cursor — **Neo4j** (`/mcp/neo4j`) + **Influx** (`/mcp/influx`) ([guide](./race-laptop-mcp.md), [tools](./mcp-neo4j-influx.md)) |
 
 ---
 
@@ -217,7 +217,7 @@ Bring a **laptop** on boat Wi‑Fi; Cursor connects to `race-mcp-gateway` at `ht
 
 | Phase | Status |
 |-------|--------|
-| **0 — Specification** | **Current** — spec, ADRs, data repo examples, skills |
+| **0 — Specification** | **Current** — spec, ADRs, data repo examples, skills, MCP gateway scaffold |
 | **1 — SLA-1 telemetry** | Not started |
 | **2 — SLA-2 race** | Not started |
 | **3 — SLA-3 vision** | Not started |

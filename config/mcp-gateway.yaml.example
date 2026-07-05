@@ -24,6 +24,8 @@ spec:
   upstreams:
     signalk_url: http://telemetry.local:3000
     influx_url: http://telemetry.local:8086
+    influx_org: ai-sailing
+    influx_bucket: signalk
     influx_token_env: INFLUX_READ_TOKEN
     neo4j_uri: bolt://neo4j:7687
     neo4j_user: mcp_analyst

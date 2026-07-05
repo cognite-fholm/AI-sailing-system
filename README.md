@@ -14,6 +14,7 @@ An edge-first, AI-assisted competitive sailing platform built on [Signal K](http
 | [spec.md](./spec.md) | Full system specification (v0.12) |
 | [docs/deployment-lifecycle.md](./docs/deployment-lifecycle.md) | GitHub + Docker CI/CD, Pi deploy, race freeze, shore PC |
 | [docs/race-laptop-mcp.md](./docs/race-laptop-mcp.md) | Laptop + Cursor + MCP at the regatta |
+| [docs/mcp-neo4j-influx.md](./docs/mcp-neo4j-influx.md) | Neo4j & Influx MCP tool reference |
 | [docs/references/README.md](./docs/references/README.md) | iRegatta + H5000 manual links |
 | [deploy/README.md](./deploy/README.md) | Env templates, digest locks, guardrails checklist |
 | [adr/README.md](./adr/README.md) | All Architecture Decision Records |
