@@ -1,6 +1,6 @@
 # AI Sailing System — Specification
 
-**Version:** 0.7.0-draft  
+**Version:** 0.8.0-draft  
 **Date:** 2026-07-05  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
@@ -71,6 +71,8 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G19 | Advisory agents consume a versioned **Google OKF** knowledge bundle for system context |
 | G20 | **GitHub + Docker** end-to-end: Actions CI, GHCR images, Compose on Pi — no cloud orchestration |
 | G21 | Shore **TrimTransformer** training on **own gaming PC** (SLA-S), not paid cloud GPU |
+| G22 | **AI-sailing-data** repo for temporal race/boat planning onshore |
+| G23 | Onboard **race-data-sync** pulls newer data from GitHub via Teltonika LTE when available |
 
 ### 3.2 Non-goals (v1)
 
@@ -101,6 +103,7 @@ Hardware is assigned **per SLA tier**. A single-boat deployment may use 1–3 Ra
 | **Boat LAN (Ethernet/Wi-Fi)** | All | Inter-node link | Gigabit preferred when tiers are split across Pis |
 | **12 V marine supply** | All | Power | N2K SMPS on telemetry node; DC-DC for additional nodes |
 | **Wi-Fi / LTE (optional)** | SLA-2 | Remote deploy & sync | Not required for race operation |
+| **Teltonika LTE router** | WAN | 4G/5G + boat LAN | See [§4.4](#44-network--teltonika-lte-router) |
 
 **Deployment profiles:**
 
@@ -134,9 +137,44 @@ The linked [google-coral/coralnpu](https://github.com/google-coral/coralnpu) rep
 
 This split is intentional and matches hardware capabilities.
 
----
+### 4.4 Network — Teltonika LTE router
 
-## 5. Three-tier SLA architecture
+**Device class:** Teltonika industrial LTE router (4G/5G) with **RMS** (Remote Management System).
+
+| Capability | Use in AI Sailing System |
+|------------|--------------------------|
+| **LTE WAN** | Internet when away from marina Wi-Fi — GitHub data sync, GRIB fetch, GHCR pull (harbor rules) |
+| **Boat LAN AP** | DHCP/DNS for `telemetry.local`, `race.local`, `vision.local` |
+| **RMS cloud** | Remote router health, config backup, firmware, optional VPN to home |
+| **Failover** | Marina Wi-Fi as WAN when available; LTE when offshore |
+
+```mermaid
+flowchart LR
+    LTE["4G/5G"]
+    RMS["Teltonika RMS\n(optional VPN)"]
+    RTR["Teltonika router"]
+    Pi1["telemetry.local"]
+    Pi2["race.local"]
+    Pi3["vision.local"]
+    GH["GitHub\nsystem + data repos"]
+    LTE --> RTR
+    RTR --> Pi1 & Pi2 & Pi3
+    Pi2 -->|race-data-sync| GH
+    RTR -.-> RMS
+```
+
+**Integration points:**
+
+| Service | Uses LTE for |
+|---------|--------------|
+| `race-data-sync` | `git pull` on [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) when remote commit ahead |
+| `grib-ingest` | Scheduled GRIB download when `ONLINE_MODE=true` |
+| Watchtower | Container pull — **harbor mode only**, `RACE_MODE=false` |
+| `training-export` | **Never** during race; harbor opt-in only |
+
+**Guardrails:** Router credentials and RMS tokens are **not** stored in git. Document AP SSID/VLAN in harbor runbook only.
+
+---
 
 The system is partitioned into **three independent SLA tiers**. Each tier:
 
@@ -261,6 +299,8 @@ flowchart TB
 | `polar-manager` | `ghcr.io/.../polar-manager` | Load **SLK** polar for own boat; serve canonical YAML |
 | `polar-certificate-extractor` | `ghcr.io/.../polar-certificate-extractor` | Derive competitor polars from ORC certificate **PNG/PDF** |
 | `handicap-manager` | `ghcr.io/.../handicap-manager` | ORC certificate handicaps + per-race WRS TCF per vessel |
+| `race-data-sync` | `ghcr.io/.../race-data-sync` | Git pull **AI-sailing-data** when GitHub ahead of local |
+| `race-import` | `ghcr.io/.../race-import` | Apply data repo `neo4j/*.yaml` → Neo4j MERGE |
 | `course-parser` | `ghcr.io/.../course-parser` | Extract courses/waypoints from SI/NOR PDFs |
 | `live-results` | `ghcr.io/.../live-results` | Corrected-time standings + VMG along course legs |
 | `course-editor` | `ghcr.io/.../course-editor` | React/TS UX — waypoints + **start-line flag selection** |
@@ -414,9 +454,63 @@ sla-3: { cpus: "2.0", memory: 3G }   # lowest priority — throttled when sla-1 
 
 A `tier-watchdog` sidecar on shared nodes pauses SLA-3 containers when SLA-1 Influx write latency exceeds 500 ms for 30 s.
 
----
+### 5.7 Dual-repository architecture
 
-## 6. System architecture
+The platform uses **two GitHub repositories** — see [ADR-0009](./adr/0009-dual-repository-race-data.md).
+
+| Repository | Role | Onboard path |
+|------------|------|--------------|
+| **[AI-sailing-system](https://github.com/cognite-fholm/AI-sailing-system)** | Code, containers, CI/CD | `/opt/ai-sailing-system/` |
+| **[AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)** | Races, boats, planning, Neo4j YAML, OKF | `/opt/ai-sailing-data/` |
+
+```mermaid
+flowchart TB
+    subgraph Shore["Onshore planning"]
+        HUMAN["Crew / tactician"]
+        DATA["AI-sailing-data\nGitHub"]
+        HUMAN -->|PR, wiki, YAML| DATA
+    end
+
+    subgraph Boat["Onboard SLA-2"]
+        SYNC["race-data-sync"]
+        IMP["race-import"]
+        N4J["Neo4j runtime"]
+        OKF["OKF loader"]
+        DATA -->|git pull via LTE/Wi-Fi| SYNC
+        SYNC --> IMP --> N4J
+        SYNC --> OKF
+    end
+
+    subgraph Knowledge["Three layers"]
+        YAML["YAML facts\nplanning"]
+        OKF2["OKF concepts\nLLM bootstrap"]
+        LIVE["Neo4j + Influx\nlive race"]
+    end
+
+    DATA --- YAML
+    DATA --- OKF2
+    N4J --- LIVE
+```
+
+**Data repo layout (summary):**
+
+| Branch | Path pattern | Content |
+|--------|--------------|---------|
+| Boats | `boats/{sail_number}/{year}/` | Ratings, polar, neo4j, okf, assets |
+| Races | `races/{year}/{year}-{month}-{slug}/` | Manifest, planning, courses, fleet, scoring |
+
+**Knowledge roles:**
+
+| Store | Holds | Does not hold |
+|-------|-------|---------------|
+| **AI-sailing-data** | Pre-race plans, static graph templates, SI-derived routes | Live AIS, live standings |
+| **Neo4j** | Runtime graph, interconnected analysis for crew + LLM | Long-form wiki prose |
+| **OKF** (data + system bundles) | Concepts — how to read Neo4j labels and YAML kinds | Telemetry samples |
+| **InfluxDB** | Time series | Handicap rules, course definitions |
+
+**Deploy rule:** Version **both** repos at race freeze — system digest lock + data git tag/ref.
+
+---
 
 ### 6.1 High-level context
 
@@ -647,19 +741,18 @@ Neo4j holds **context** (who, what, where, why); InfluxDB holds **telemetry** (h
 | SLA-2 (race) | `Llama-3.2-3B-Instruct-Q4_K_M.gguf` | ~2 GB |
 | SLA-3 (vision) | `Llama-3.2-11B-Vision-Instruct-Q4_K_M.gguf` (or smaller) | 4–8 GB |
 
-| SLA-3 (vision) | `Llama-3.2-11B-Vision-Instruct-Q4_K_M.gguf` (or smaller) | 4–8 GB |
-
 #### 7.5.1 Advisory agent context — Google OKF
 
 **Format:** [Google Open Knowledge Format (OKF) v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)  
-**Bundle path (on Pi):** `/opt/knowledge/sailing-system/` (git submodule or volume mount)  
-**Consumers:** `tactical-coach`, `sail-analysis-api`, `course-flag-detector` (ICS flag reference), optional `crawl-agent` (enrichment writer)
+**System bundle:** `/opt/knowledge/sailing-system/` — architecture, marine paths, Neo4j schema reference  
+**Race/boat bundles:** `/opt/ai-sailing-data/**/okf/` — per-regatta and per-boat-year concepts from [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)  
+**Consumers:** `tactical-coach`, `sail-analysis-api`, `course-flag-detector`, `okf-loader`
 
 OKF defines the **curated system context** that advisory agents read before and during inference. It complements — but does not replace — live data from InfluxDB and Neo4j:
 
 | Layer | Role | Update frequency |
 |-------|------|------------------|
-| **OKF bundle** | Stable domain knowledge, playbooks, schema, SI summaries | Harbor / regatta prep; git pull when online |
+| **OKF bundle** | Stable domain + **per-race/boat** concepts | Harbor / regatta prep; `race-data-sync` |
 | **Neo4j** | Live race graph (fleet, course selection, standings) | Continuous during race |
 | **InfluxDB** | Live telemetry (wind, SOG, heel) | Sub-second |
 
@@ -1234,7 +1327,8 @@ Polars define target boat speed and VMG for each **TWS × TWA** combination. The
 | Attribute | Value |
 |-----------|-------|
 | **Format** | **SYLK (`.slk`)** — ORC / sail-performance export |
-| **Reference file (dev)** | `C:\Repositories\boat_system\7710 (3).slk` |
+| **Reference file (dev)** | `AI-sailing-data/boats/NOR-10133/2026/assets/7710.slk` (from `7710 (3).slk`) |
+| **Certificate** | `ORC Certificate for Xbox.pdf` — CertNo **7710** matches SLK data file |
 | **Deploy path (Pi)** | `/data/polars/own/7710.slk` (copy at harbor sync) |
 | **Parser** | `polar-manager` SLK module (`slk_parser.py`) |
 | **Required** | Yes — system will not start race mode without own-boat polar |
@@ -1266,8 +1360,10 @@ Condition=reach TWA=52.0  BTV=5.86  VMG=3.61
 ```yaml
 vessel:
   id: own-boat
-  name: "7710"
-  mmsi: "257771000"          # set to transponder MMSI
+  name: "Xbox"
+  sail_number: "NOR-10133"
+  mmsi: "257771000"
+  orc_cert_no: "7710"
   is_own: true
 polar:
   source_type: slk
@@ -2021,23 +2117,134 @@ For **Færderseilasen 2026 §23** (Racing classes): `corrected = elapsed × hand
 | `polar-manager` | Speed prediction; separate from time correction |
 | `tactical-coach` | Explains rank delta using handicap + VMG context |
 
-**Own boat** (`7710 (3).slk`) + **competitor** (`ORC Certificate for Off Course.pdf`): both need `HandicapRating` nodes before live results activate.
+**Own boat** — **Xbox** (NOR 10133): SLK `7710.slk` matches [ORC Certificate for Xbox.pdf](https://github.com/cognite-fholm/AI-sailing-data) (CertNo 7710). Competitor **OFF COURSE** uses separate ORC cert — both need `HandicapRating` nodes before live results activate.
 
 #### 7.14.4 File layout (dev machine)
 
 ```
 C:\Repositories\boat_system\
-├── Seilingsbestemmelser_Færderseilasen26_2.pdf   ← SI; chapter 11 routes
-├── ORC Certificate for Off Course.pdf              ← competitor handicaps + polar
-├── 7710 (3).slk                                  ← own-boat polar
-├── off_course.png                                ← competitor polar (image fallback)
-└── AI-sailing-system\
-    └── config\
-        ├── courses.yaml
-        ├── handicaps.yaml
-        ├── vessel.yaml
-        └── competitors.yaml
+├── AI-sailing-system\          ← code, containers, CI
+├── AI-sailing-data\            ← races, boats, planning (GitHub)
+├── 7710 (3).slk                ← source polar → copied to data repo assets
+├── ORC Certificate for Off Course.pdf
+├── Seilingsbestemmelser_*.pdf
+└── off_course.png
 ```
+
+Legacy `AI-sailing-system/config/*.yaml` files are **deprecated** in favor of `AI-sailing-data` — kept as dev shortcuts until `race-import` is implemented.
+
+### 7.15 Race & boat data repository (AI-sailing-data)
+
+**Repository:** [github.com/cognite-fholm/AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)  
+**ADR:** [0009](./adr/0009-dual-repository-race-data.md)  
+**Schema:** `schema/README.md` in data repo
+
+#### 7.15.1 Purpose — onshore planning
+
+All regatta preparation happens in **git** before leaving harbor:
+
+| Activity | Data repo location |
+|----------|-------------------|
+| GRIB strategy | `races/.../planning/grib-plan.yaml` |
+| Weather insights | `planning/weather-notes.md` |
+| Course preference | `planning/course-preference.yaml` |
+| Waypoints & routes | `courses/routes/*.yaml` |
+| Fleet & handicaps | `fleet.yaml` + `boats/{sail_number}/{year}/ratings.yaml` |
+| Human strategy | `wiki/planning.md` |
+| Neo4j preload | `neo4j/import-order.yaml` + nodes/relationships |
+| LLM bootstrap | `okf/*.md` |
+
+#### 7.15.2 Boat organization
+
+```
+boats/
+  NOR-10133/                    # Xbox — sail NOR 10133
+    boat.yaml                   # stable identity (MMSI, is_own)
+    wiki/notes.md
+    2026/
+      season.yaml
+      ratings.yaml
+      polar.yaml
+      neo4j/
+      okf/
+      assets/7710.slk
+  NOR-15788/
+    boat.yaml
+    2026/
+      ratings.yaml              # ORC 667232, APH 1.2082
+      ...
+```
+
+Each **year** folder captures rating changes. Competitors the own boat has raced are retained for fleet analysis across seasons.
+
+#### 7.15.3 Race organization
+
+```
+races/
+  2025/2025-10-hostcup/         # Høstcup — Bane A/B, class flags
+  2026/2026-06-faerderseilasen/ # Færderseilasen §11 routes
+```
+
+Folder name: `{year}-{month}-{slug}`. Manifest: `race.yaml` (`kind: Race`).
+
+#### 7.15.4 Neo4j YAML import format
+
+Declarative files use `apiVersion: sailing.cognite-fholm/v1`:
+
+```yaml
+kind: Neo4jNode
+metadata:
+  ref: vessel-7710
+spec:
+  labels: [Vessel]
+  merge_keys: [id]
+  properties:
+    id: own-boat
+    sail_number: "7710"
+    is_own: true
+```
+
+`race-import` resolves `from_ref` / `to_ref` in relationship files and executes idempotent `MERGE`. **Runtime-only** labels (`LiveStanding`, `CourseSelection`, `AisTrack`) are never imported from git.
+
+#### 7.15.5 `race-data-sync` service
+
+**Container:** `race-data-sync` (SLA-2)  
+**Config:** `config/data-repo.yaml`
+
+| Setting | Default |
+|---------|---------|
+| `repo_url` | `https://github.com/cognite-fholm/AI-sailing-data.git` |
+| `local_path` | `/opt/ai-sailing-data` |
+| `branch` | `main` or race tag |
+| `poll_interval_minutes` | 60 when `ONLINE_MODE=true` |
+| `auto_pull` | `true` in harbor; `false` when `RACE_MODE=true` (configurable) |
+
+**Flow:**
+
+1. Compare `git rev-parse HEAD` with `git ls-remote origin`.
+2. If remote ahead and policy allows → `git pull --ff-only`.
+3. Emit event → `race-import` (optional auto) + `okf-loader` refresh + `polar-manager` reload.
+4. Log sync result to Neo4j `DataSyncEvent` node.
+
+**LTE:** Uses Teltonika router WAN — no marina Wi-Fi required for data-only updates.
+
+#### 7.15.6 `race-import` service
+
+```bash
+race-import apply --race faerderseilasen-2026 [--dry-run]
+race-import apply --boat 7710 --year 2026
+```
+
+Loads boats referenced in `fleet.yaml`, then race `neo4j/import-order.yaml`. Validates against `schema/README.md` before MERGE.
+
+#### 7.15.7 Dual-repo deployment
+
+| Step | System repo | Data repo |
+|------|-------------|-----------|
+| Harbor clone | `git clone` → `/opt/ai-sailing-system` | `git clone` → `/opt/ai-sailing-data` |
+| Version pin | `deploy/locks/current.env` digests | `git checkout` tag or commit |
+| Sync script | `harbor-pull.sh` | `harbor-sync.sh` → `race-data-sync pull` |
+| Race freeze | GHCR image lock | `git checkout race-faerder-2026` |
 
 ---
 
@@ -2066,7 +2273,9 @@ C:\Repositories\boat_system\
 | Live results | FastAPI + Neo4j | Python | Corrected-time standings |
 | Handicap registry | ORC PDF parser | Python | Certificate + WRS TCF per race |
 | Agent context | **Google OKF** v0.1 | Markdown/YAML | Knowledge bundle for advisory agents |
-| OKF enricher | Python + templates | Python | SI/config → OKF concept sync |
+| Race/boat data | **AI-sailing-data** GitHub repo | YAML/OKF | Temporal planning; Neo4j import source |
+| Data sync | `race-data-sync` | Python | Git pull data repo via LTE/Wi-Fi |
+| Graph import | `race-import` | Python | MERGE neo4j YAML bundles |
 | API / coach | FastAPI | Python | Async, typed, small footprint |
 | Containers | Docker Compose | YAML | Repeatable; works on Pi arm64 |
 | CI/CD | **GitHub Actions** | YAML | Lint, test, build arm64, push GHCR |
@@ -2555,6 +2764,11 @@ flowchart LR
 | FR-99 | Regatta deploys use **digest-pinned** images from `deploy/locks/*.env` |
 | FR-100 | Shore TrimTransformer training runs on **local gaming PC** (SLA-S), not cloud GPU |
 | FR-101 | Harbor sync separates **container pulls** from **models / OKF / config** artifacts |
+| FR-102 | **AI-sailing-data** holds races (by year/date) and boats (by sail number/year) |
+| FR-103 | `race-data-sync` compares local vs GitHub and pulls when newer (policy-gated) |
+| FR-104 | `race-import` applies declarative Neo4j YAML from data repo without clobbering runtime nodes |
+| FR-105 | Deploy uses **both** system image lock and data repo git ref at race freeze |
+| FR-106 | Teltonika LTE provides WAN for data sync and GRIB when marina Wi-Fi unavailable |
 
 ---
 

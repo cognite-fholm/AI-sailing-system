@@ -1,0 +1,20 @@
+# AI-sailing-data repository connection
+# Clone target on Pi: /opt/ai-sailing-data
+
+data_repo:
+  url: https://github.com/cognite-fholm/AI-sailing-data.git
+  local_path: /opt/ai-sailing-data
+  branch: main
+  tag: null
+
+sync:
+  poll_interval_minutes: 60
+  auto_pull: true
+  auto_import_neo4j: false
+  online_required: true
+
+active:
+  regatta_id: faerderseilasen-2026
+  race_path: races/2026/2026-06-faerderseilasen
+  own_boat_path: boats/NOR-10133
+  index_file: index.yaml

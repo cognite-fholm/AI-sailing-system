@@ -57,11 +57,19 @@ vessels:
         value: 496.6
         unit: sec_per_nm
 
-  # Own boat — add ORC certificate or club rating when available
-  - name: "7710"
-    sail_number: null
+  # Own boat — Xbox (NOR 10133), ORC CertNo 7710 — see AI-sailing-data/boats/NOR-10133/
+  - name: "Xbox"
+    sail_number: "NOR-10133"
     mmsi: "257771000"
-  #   ratings: []
+    orc_cert_no: "7710"
+    ratings:
+      - type: scoring_aph
+        value: 1.1515
+      - type: aph_tot
+        value: 1.1515
+      - type: aph_tod
+        value: 521.1
+        unit: sec_per_nm
 
 # Per-race WRS TCF — populated when ORC issues values before start
 wrs_overrides: []

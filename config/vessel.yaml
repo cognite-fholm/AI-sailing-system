@@ -1,21 +1,26 @@
-# Own-boat configuration — polar from SLK file
-# Dev path resolves to: C:\Repositories\boat_system\7710 (3).slk
+# Own-boat configuration — Xbox (NOR 10133)
+# Polar SLK matches ORC Certificate for Xbox.pdf (CertNo / Data file 7710)
+# Canonical source: AI-sailing-data repo boats/NOR-10133/
 
 vessel:
   id: own-boat
-  name: "7710"
+  name: "Xbox"
+  sail_number: "NOR-10133"
   mmsi: "257771000"          # TODO: set to your AIS transponder MMSI
   is_own: true
+  orc_cert_no: "7710"
 
-# Regatta class — shown in course-editor Start Line panel (ICS class flag)
-# Example: Høstcup class 3 → Foxtrot
 regatta:
-  active_id: faerderseilasen-2026    # switch to hostcup-2025 when racing Høstcup
-  class_no: null                      # set 1–3 for flag-signaled regattas (Oscar/Echo/Foxtrot)
+  active_id: faerderseilasen-2026
+  class_no: null
 
 polar:
   source_type: slk
-  path: "../7710 (3).slk"    # relative to AI-sailing-system/ repo root
-  # path: "/data/polars/own/7710.slk"   # Raspberry Pi deploy path
+  path: "../AI-sailing-data/boats/NOR-10133/2026/assets/7710.slk"
+  # path: "/opt/ai-sailing-data/boats/NOR-10133/2026/assets/7710.slk"
   slk_id: "7710"
+  certificate_path: "../AI-sailing-data/boats/NOR-10133/2026/assets/ORC Certificate for Xbox.pdf"
   auto_reload: true
+
+data_repo:
+  boat_path: boats/NOR-10133
