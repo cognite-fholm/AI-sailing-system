@@ -1,5 +1,6 @@
-# Active regatta course configuration
+# Active regatta course configuration — narrative SI routes
 # SI reference: ../Seilingsbestemmelser_Færderseilasen26_2.pdf (chapter 11)
+# For flag-signaled multi-course regattas (Høstcup Bane A/B), see courses-hostcup.yaml
 
 regatta:
   id: faerderseilasen-2026

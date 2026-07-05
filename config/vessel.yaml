@@ -7,6 +7,12 @@ vessel:
   mmsi: "257771000"          # TODO: set to your AIS transponder MMSI
   is_own: true
 
+# Regatta class — shown in course-editor Start Line panel (ICS class flag)
+# Example: Høstcup class 3 → Foxtrot
+regatta:
+  active_id: faerderseilasen-2026    # switch to hostcup-2025 when racing Høstcup
+  class_no: null                      # set 1–3 for flag-signaled regattas (Oscar/Echo/Foxtrot)
+
 polar:
   source_type: slk
   path: "../7710 (3).slk"    # relative to AI-sailing-system/ repo root

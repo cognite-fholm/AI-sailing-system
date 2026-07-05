@@ -1,6 +1,6 @@
 # AI Sailing System — Specification
 
-**Version:** 0.5.0-draft  
+**Version:** 0.6.0-draft  
 **Date:** 2026-07-05  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
@@ -66,6 +66,8 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G14 | Parse race courses from competition program PDFs (e.g. SI chapter 11) |
 | G15 | Live corrected-time standings from waypoints, handicaps, and AIS progress |
 | G16 | Multiple handicap numbers per boat (ORC certificate + per-race WRS TCF) |
+| G17 | Multiple course variants per regatta; active course from start-boat flags |
+| G18 | UX shows class flag + course signals; user confirms or overrides vision detection |
 
 ### 3.2 Non-goals (v1)
 
@@ -258,7 +260,8 @@ flowchart TB
 | `handicap-manager` | `ghcr.io/.../handicap-manager` | ORC certificate handicaps + per-race WRS TCF per vessel |
 | `course-parser` | `ghcr.io/.../course-parser` | Extract courses/waypoints from SI/NOR PDFs |
 | `live-results` | `ghcr.io/.../live-results` | Corrected-time standings + VMG along course legs |
-| `course-editor` | `ghcr.io/.../course-editor` | React/TypeScript UX — manual waypoint coordinates |
+| `course-editor` | `ghcr.io/.../course-editor` | React/TS UX — waypoints + **start-line flag selection** |
+| `course-flag-detector` | `ghcr.io/.../course-flag-detector` | Optional vision: read start-boat flags from GoPro photo |
 | `crawl-agent` | `ghcr.io/.../crawl-agent` | NOR/SI crawl ([crawl_web](https://github.com/cognite-fholm/crawl_web) lineage) |
 | `llama-tactical` | `ghcr.io/.../llama-cpp` | Text LLM — debrief, tactical Q&A |
 | `tactical-coach` | `ghcr.io/.../tactical-coach` | FastAPI RAG over Neo4j + Influx + wind zones |
@@ -566,7 +569,11 @@ Signal K is the **single source of truth** for live marine data. It:
 | `AisTrack` | Time-series reference for vessel movement |
 | `Race` | Regatta, passage race |
 | `Course` | Windward/leeward, coastal — parsed from SI |
-| `CourseRoute` | Named route variant (e.g. `11.1 Tristein`) |
+| `CourseRoute` | Named route variant (e.g. `11.1 Tristein`, `Bane A`, `Bane B`) |
+| `ClassFlag` | Fleet class signal flag (e.g. Oscar, Foxtrot) per SI §7 |
+| `StartBoatSignal` | Start-boat display linking signal → course (e.g. numeral 2 → Bane A) |
+| `SupplementarySignal` | Modifies rounding (e.g. flag **T** → first mark starboard) |
+| `CourseSelection` | Active course for current race + selection source |
 | `Waypoint` | Mark/gate with lat/lon, rounding rule, optional distance |
 | `HandicapRating` | ORC ToT/ToD/APH or WRS TCF for a vessel |
 | `LiveStanding` | Current corrected-time position in fleet |
@@ -594,7 +601,11 @@ Signal K is the **single source of truth** for live marine data. It:
 (c:Course)-[:HAS_MARK]->(m:Mark)
 (v:Vessel)-[:ROUNDED]->(m:Mark)
 (v:Vessel)-[:PERFORMED]->(t:Tack)
-(t:Tactic)-[:SUGGESTS]->(a:Action)
+(r:Race)-[:USES_SELECTION]->(sel:CourseSelection)
+(sel)-[:SELECTED_ROUTE]->(cr:CourseRoute)
+(cr:CourseRoute)-[:REQUIRES_SIGNAL]->(sb:StartBoatSignal)
+(r:Regatta)-[:HAS_CLASS]->(cf:ClassFlag)
+(v:Vessel)-[:SAILS_IN_CLASS]->(cf:ClassFlag)
 ```
 
 Neo4j holds **context** (who, what, where, why); InfluxDB holds **telemetry** (how fast, when).
@@ -607,7 +618,7 @@ Neo4j holds **context** (who, what, where, why); InfluxDB holds **telemetry** (h
 |----------|------|----------------|------------|
 | `grafana-telemetry` | SLA-1 | 3001 | SOG, COG, AWA, AWS, depth, heel, system health |
 | `grafana-race` | SLA-2 | 3002 | Fleet map, polars, wind heatmap, **live standings**, course overlay |
-| `course-editor` | SLA-2 | 3010 | React/TypeScript waypoint editor (when coords missing) |
+| `course-editor` | SLA-2 | 3010 | React/TS — waypoints + **Start Line** flag/course selection |
 | `grafana-sail` | SLA-3 | 3003 | Trim timeline, sail images, vision LLM output |
 
 ### 7.5 AI — LLaMA + Coral
@@ -1384,9 +1395,10 @@ Default weights: `w₁=0.35, w₂=0.40, w₃=0.10, w₄=0.15` (tunable per boat 
 
 ### 7.13 Race courses, waypoints & live results
 
-**SLA tier:** SLA-2  
-**Containers:** `course-parser`, `live-results`, `course-editor` (React/TypeScript)  
-**Reference SI:** `C:\Repositories\boat_system\Seilingsbestemmelser_Færderseilasen26_2.pdf` — **Chapter 11 (Løpene)**
+**SLA tier:** SLA-2 (+ optional SLA-3 vision for flag photos)  
+**Containers:** `course-parser`, `live-results`, `course-editor`, `course-flag-detector`  
+**Reference SI (narrative routes):** `C:\Repositories\boat_system\Seilingsbestemmelser_Færderseilasen26_2.pdf` — §11  
+**Reference SI (flag-signaled courses):** `C:\Repositories\boat_system\Seilingsbestemmelser Høstcup 2025 ENDELIG.pdf` — Vedlegg 1 & 2
 
 #### 7.13.1 Competition program course parsing
 
@@ -1460,7 +1472,198 @@ flowchart LR
 | `PUT /courses/{route_id}/waypoints` | Save user-edited coordinates |
 | `GET /courses/{route_id}/geojson` | Course line for Grafana map |
 
-#### 7.13.2 Manual waypoint entry — React/TypeScript UX
+**Parsing profiles** — `course-parser` supports two SI patterns:
+
+| Profile | Example regatta | Course discovery |
+|---------|-----------------|------------------|
+| `narrative` | Færderseilasen §11 | Named sections (`11.1 Tristein`, …) |
+| `flag_signaled` | Høstcup Vedlegg 1/2 | **Bane A / Bane B** + start-boat **numeral pennants** |
+
+#### 7.13.2 Multiple courses per race & start-boat flag signaling
+
+A single regatta often publishes **several possible courses** for the same race. The **actual course** is communicated at the start line by flags displayed on the **committee / start boat** — not known until the start sequence.
+
+**Reference — Høstcup 2025, Vedlegg 1 (distanseseilaser):**
+
+> *"Bane A seiles hvis tallstander 2 er vist ombord i startbåten ved start. Bane B seiles når tallstander 3 er vist ombord i startbåten ved start."*
+
+**Supplementary signal (same appendix):**
+
+> *"Dersom signalflagg **T** vises ombord i startbåten ved start skal første merke rundes om styrbord. Er ikke signalflagg T vist … skal første merke rundes om babord."*
+
+**Class flags (Høstcup §7)** — identify which fleet you start with:
+
+| Class | Description | Flag |
+|-------|-------------|------|
+| 1 | NOR Rating distanseseilaser | **Oscar** |
+| 2 | NOR Rating shorthand distanse | **Echo** |
+| 3 | NOR Rating baneseilaser | **Foxtrot** |
+
+**Course variants per class (Høstcup):**
+
+| Class | Appendix | Variants | Start-boat signal |
+|-------|----------|----------|-------------------|
+| 1–2 | Vedlegg 1 | **Bane A** (~22 nm), **Bane B** (~23 nm) | Numeral **2** → A, **3** → B |
+| 3 | Vedlegg 2 | Short / medium / long windward-leeward | **None** / **2** / **3** |
+
+**Vedlegg 2 baneseilaser sequences:**
+
+| Signal on start boat | Mark sequence |
+|---------------------|---------------|
+| No numeral | Start – 1 – 1a – 2 – 1 – 1a – Mål |
+| Numeral **2** | Start – 1 – 1a – Mål |
+| Numeral **3** | Start – 1 – 1a – 2 – 1 – 1a – 2 – 1 – 1a – Mål |
+
+**Data model (Neo4j):**
+
+```cypher
+(r:Regatta {id: "hostcup-2025"})-[:HAS_CLASS]->(cf:ClassFlag {
+  class_no: 3,
+  name: "NOR Rating baneseilaser",
+  ics_flag: "Foxtrot",
+  letter: "F"
+})
+
+(r)-[:OFFERS_COURSE]->(cr:CourseRoute {
+  route_id: "bane-a",
+  name: "Bane A",
+  distance_nm: 22,
+  appendix: "vedlegg-1"
+})
+
+(sb:StartBoatSignal {
+  signal_type: "numeral_pennant",
+  display: "2",
+  maps_to_route_id: "bane-a"
+})
+
+(cr)-[:REQUIRES_SIGNAL]->(sb)
+
+(ss:SupplementarySignal {
+  ics_flag: "T",
+  effect: "first_mark_rounding",
+  rounding: "starboard",
+  default_if_absent: "port"
+})
+
+(sel:CourseSelection {
+  race_id: "hostcup-2025-race2",
+  route_id: "bane-a",
+  source: "user",           // user | vision | default
+  vision_confidence: null,
+  selected_at: datetime(),
+  supplementary: ["T"]        // active modifier flags
+})
+```
+
+**`course-parser` output for flag-signaled regattas (`courses/hostcup-2025.json`):**
+
+```json
+{
+  "regatta_id": "hostcup-2025",
+  "source_file": "Seilingsbestemmelser Høstcup 2025 ENDELIG.pdf",
+  "class_flags": [
+    {"class_no": 1, "ics_flag": "Oscar", "letter": "O"},
+    {"class_no": 2, "ics_flag": "Echo", "letter": "E"},
+    {"class_no": 3, "ics_flag": "Foxtrot", "letter": "F"}
+  ],
+  "start_boat_signals": [
+    {"signal": "numeral_2", "display": "2", "route_id": "bane-a"},
+    {"signal": "numeral_3", "display": "3", "route_id": "bane-b"},
+    {"signal": "none", "display": null, "route_id": "wl-long", "classes": [3]}
+  ],
+  "supplementary_signals": [
+    {"ics_flag": "T", "affects": "waypoint_1", "rounding_if_present": "starboard", "rounding_if_absent": "port"}
+  ],
+  "routes": [
+    {
+      "route_id": "bane-a",
+      "name": "Bane A",
+      "distance_nm": 22,
+      "requires_signal": "numeral_2",
+      "waypoints": [
+        {"seq": 1, "name": "Kryssmerke", "lat": null, "lon": null, "rounding": "from_T_flag"},
+        {"seq": 2, "name": "Østre Måsane", "lat": 59.8269, "lon": 10.5835, "rounding": "starboard"}
+      ]
+    },
+    {
+      "route_id": "bane-b",
+      "name": "Bane B",
+      "distance_nm": 23,
+      "requires_signal": "numeral_3",
+      "waypoints": []
+    }
+  ]
+}
+```
+
+**Runtime behaviour:**
+
+1. Before start: all `CourseRoute` variants for the regatta are loaded; **none** is active.
+2. At start sequence: crew observes start boat (or receives GoPro capture).
+3. `CourseSelection` is created — binds `race_id` + `route_id` + modifiers.
+4. `live-results`, `wind-field-analyzer`, and VMG use **only the selected route**.
+5. Changing selection mid-race requires user override + audit log (normally fixed at start).
+
+#### 7.13.3 Start-line flag UX & vision detection
+
+**Container:** `course-editor` (React/TypeScript) — **Start Line** panel  
+**Optional:** `course-flag-detector` (SLA-2 or SLA-3) — Coral + vision on start-boat photo
+
+```mermaid
+flowchart TB
+    subgraph UX["course-editor — Start Line panel"]
+        CF["Your class flag\nFoxtrot ■"]
+        SF["Course signals\n2 → Bane A | 3 → Bane B"]
+        SUP["Modifiers\n□ Flag T"]
+        SEL["Confirm selection"]
+    end
+
+    subgraph Vision["Optional — GoPro at start"]
+        PHOTO["Photo incl. start boat"]
+        DET["course-flag-detector"]
+        PHOTO --> DET
+    end
+
+    DET -.->|suggested route| UX
+    USER["Crew"] --> SEL
+    SEL --> API["POST /courses/selection"]
+    API --> N4J["CourseSelection"]
+```
+
+**UX requirements (`http://race.local:3010/start`):**
+
+| Panel | Content |
+|-------|---------|
+| **Your class** | ICS flag graphic + name for own boat's fleet (from `vessel.yaml` `class_no` or user setting) — e.g. **Foxtrot** for Høstcup class 3 |
+| **Course signals** | All `StartBoatSignal` options for this class — visual numeral pennants **2**, **3**, or "no numeral" with route name (**Bane A**, **Bane B**, WL short, …) |
+| **Modifiers** | Toggle supplementary flags (**T**) when observed on start boat |
+| **Vision suggestion** | If GoPro photo processed: *"Detected: numeral 2 → Bane A (87%)"* with **Accept** / **Override** |
+| **Confirm** | Locks `CourseSelection` for active `race_id`; shows selected track on map |
+
+**Flag visuals:** Render standard ICS racing flag shapes (numeral pennants 0–9, letter flags, **T** = red cross on white) — not text-only.
+
+**`course-flag-detector` pipeline (optional):**
+
+1. Trigger: manual upload, GoPro burst at start, or `capture_trigger` on preparatory signal.
+2. Coral ROI: locate start boat / flag halyard region.
+3. Classify visible flags: numeral pennants, **T**, class flags (CNN or small vision model).
+4. Map to `StartBoatSignal` → suggested `route_id` + `SupplementarySignal[]`.
+5. Return `{ suggested_route, confidence, flags_detected[] }` — **never auto-lock** without user confirm (configurable `auto_select_above_confidence: 0.95` for advanced users).
+
+**API:**
+
+| Endpoint | Action |
+|----------|--------|
+| `GET /courses/{regatta_id}/signals` | Class flags + start-boat signals + supplementary |
+| `POST /courses/selection` | Set active course `{ race_id, route_id, supplementary[], source }` |
+| `GET /courses/selection/{race_id}` | Current selection |
+| `POST /courses/flag-detect` | Image → suggested course |
+| `PUT /courses/selection/{race_id}/override` | User override with reason |
+
+**Integration with Færderseilasen-style regattas:** Routes like `11.1`–`11.6` may also be signaled from the committee boat; parser stores optional `StartBoatSignal` mappings when SI defines them. If not defined, user picks route manually from list (same UX, no vision mapping).
+
+#### 7.13.4 Manual waypoint entry — React/TypeScript UX
 
 When `course-parser` cannot resolve coordinates, the crew enters them via **`course-editor`** — a lightweight **React + TypeScript** SPA served from the SLA-2 Pi.
 
@@ -1492,7 +1695,7 @@ flowchart TB
 
 **Offline:** Map tiles pre-cached; editor works without internet after initial harbor setup.
 
-#### 7.13.3 VMG and progress along course
+#### 7.13.5 VMG and progress along course
 
 **Container:** `live-results` (uses parsed waypoints + AIS + SLA-1 wind)
 
@@ -1516,11 +1719,11 @@ Coordinates from chapter 11 enable VMG **relative to the rhumb line** on each le
 |------|--------|
 | `mmsi`, `race_id`, `route_id`, `leg_seq` | `vmg`, `dtm`, `btm`, `course_pct`, `lat`, `lon` |
 
-#### 7.13.4 Live results list (corrected time ordering)
+#### 7.13.6 Live results list (corrected time ordering)
 
 **Reference SI §23:** *"Korrigert tid brukes til resultatberegning, korrigert tid = seilt tid × handicap"*
 
-**`live-results`** computes **provisional standings** during the race:
+**`live-results`** computes **provisional standings** during the race (requires active **`CourseSelection`**):
 
 ```mermaid
 flowchart LR
@@ -1959,53 +2162,60 @@ flowchart LR
 | FR-33 | `handicap-manager` loads multiple ORC ratings per vessel from certificate PDF |
 | FR-34 | Per-race **ORC WRS TCF** overrides static handicap when issued |
 | FR-35 | Active handicap selected from SI scoring rule + wind band (single/triple/WRS) |
+| FR-36 | Parser loads **multiple course variants** per regatta (e.g. Bane A / Bane B) |
+| FR-37 | `StartBoatSignal` maps start-boat displays (numeral 2/3) to `CourseRoute` |
+| FR-38 | `ClassFlag` linked to own boat; shown in course-editor Start Line panel |
+| FR-39 | User **confirms** active course at start; stored as `CourseSelection` |
+| FR-40 | Optional `course-flag-detector` suggests course from start-boat photo; user may override |
+| FR-41 | Supplementary signals (e.g. flag **T**) modify waypoint rounding rules |
 
 ### 11.3 SLA-3 — Sail performance vision (GoPro HERO13)
 
 | ID | Requirement |
 |----|-------------|
-| FR-40 | Orchestrate 3–5 GoPro HERO13 cameras via Open GoPro BLE/Wi-Fi |
-| FR-41 | Synchronized multi-camera still burst within ±200 ms |
-| FR-42 | Coral preprocess extracts sail/boom ROI before geometry + LLM |
-| FR-43 | `sail-geometry` computes boom angle, mast heel, draft, twist, luff metrics |
-| FR-44 | Each capture aligned to SLA-1 telemetry (`t_influx` ±100 ms) |
-| FR-45 | `condition-matcher` finds best `BestTrimSnapshot` in similar conditions |
-| FR-46 | Crew sees current vs best Δ for boom, heel, draft on grafana-sail |
-| FR-47 | Vision LLM produces qualitative trim narrative per capture burst |
-| FR-48 | Results published to SLA-2 Neo4j as `SailGeometry`, `TrimDelta`, `SailAnalysis` |
-| FR-49 | SLA-3 pausable without affecting SLA-1 or SLA-2 |
+| FR-50 | Orchestrate 3–5 GoPro HERO13 cameras via Open GoPro BLE/Wi-Fi |
+| FR-51 | Synchronized multi-camera still burst within ±200 ms |
+| FR-52 | Coral preprocess extracts sail/boom ROI before geometry + LLM |
+| FR-53 | `sail-geometry` computes boom angle, mast heel, draft, twist, luff metrics |
+| FR-54 | Each capture aligned to SLA-1 telemetry (`t_influx` ±100 ms) |
+| FR-55 | `condition-matcher` finds best `BestTrimSnapshot` in similar conditions |
+| FR-56 | Crew sees current vs best Δ for boom, heel, draft on grafana-sail |
+| FR-57 | Vision LLM produces qualitative trim narrative per capture burst |
+| FR-58 | Results published to SLA-2 Neo4j as `SailGeometry`, `TrimDelta`, `SailAnalysis` |
+| FR-59 | SLA-3 pausable without affecting SLA-1 or SLA-2 |
+| FR-60 | GoPro capture at start may feed `course-flag-detector` (user confirms course) |
 
 ### 11.4 Onshore training (SLA-S)
 
 | ID | Requirement |
 |----|-------------|
-| FR-50 | `training-export` builds multimodal bundles (telemetry + images + geometry) in harbor |
-| FR-51 | Export requires explicit `TRAINING_EXPORT_CONSENT` per session |
-| FR-52 | Shore pipeline trains TrimTransformer on GPU machines (PyTorch) |
-| FR-53 | Model predicts optimal boom angle, mast heel, sail shape for condition vector |
-| FR-54 | Evaluator holds out full regatta sessions — no random frame leakage |
-| FR-55 | Quantized `trim-predictor` artifact deployable to SLA-3 via GHCR |
-| FR-56 | `BestTrimSnapshot` sets sync from shore to boat Neo4j after training round |
+| FR-70 | `training-export` builds multimodal bundles (telemetry + images + geometry) in harbor |
+| FR-71 | Export requires explicit `TRAINING_EXPORT_CONSENT` per session |
+| FR-72 | Shore pipeline trains TrimTransformer on GPU machines (PyTorch) |
+| FR-73 | Model predicts optimal boom angle, mast heel, sail shape for condition vector |
+| FR-74 | Evaluator holds out full regatta sessions — no random frame leakage |
+| FR-75 | Quantized `trim-predictor` artifact deployable to SLA-3 via GHCR |
+| FR-76 | `BestTrimSnapshot` sets sync from shore to boat Neo4j after training round |
 
 ### 11.5 AI coaching (cross-tier)
 
 | ID | Requirement |
 |----|-------------|
-| FR-60 | SLA-2 text LLM answers tactical questions in &lt; 30 s on Pi 5 |
-| FR-61 | No tier sends data off-device without explicit opt-in |
-| FR-62 | SLA-2 coach context: telemetry + race graph + **active wind zones** |
-| FR-63 | SLA-3 vision LLM runs only on vision node; no SLA-1 co-location in race profile |
+| FR-80 | SLA-2 text LLM answers tactical questions in &lt; 30 s on Pi 5 |
+| FR-81 | No tier sends data off-device without explicit opt-in |
+| FR-82 | SLA-2 coach context: telemetry + race graph + active wind zones + **selected course** |
+| FR-83 | SLA-3 vision LLM runs only on vision node; no SLA-1 co-location in race profile |
 
 ### 11.6 Operations
 
 | ID | Requirement |
 |----|-------------|
-| FR-70 | SLA-1 full stack boots in &lt; 60 s on power-on |
-| FR-71 | Remote container update per tier without manual SSH (when online) |
-| FR-72 | `RACE_MODE=true` disables Watchtower on all tiers; SLA-1 never auto-updates |
-| FR-73 | System runs with zero internet for 72+ hours across all tiers |
-| FR-74 | Each tier deployable via separate `docker compose -f docker-compose.sla-N.yml` |
-| FR-75 | `grib-store` and `polars/` volumes persist across reboots on SLA-2 |
+| FR-90 | SLA-1 full stack boots in &lt; 60 s on power-on |
+| FR-91 | Remote container update per tier without manual SSH (when online) |
+| FR-92 | `RACE_MODE=true` disables Watchtower on all tiers; SLA-1 never auto-updates |
+| FR-93 | System runs with zero internet for 72+ hours across all tiers |
+| FR-94 | Each tier deployable via separate `docker compose -f docker-compose.sla-N.yml` |
+| FR-95 | `grib-store` and `polars/` volumes persist across reboots on SLA-2 |
 
 ---
 
@@ -2053,7 +2263,8 @@ AI-sailing-system/
 ├── polar-certificate-extractor/    # SLA-2 ORC PNG/PDF → derived polar
 ├── wind-field-analyzer/
 ├── course-parser/                  # SLA-2 SI/NOR PDF → waypoints
-├── course-editor/                  # SLA-2 React/TS waypoint UX
+├── course-editor/                  # SLA-2 React/TS waypoint + Start Line flag UX
+├── course-flag-detector/           # Optional start-boat flag vision (Coral)
 ├── live-results/                   # SLA-2 corrected-time standings
 ├── handicap-manager/               # SLA-2 ORC + WRS handicaps
 ├── config/
@@ -2115,7 +2326,8 @@ AI-sailing-system/
 - [ ] `ais-collector` + `polar-manager` (SLK + ORC PDF)
 - [ ] `grib-ingest` + `grib-parser` + `wind-field-analyzer`
 - [ ] `course-parser` — Færderseilasen §11 PDF
-- [ ] `course-editor` — React/TS waypoint UI
+- [ ] `course-editor` — React/TS waypoint + Start Line flag/course selection UI
+- [ ] `course-flag-detector` — optional start-boat flag vision
 - [ ] `handicap-manager` — ORC certificate + WRS TCF
 - [ ] `live-results` — corrected-time standings + VMG
 - [ ] grafana-race dashboards

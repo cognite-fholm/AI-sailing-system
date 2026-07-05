@@ -1,0 +1,106 @@
+# Høstcup 2025 — multi-course regatta with start-boat flag signaling
+# SI reference: ../Seilingsbestemmelser Høstcup 2025 ENDELIG.pdf
+# Parsing profile: flag_signaled (Vedlegg 1 distanse, Vedlegg 2 baneseilaser)
+
+regatta:
+  id: hostcup-2025
+  name: "Høstcup 2025"
+  si_pdf: "../Seilingsbestemmelser Høstcup 2025 ENDELIG.pdf"
+  parsing_profile: flag_signaled
+  scoring:
+    method: corrected_time
+
+# Own boat class — drives "Your class flag" panel in course-editor
+# Set class_no to match your fleet (1=Oscar, 2=Echo, 3=Foxtrot)
+class_flags:
+  - class_no: 1
+    name: "NOR Rating distanseseilaser"
+    ics_flag: Oscar
+    letter: O
+  - class_no: 2
+    name: "NOR Rating shorthand distanse"
+    ics_flag: Echo
+    letter: E
+  - class_no: 3
+    name: "NOR Rating baneseilaser"
+    ics_flag: Foxtrot
+    letter: F
+
+# Signals displayed on committee / start boat at start
+start_boat_signals:
+  # Vedlegg 1 — classes 1–2 (distance)
+  - signal_id: numeral_2
+    signal_type: numeral_pennant
+    display: "2"
+    route_id: bane-a
+    classes: [1, 2]
+  - signal_id: numeral_3
+    signal_type: numeral_pennant
+    display: "3"
+    route_id: bane-b
+    classes: [1, 2]
+  # Vedlegg 2 — class 3 (windward-leeward)
+  - signal_id: wl_none
+    signal_type: numeral_pennant
+    display: null
+    route_id: wl-long
+    classes: [3]
+  - signal_id: wl_2
+    signal_type: numeral_pennant
+    display: "2"
+    route_id: wl-short
+    classes: [3]
+  - signal_id: wl_3
+    signal_type: numeral_pennant
+    display: "3"
+    route_id: wl-extra
+    classes: [3]
+
+supplementary_signals:
+  - ics_flag: T
+    affects: first_mark
+    rounding_if_present: starboard
+    rounding_if_absent: port
+    applies_to: [bane-a, bane-b]   # Vedlegg 1 only
+
+# No active route until crew confirms at start (CourseSelection)
+active_selection: null
+
+routes:
+  - route_id: bane-a
+    name: "Bane A"
+    appendix: vedlegg-1
+    distance_nm: 22
+    requires_signal: numeral_2
+    classes: [1, 2]
+    mark_sequence: "Start – Kryssmerke – Østre Måsane – … – Mål"
+  - route_id: bane-b
+    name: "Bane B"
+    appendix: vedlegg-1
+    distance_nm: 23
+    requires_signal: numeral_3
+    classes: [1, 2]
+  - route_id: wl-short
+    name: "Baneseilaser kort"
+    appendix: vedlegg-2
+    requires_signal: wl_2
+    classes: [3]
+    mark_sequence: "Start – 1 – 1a – Mål"
+  - route_id: wl-long
+    name: "Baneseilaser lang (ingen tallstander)"
+    appendix: vedlegg-2
+    requires_signal: wl_none
+    classes: [3]
+    mark_sequence: "Start – 1 – 1a – 2 – 1 – 1a – Mål"
+  - route_id: wl-extra
+    name: "Baneseilaser ekstra"
+    appendix: vedlegg-2
+    requires_signal: wl_3
+    classes: [3]
+    mark_sequence: "Start – 1 – 1a – 2 – 1 – 1a – 2 – 1 – 1a – Mål"
+
+# Vision-assisted course detection (optional)
+flag_detection:
+  enabled: true
+  auto_select_above_confidence: null   # null = always require user confirm
+  capture_source: gopro                # gopro | upload | manual

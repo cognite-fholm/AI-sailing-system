@@ -11,7 +11,8 @@ An edge-first, AI-assisted competitive sailing platform built on [Signal K](http
 | Document | Purpose |
 |----------|---------|
 | [spec.md](./spec.md) | System specification, architecture, technology choices, and lineage from prior CogSail work |
-| [adr/0001-system-architecture-and-technology-choices.md](./adr/0001-system-architecture-and-technology-choices.md) | Architecture Decision Record for core platform choices |
+| [adr/0005-course-parsing-handicaps-live-results.md](./adr/0005-course-parsing-handicaps-live-results.md) | SI course parsing, handicaps, live results |
+| [adr/0006-start-boat-course-flags.md](./adr/0006-start-boat-course-flags.md) | Multi-course regattas, start-boat flag signaling, vision assist |
 
 ## Goal
 
@@ -32,7 +33,7 @@ Each onboard tier has its own Docker Compose stack and may run on a **different 
 
 **Wind & fleet:** GRIB refresh, polars, AIS, and wind-on-course analysis ([§7.12](./spec.md#712-grib-polars-ais--wind-on-course-analysis)).
 
-**Courses & results:** SI PDF course parsing (Færderseilasen §11), React waypoint editor, live corrected-time standings, multi-handicap ORC + WRS ([§7.13–7.14](./spec.md#713-race-courses-waypoints--live-results)).
+**Courses & results:** SI PDF course parsing (Færderseilasen §11; Høstcup Bane A/B + start-boat flags), React waypoint + **Start Line** course selection, optional vision flag detection, live corrected-time standings, multi-handicap ORC + WRS ([§7.13–7.14](./spec.md#713-race-courses-waypoints--live-results)).
 
 ## Quick stack
 

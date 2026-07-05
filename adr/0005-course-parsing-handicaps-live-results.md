@@ -18,6 +18,8 @@ The system must:
 3. Compute **VMG** and **live corrected-time standings** for own boat and competitors.
 4. Store **several handicap numbers per boat** and select the active one per race rules.
 
+For regattas with **multiple courses per race** signaled from the start boat (e.g. Høstcup Bane A/B), see [ADR-0006](./0006-start-boat-course-flags.md).
+
 **Reference files:**
 
 - `Seilingsbestemmelser_Færderseilasen26_2.pdf` — chapter 11 routes
