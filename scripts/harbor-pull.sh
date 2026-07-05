@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Pull digest-pinned images and restart compose stack for one SLA tier.
+# Usage: ./scripts/harbor-pull.sh --tier 2
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT"
+
+TIER=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --tier) TIER="$2"; shift 2 ;;
+    *) echo "Unknown arg: $1"; exit 1 ;;
+  esac
+done
+
+if [[ -z "$TIER" || ! "$TIER" =~ ^[123]$ ]]; then
+  echo "Usage: $0 --tier {1|2|3}"
+  exit 1
+fi
+
+if [[ -f deploy/locks/current.env ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source deploy/locks/current.env
+  set +a
+fi
+
+if [[ -f deploy/env/harbor.env ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source deploy/env/harbor.env
+  set +a
+fi
+
+if [[ "${RACE_MODE:-false}" == "true" ]]; then
+  echo "ERROR: RACE_MODE=true — refuse pull (guardrail GR-1). Use race freeze procedure."
+  exit 1
+fi
+
+COMPOSE_FILE="docker-compose.sla-${TIER}.yml"
+if [[ ! -f "$COMPOSE_FILE" ]]; then
+  echo "Missing $COMPOSE_FILE (Phase 1+)"
+  exit 1
+fi
+
+EXTRA=()
+if [[ "$TIER" != "1" && -f docker-compose.harbor.yml ]]; then
+  EXTRA=(-f docker-compose.harbor.yml)
+fi
+
+echo "Pulling SLA-${TIER}..."
+docker compose -f "$COMPOSE_FILE" "${EXTRA[@]}" pull
+docker compose -f "$COMPOSE_FILE" "${EXTRA[@]}" up -d
+echo "Done SLA-${TIER}"

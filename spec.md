@@ -1,6 +1,6 @@
 # AI Sailing System — Specification
 
-**Version:** 0.6.0-draft  
+**Version:** 0.7.0-draft  
 **Date:** 2026-07-05  
 **Author:** cognite-fholm  
 **Status:** Draft — architecture & requirements
@@ -25,7 +25,7 @@ The system is designed to:
 - Operate on one or more **Raspberry Pi** nodes with a **PiCAN-M HAT** on the telemetry node (NMEA buses + 3 A SMPS).
 - Use a **Google Coral** accelerator on the vision node for sail-image preprocessing.
 - **Isolate tiers** so image analysis and race-graph workloads cannot starve live instrument data.
-- Support **remote upgrades** via container-based deployment when connectivity is available.
+- Support **remote upgrades** via **GitHub Actions → GHCR → Docker Compose** on Raspberry Pi when connectivity is available.
 - Build directly on lessons learned from the existing **CogSail** repositories.
 
 ---
@@ -68,6 +68,9 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G16 | Multiple handicap numbers per boat (ORC certificate + per-race WRS TCF) |
 | G17 | Multiple course variants per regatta; active course from start-boat flags |
 | G18 | UX shows class flag + course signals; user confirms or overrides vision detection |
+| G19 | Advisory agents consume a versioned **Google OKF** knowledge bundle for system context |
+| G20 | **GitHub + Docker** end-to-end: Actions CI, GHCR images, Compose on Pi — no cloud orchestration |
+| G21 | Shore **TrimTransformer** training on **own gaming PC** (SLA-S), not paid cloud GPU |
 
 ### 3.2 Non-goals (v1)
 
@@ -644,6 +647,119 @@ Neo4j holds **context** (who, what, where, why); InfluxDB holds **telemetry** (h
 | SLA-2 (race) | `Llama-3.2-3B-Instruct-Q4_K_M.gguf` | ~2 GB |
 | SLA-3 (vision) | `Llama-3.2-11B-Vision-Instruct-Q4_K_M.gguf` (or smaller) | 4–8 GB |
 
+| SLA-3 (vision) | `Llama-3.2-11B-Vision-Instruct-Q4_K_M.gguf` (or smaller) | 4–8 GB |
+
+#### 7.5.1 Advisory agent context — Google OKF
+
+**Format:** [Google Open Knowledge Format (OKF) v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)  
+**Bundle path (on Pi):** `/opt/knowledge/sailing-system/` (git submodule or volume mount)  
+**Consumers:** `tactical-coach`, `sail-analysis-api`, `course-flag-detector` (ICS flag reference), optional `crawl-agent` (enrichment writer)
+
+OKF defines the **curated system context** that advisory agents read before and during inference. It complements — but does not replace — live data from InfluxDB and Neo4j:
+
+| Layer | Role | Update frequency |
+|-------|------|------------------|
+| **OKF bundle** | Stable domain knowledge, playbooks, schema, SI summaries | Harbor / regatta prep; git pull when online |
+| **Neo4j** | Live race graph (fleet, course selection, standings) | Continuous during race |
+| **InfluxDB** | Live telemetry (wind, SOG, heel) | Sub-second |
+
+**Why OKF:** Vendor-neutral, human-readable markdown with YAML frontmatter; diffable in git; traversable by agents without proprietary SDKs. Producers (humans, `course-parser`, `okf-enricher`) and consumers (`tactical-coach`, vision LLM prompts) are independent.
+
+**Bundle layout:**
+
+```
+knowledge/sailing-system/          # OKF Knowledge Bundle
+├── index.md                       # okf_version: "0.1"; directory map
+├── log.md                         # Change history
+├── system/
+│   ├── sla-tiers.md               # type: Reference — three-tier architecture
+│   └── advisory-agents.md         # type: Playbook — which agent does what
+├── marine/
+│   ├── signalk-paths.md           # type: Reference — key Signal K paths
+│   └── nmea-sources.md            # type: Reference — PiCAN-M buses
+├── graph/
+│   ├── neo4j-schema.md            # type: Reference — node labels & relationships
+│   └── course-selection.md        # type: Playbook — StartBoatSignal / CourseSelection
+├── regatta/
+│   ├── hostcup-2025.md            # type: Playbook — Bane A/B, class flags, flag T
+│   └── faerderseilasen-2026.md    # type: Playbook — §11 routes, §23 scoring
+├── scoring/
+│   ├── orc-handicaps.md           # type: Reference — APH, triple-number, WRS TCF
+│   └── live-results.md            # type: Playbook — corrected time formula
+├── wind/
+│   ├── grib-usage.md              # type: Playbook — stale GRIB, fusion rules
+│   └── polar-interpretation.md    # type: Reference — SLK columns, ORC derived
+└── sail/
+    ├── trim-metrics.md            # type: Reference — boom, draft, twist definitions
+    └── gopro-capture.md           # type: Playbook — burst modes, geometry pipeline
+```
+
+**Example concept** (`regatta/hostcup-2025.md`):
+
+```markdown
+---
+type: Playbook
+title: Høstcup 2025 — courses and start-boat signals
+description: Bane A/B selection, class flags, and supplementary flag T.
+tags: [regatta, hostcup, course-selection]
+resource: file://../Seilingsbestemmelser Høstcup 2025 ENDELIG.pdf
+timestamp: 2026-07-05T00:00:00Z
+---
+
+# Class flags (§7)
+
+| Class | Flag |
+|-------|------|
+| 1 | Oscar |
+| 2 | Echo |
+| 3 | Foxtrot |
+
+# Course signals (Vedlegg 1)
+
+- Numeral **2** on start boat → [Bane A](/regatta/routes/bane-a.md)
+- Numeral **3** on start boat → [Bane B](/regatta/routes/bane-b.md)
+- Flag **T** present → first mark **starboard**; absent → **port**
+
+See [course selection playbook](/graph/course-selection.md).
+```
+
+**`okf-enricher` container (SLA-2):**
+
+| Trigger | Action |
+|---------|--------|
+| `POST /courses/parse` completes | Write / update `regatta/{id}.md` concepts from parsed SI |
+| `handicap-manager` import | Update `scoring/orc-handicaps.md` per vessel |
+| Harbor sync | Regenerate `graph/neo4j-schema.md` from live schema |
+| Manual edit | Crew edits markdown; git commit in harbor |
+
+**Advisory agent consumption pattern:**
+
+```mermaid
+flowchart LR
+    OKF["OKF bundle\n/opt/knowledge/"]
+    N4J["Neo4j\nlive graph"]
+    IFX["InfluxDB\nlive telemetry"]
+    COACH["tactical-coach"]
+    SAIL["sail-analysis-api"]
+    LLM2["llama-tactical"]
+    VLLM["llama-vision"]
+
+    OKF -->|playbooks + schema| COACH
+    OKF -->|trim + capture refs| SAIL
+    N4J -->|Cypher RAG| COACH
+    IFX -->|time windows| COACH
+    COACH --> LLM2
+    SAIL --> VLLM
+```
+
+1. **Bootstrap:** Load bundle `index.md`; agent reads relevant concepts by `type` and `tags` (e.g. `Playbook` + `regatta`).
+2. **Per query:** Merge OKF concept text with live Neo4j/Influx facts in the prompt.
+3. **Citations:** Agent responses cite OKF concept IDs and live data paths (FR: no uncited tactical claims).
+
+**`AGENTS.md` (bundle root, OKF convention):** Instructions for advisory agents — which concepts to read first, offline-only constraint, and override rules for `CourseSelection`.
+
+**Offline:** Full bundle ships on disk with the Pi image; no network required to read context at sea.
+
 ### 7.6 Race intelligence service — **SLA-2 only**
 
 **Language:** Python 3.11+
@@ -997,7 +1113,8 @@ L = λ₁ · MSE(optimal_trim, predicted_trim)
 | `model-evaluator` | Custom + W&B | Holdout by regatta; report per-condition MAE |
 | `neo4j-shore` | Neo4j (optional) | Aggregate fleet learnings → publish `BestTrimSnapshot` sets to boats |
 
-**Containers:** `docker-compose.sla-shore.yml` (not deployed on Pi).
+**Host:** Personal **gaming PC** with NVIDIA GPU (CUDA) — **SLA-S**, harbor/home network only  
+**Containers:** `shore/docker-compose.sla-shore.yml` (not deployed on Pi; not cloud VM)
 
 #### 7.11.5 Deployment back to boat
 
@@ -1026,7 +1143,7 @@ After training and evaluation:
 | Retention | Raw images on shore: 24 months; delete on request |
 | Race mode | `training-export` container **stopped** when `RACE_MODE=true` |
 
-| Race mode | `training-export` container **stopped** when `RACE_MODE=true` |
+**Shore hardware:** Use existing **gaming PC** rather than Azure/AWS GPU VMs — PyTorch + CUDA locally; publish artifacts to GHCR from harbor; see [§9.6](#96-shore-training--gaming-pc-sla-s).
 
 ---
 
@@ -1948,9 +2065,15 @@ C:\Repositories\boat_system\
 | Course editor | React + TypeScript + Vite | TS/TSX | Manual waypoint entry on Pi |
 | Live results | FastAPI + Neo4j | Python | Corrected-time standings |
 | Handicap registry | ORC PDF parser | Python | Certificate + WRS TCF per race |
+| Agent context | **Google OKF** v0.1 | Markdown/YAML | Knowledge bundle for advisory agents |
+| OKF enricher | Python + templates | Python | SI/config → OKF concept sync |
 | API / coach | FastAPI | Python | Async, typed, small footprint |
 | Containers | Docker Compose | YAML | Repeatable; works on Pi arm64 |
-| Remote updates | Watchtower or custom agent | — | Pull from GHCR when online |
+| CI/CD | **GitHub Actions** | YAML | Lint, test, build arm64, push GHCR |
+| Container registry | **GHCR** (`ghcr.io/cognite-fholm`) | OCI | Free with GitHub; same org as repo |
+| Pi orchestration | Docker Compose + systemd | — | No Kubernetes; optional Watchtower in harbor |
+| Shore training host | **Gaming PC** (SLA-S) | Docker Compose | Local GPU; harbor-only TrimTransformer training |
+| Remote updates | Watchtower (harbor only) | — | Pull from GHCR when `RACE_MODE=false` |
 | Config | Environment + YAML | — | No cloud config dependency |
 
 ---
@@ -2037,23 +2160,231 @@ graph TB
 | `docker-compose.sla-3.yml` | `vision.local` | Harbor only |
 | `docker-compose.harbor.yml` | Overlay — enables Watchtower per tier | When `RACE_MODE=false` |
 
-### 9.2 Remote upgrade strategy
+### 9.2 Platform commitment — GitHub + Docker
 
-**Problem:** How to upgrade containers at sea (or from harbor Wi-Fi) without breaking the NMEA bus stack.
+The project goes **all-in on GitHub and Docker**. No Azure Container Registry, Kubernetes, or cloud edge orchestration for the boat stack. Shore ML runs on **own hardware** (gaming PC), not rented cloud GPU.
 
-**Approach:**
+| Concern | Choice | Rationale |
+|---------|--------|-----------|
+| Source control | **GitHub** (`cognite-fholm/AI-sailing-system`) | Single home for code, issues, releases |
+| CI | **GitHub Actions** | Free tier; native GHCR push; path-filtered workflows per SLA tier |
+| Registry | **GHCR** (`ghcr.io/cognite-fholm/*`) | Zero marginal cost; digest-pinned deploys |
+| Edge runtime | **Docker Compose** on Raspberry Pi (`linux/arm64`) | Matches ADR-0001/0002; no k3s overhead |
+| Edge updates | **Watchtower** (harbor overlay only) | Pull-based; disabled during races |
+| Shore training | **Gaming PC** + `docker-compose.sla-shore.yml` | Cost-effective vs cloud GPU VMs |
+| Config / knowledge | Git + bind mounts | Not baked into app images |
 
-1. **Immutable images** — publish multi-arch (`linux/arm64`) images to GitHub Container Registry (`ghcr.io/cognite-fholm/...`).
-2. **Watchtower** — polls registry on schedule when `WATCHTOWER_HTTP_API_PERIODIC_POLLS` or network is up; updates one service at a time.
-3. **Signal K stays up** — `network_mode: host` on SLA-1 `signalk-server` only; CAN/serial device paths remain stable.
-4. **Per-tier rollout** — upgrade SLA-3 first, then SLA-2, **never SLA-1** during an active race session.
-5. **Pre-race freeze** — `WATCHTOWER_NO_PULL=true` on all compose files, or disable via label on SLA-1 always.
-5. **Rollback** — pin image digests in `docker-compose.prod.yml`; keep previous digest in `.env.previous`.
-6. **Offline updates** — USB stick with `docker load` images as fallback.
+**Explicitly out of scope:** ACR, AKS, Argo CD, Terraform cloud state, direct Actions→SSH deploy to boat.
 
-**NMEA bus consideration:** Container restarts on `signalk-server` cause brief data gaps (~seconds). Watchtower should run **only in harbor mode**, not during active racing. A systemd timer can enable Watchtower when `eth0/wlan0` has internet and `RACE_MODE=false`.
+### 9.3 CI pipeline — GitHub Actions → GHCR
 
-### 9.3 Local-only operation checklist
+**Workflow layout** (`.github/workflows/`):
+
+| Workflow | Trigger | Actions |
+|----------|---------|---------|
+| `ci.yml` | Pull request | Lint, unit tests, compose config validate |
+| `publish-sla-1.yml` | Push to `main` (path: `signalk/**`, `influxdb/**`, …) | `docker buildx` **linux/arm64** → push GHCR |
+| `publish-sla-2.yml` | Push to `main` (path: `tactical-coach/**`, `course-parser/**`, …) | Same |
+| `publish-sla-3.yml` | Push to `main` (path: `gopro-orchestrator/**`, `sail-geometry/**`, …) | Same |
+| `release.yml` | Tag `v*` | Build all tiers; write `deploy/locks/{tag}.env`; GitHub Release notes |
+
+**Image tagging:**
+
+| Tag | When | Use |
+|-----|------|-----|
+| `sha-{git_sha}` | Every `main` build | Traceability |
+| `main` | Latest successful `main` | Harbor dev pulls |
+| `v0.4.0` | Git tag | Regatta freeze / production |
+| `@sha256:…` | Digest | **Pinned** in `deploy/locks/*.env` |
+
+**Build rules:**
+
+1. **arm64 only** for Pi images (amd64 optional for local dev smoke tests).
+2. **Path filters** — do not rebuild all 20+ services on every commit.
+3. **No GGUF / training data in images** — see §9.7.
+4. **Self-hosted arm64 runner** (optional Phase 4+) on a spare Pi at home when QEMU builds become slow.
+
+**Secrets (GitHub repo settings):**
+
+| Secret | Purpose |
+|--------|---------|
+| `GITHUB_TOKEN` (built-in) | Push to GHCR (`packages: write`) |
+| None required for Pi pull | GHCR public packages or `docker login ghcr.io` once on each Pi |
+
+### 9.4 CD on Raspberry Pi — Docker Compose
+
+Each Pi runs **one SLA compose stack**, started by **systemd** (`ai-sailing-sla-N.service`).
+
+```bash
+# Example — race.local (SLA-2)
+cd /opt/ai-sailing-system
+source deploy/env/harbor.env          # or race.env during regatta
+docker compose -f docker-compose.sla-2.yml \
+  --env-file deploy/locks/current.env \
+  up -d
+```
+
+**Compose overlays:**
+
+| File | When |
+|------|------|
+| `docker-compose.sla-N.yml` | Always — service definitions |
+| `deploy/locks/current.env` | Image digest pins (`POLAR_MANAGER_IMAGE=…@sha256:…`) |
+| `docker-compose.harbor.yml` | `RACE_MODE=false` — enables Watchtower on SLA-2/3 |
+| `deploy/compact|standard|race/*.yml` | Topology overrides (1–3 Pi) |
+
+**Watchtower policy:**
+
+| Tier | Watchtower | Label |
+|------|------------|-------|
+| SLA-1 | **Never** | `com.centurylinklabs.watchtower.enable=false` on all services |
+| SLA-2 | Harbor only | Enabled via `docker-compose.harbor.yml` |
+| SLA-3 | Harbor only | Same |
+
+Watchtower updates **one container at a time**; SLA-1 is updated only via **manual** `compose pull && up` in harbor.
+
+### 9.5 Lifecycle states and guardrails
+
+```mermaid
+stateDiagram-v2
+    [*] --> Development
+    Development --> Harbor: merge to main, pull on Pi
+    Harbor --> RaceFreeze: pre-regatta lock digests
+    RaceFreeze --> Racing: RACE_MODE=true
+    Racing --> Harbor: regatta ends, RACE_MODE=false
+    Harbor --> Development: local compose build
+    Racing --> Offline: no internet
+    Offline --> Harbor: return to marina
+```
+
+| State | `RACE_MODE` | Watchtower | SLA-1 update | Training export |
+|-------|-------------|------------|--------------|-----------------|
+| **Development** | `false` | off | local build OK | n/a |
+| **Harbor** | `false` | SLA-2/3 on | manual only | opt-in consent |
+| **Race freeze** | `false` | off | manual + checklist | stopped |
+| **Racing** | `true` | **off all tiers** | **forbidden** | **stopped** |
+| **Offline** | `true` | off | USB `docker load` only | stopped |
+
+**Guardrails (non-negotiable):**
+
+| ID | Rule |
+|----|------|
+| **GR-1** | `RACE_MODE=true` → Watchtower disabled on every Pi (`WATCHTOWER_NO_PULL=true` or harbor overlay not loaded) |
+| **GR-2** | SLA-1 `signalk-server` never auto-restarts from Watchtower — NMEA gaps at start sequence are unacceptable |
+| **GR-3** | Deploy order when upgrading: **SLA-3 → SLA-2 → SLA-1**; never all tiers simultaneously |
+| **GR-4** | Production compose uses **digest pins** from `deploy/locks/` — not bare `:latest` |
+| **GR-5** | `training-export` and shore push containers **stopped** when `RACE_MODE=true` |
+| **GR-6** | Neo4j / InfluxDB / image-store volumes are **never** destroyed by `compose up` — migrations are explicit jobs |
+| **GR-7** | Rollback = restore previous `deploy/locks/*.env` + `compose up` — keep last two lock files |
+| **GR-8** | Harbor sync script runs **models + OKF + config** separately from container pulls |
+| **GR-9** | GitHub Release tag required before any regatta freeze lock file is marked `production` |
+| **GR-10** | No off-device data export without `TRAINING_EXPORT_CONSENT` |
+
+**Race freeze procedure** (before regatta):
+
+1. Tag release: `git tag v0.4.0 && git push --tags`
+2. CI builds all images; `release.yml` writes `deploy/locks/v0.4.0.env`
+3. Copy to Pis: `deploy/locks/current.env` (or symlink)
+4. On each Pi in harbor: `scripts/harbor-sync.sh` (models, OKF, config) then `scripts/harbor-pull.sh`
+5. Run pre-flight checklist (§9.3 former 9.3 → §9.9)
+6. Set `RACE_MODE=true` in `deploy/env/race.env` on all nodes
+7. Disable Watchtower / stop harbor overlay
+
+### 9.6 Shore training — gaming PC (SLA-S)
+
+**Hardware:** Personal **gaming PC** with NVIDIA GPU (CUDA). Not deployed to Raspberry Pi. Not a cloud VM.
+
+**Location:** Home / workshop — same LAN as harbor Pis when syncing training bundles.
+
+| Component | Runs on | Deploy |
+|-----------|---------|--------|
+| `dataset-curator` | Gaming PC | `docker compose -f shore/docker-compose.sla-shore.yml` |
+| `trim-transformer-trainer` | Gaming PC (GPU) | Same |
+| `model-evaluator` | Gaming PC | Same |
+| `MLflow` (local) | Gaming PC | Volume `~/mlflow/` |
+
+**Data flow:**
+
+```mermaid
+flowchart LR
+    BOAT["SLA-3 training-export\nharbor USB or LAN"]
+    BUNDLE["training bundle\n/opt/exports/"]
+    PC["Gaming PC\nSLA-S Compose"]
+    MLF["MLflow checkpoints"]
+    GHCR["GHCR\ntrim-predictor:v*"]
+    PI3["vision.local\nSLA-3"]
+
+    BOAT -->|consent only| BUNDLE --> PC
+    PC --> MLF
+    PC -->|quantize + publish| GHCR
+    GHCR -->|harbor pull| PI3
+```
+
+**Shore lifecycle:**
+
+1. **Ingest** — copy harbor export bundle to PC (`rsync` / USB).
+2. **Curate** — `dataset-curator` splits by **session** (no frame leakage).
+3. **Train** — `trim-transformer-trainer` on GPU; log to local MLflow.
+4. **Evaluate** — hold out full regatta sessions; gate release on MAE thresholds.
+5. **Publish** — push `trim-predictor:{version}` to GHCR (arm64 ONNX artifact or thin inference image).
+6. **Deploy to boat** — harbor: `harbor-pull.sh` on `vision.local`; import `BestTrimSnapshot` to Neo4j.
+
+**Cost:** electricity only — no Azure/AWS GPU rental.
+
+### 9.7 Artifact classes — what CI builds vs harbor sync
+
+| Artifact | In GHCR image? | How it reaches the Pi |
+|----------|----------------|------------------------|
+| Python / Node app services | Yes | `compose pull` |
+| `course-editor` static build | Yes | same |
+| LLaMA GGUF (2–8 GB) | **No** | `scripts/harbor-sync.sh` → `/opt/models/sla-{2,3}/` |
+| `trim-predictor` ONNX | Optional thin image | GHCR on release + harbor pull |
+| OKF knowledge bundle | **No** | `git pull` or rsync → `/opt/knowledge/` |
+| `config/*.yaml` | **No** | bind mount `/opt/ai-sailing-system/config/` |
+| Polars (SLK / derived YAML) | **No** | `data/polars/` volume |
+| GRIB files | **No** | `data/grib/` volume |
+| Neo4j / InfluxDB data | **Never** | named volumes; backup via `scripts/backup-volumes.sh` |
+
+### 9.8 Rollback and offline fallback
+
+**Rollback (harbor, internet available):**
+
+```bash
+cp deploy/locks/v0.3.9.env deploy/locks/current.env
+./scripts/harbor-pull.sh --tier 3
+./scripts/harbor-pull.sh --tier 2
+# SLA-1 only if required:
+./scripts/harbor-pull.sh --tier 1
+```
+
+**Offline (no registry):**
+
+```bash
+# Prepared on shore before departure:
+docker save ghcr.io/cognite-fholm/tactical-coach:v0.4.0 | gzip > tactical-coach.tar.gz
+# On Pi:
+docker load < tactical-coach.tar.gz
+```
+
+Keep a USB stick with **saved images + lock file** matching the frozen regatta stack.
+
+### 9.9 Remote upgrade strategy (summary)
+
+**Problem:** Upgrade containers from harbor Wi-Fi without breaking NMEA or mid-race stability.
+
+**Approach** (unchanged principles, now under GitHub + Docker guardrails):
+
+1. **Immutable images** on GHCR (`linux/arm64`).
+2. **Watchtower** — harbor only, SLA-2/3, one service at a time.
+3. **Signal K** — `network_mode: host`; manual SLA-1 updates only in harbor with `candump` pre-check.
+4. **Per-tier rollout** — SLA-3 → SLA-2 → SLA-1 (GR-3).
+5. **Pre-race freeze** — digest lock file + `RACE_MODE=true` (GR-1, GR-4).
+6. **Rollback** — previous `deploy/locks/*.env` (GR-7).
+7. **Offline** — `docker load` from USB (§9.8).
+
+**NMEA bus consideration:** Container restarts on `signalk-server` cause brief data gaps (~seconds). Watchtower **never** targets SLA-1. A systemd timer may start Watchtower only when `RACE_MODE=false` and network is up.
+
+### 9.10 Local-only operation checklist
 
 - [ ] Each tier has independent `restart: unless-stopped`
 - [ ] DNS not required (use `/etc/hosts` for `telemetry.local`, `race.local`, `vision.local`)
@@ -2203,8 +2534,10 @@ flowchart LR
 |----|-------------|
 | FR-80 | SLA-2 text LLM answers tactical questions in &lt; 30 s on Pi 5 |
 | FR-81 | No tier sends data off-device without explicit opt-in |
-| FR-82 | SLA-2 coach context: telemetry + race graph + active wind zones + **selected course** |
-| FR-83 | SLA-3 vision LLM runs only on vision node; no SLA-1 co-location in race profile |
+| FR-82 | SLA-2 coach context: OKF bundle + telemetry + race graph + wind zones + **selected course** |
+| FR-83 | SLA-3 vision LLM receives OKF trim/capture playbooks in prompt context |
+| FR-84 | `okf-enricher` syncs parsed SI, handicaps, and schema into OKF concepts |
+| FR-85 | Advisory agents cite OKF concept IDs and live data sources in responses |
 
 ### 11.6 Operations
 
@@ -2216,6 +2549,12 @@ flowchart LR
 | FR-93 | System runs with zero internet for 72+ hours across all tiers |
 | FR-94 | Each tier deployable via separate `docker compose -f docker-compose.sla-N.yml` |
 | FR-95 | `grib-store` and `polars/` volumes persist across reboots on SLA-2 |
+| FR-96 | All app images built by **GitHub Actions** and published to **GHCR** (`linux/arm64`) |
+| FR-97 | Pi deployment uses **Docker Compose** only — no Kubernetes on boat hardware |
+| FR-98 | `RACE_MODE=true` enforces guardrails GR-1–GR-5 (no Watchtower, no training export) |
+| FR-99 | Regatta deploys use **digest-pinned** images from `deploy/locks/*.env` |
+| FR-100 | Shore TrimTransformer training runs on **local gaming PC** (SLA-S), not cloud GPU |
+| FR-101 | Harbor sync separates **container pulls** from **models / OKF / config** artifacts |
 
 ---
 
@@ -2243,10 +2582,23 @@ AI-sailing-system/
 ├── docker-compose.sla-2.yml    # Race & competitor tier
 ├── docker-compose.sla-3.yml    # Sail vision tier
 ├── docker-compose.harbor.yml     # Watchtower overlay (harbor mode)
+├── .github/
+│   └── workflows/                # CI: lint/test; CD: build arm64 → GHCR
 ├── deploy/
+│   ├── README.md                 # Lifecycle, guardrails, race freeze
+│   ├── env/
+│   │   ├── harbor.env.example
+│   │   └── race.env.example
+│   ├── locks/                    # Digest-pinned image env files per release
 │   ├── compact/                  # Single-Pi overrides
 │   ├── standard/                 # 2-Pi overrides
 │   └── race/                     # 3-Pi overrides (recommended)
+├── scripts/
+│   ├── harbor-sync.sh            # Models, OKF, config (not containers)
+│   ├── harbor-pull.sh            # compose pull per tier
+│   ├── install-pi-telemetry.sh
+│   ├── install-pi-race.sh
+│   └── install-pi-vision.sh
 ├── signalk/                      # SLA-1
 ├── influxdb/                     # SLA-1
 ├── grafana/
@@ -2295,13 +2647,11 @@ AI-sailing-system/
 ├── models/
 │   ├── sla-2/                      # Text GGUF manifests
 │   └── sla-3/                      # Vision GGUF manifests
-├── scripts/
-│   ├── install-pi-telemetry.sh
-│   ├── install-pi-race.sh
-│   └── install-pi-vision.sh
+├── knowledge/                      # OKF bundle (advisory agent context)
 └── docs/
     ├── hardware-setup.md
-    └── sla-tiers.md
+    ├── sla-tiers.md
+    └── deployment-lifecycle.md
 ```
 
 ---
@@ -2339,19 +2689,21 @@ AI-sailing-system/
 - [ ] Coral preprocess + vision LLM
 - [ ] grafana-sail dashboards (current vs best trim)
 
-### Phase 4 — Multi-Pi & remote ops
-- [ ] Race profile (3-node) deployment guide
-- [ ] GHCR publish pipeline per tier
-- [ ] Watchtower harbor mode per compose file
-- [ ] tier-watchdog for compact profile
+### Phase 4 — GitHub CI/CD & multi-Pi ops
+- [ ] `.github/workflows/ci.yml` — lint + test on PR
+- [ ] `publish-sla-{1,2,3}.yml` — arm64 build → GHCR
+- [ ] `release.yml` — tag → `deploy/locks/{version}.env`
+- [ ] `docker-compose.harbor.yml` + Watchtower (SLA-2/3 only)
+- [ ] `scripts/harbor-sync.sh` + `harbor-pull.sh`
+- [ ] Race profile (3-node) deployment guide + systemd units
 - [ ] Migrate `cogsail-python` mapping utilities
 
-### Phase 5 — Onshore training (SLA-S)
-- [ ] `training-export` harbor bundles
-- [ ] `docker-compose.sla-shore.yml` on GPU server
-- [ ] TrimTransformer training pipeline
+### Phase 5 — Shore training (gaming PC / SLA-S)
+- [ ] `training-export` harbor bundles (opt-in)
+- [ ] `shore/docker-compose.sla-shore.yml` on **local gaming PC** (CUDA)
+- [ ] TrimTransformer train/eval → GHCR `trim-predictor`
 - [ ] `trim-predictor` edge deployment to SLA-3
-- [ ] `BestTrimSnapshot` shore → boat sync
+- [ ] `BestTrimSnapshot` shore → boat Neo4j sync
 
 ---
 

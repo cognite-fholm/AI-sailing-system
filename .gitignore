@@ -9,9 +9,12 @@ Thumbs.db
 *.swo
 
 # Environment
+# Environment
 .env
 .env.*
 !.env.example
+deploy/env/*.env
+deploy/locks/current.env
 
 # Python
 __pycache__/

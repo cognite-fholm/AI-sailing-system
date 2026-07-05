@@ -1,0 +1,34 @@
+# Lint and test on pull requests and main
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate YAML configs
+        run: |
+          python -c "
+          import yaml, pathlib, sys
+          for p in pathlib.Path('config').glob('*.yaml'):
+              yaml.safe_load(p.read_text(encoding='utf-8'))
+              print('OK', p)
+          "
+
+      - name: Check ADR index
+        run: test -f adr/README.md
+
+      # Placeholder — extend when service code lands:
+      # - ruff check (Python services)
+      # - npm test (course-editor)

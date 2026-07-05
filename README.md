@@ -4,15 +4,17 @@ An edge-first, AI-assisted competitive sailing platform built on [Signal K](http
 
 ## Status
 
-**Phase 0 — Specification.** This repository currently contains architecture documentation only.
+**Phase 0 — Specification.** Architecture, ADRs, deploy scaffolding, and GitHub Actions workflow stubs.
 
 ## Documentation
 
 | Document | Purpose |
 |----------|---------|
 | [spec.md](./spec.md) | System specification, architecture, technology choices, and lineage from prior CogSail work |
-| [adr/0005-course-parsing-handicaps-live-results.md](./adr/0005-course-parsing-handicaps-live-results.md) | SI course parsing, handicaps, live results |
-| [adr/0006-start-boat-course-flags.md](./adr/0006-start-boat-course-flags.md) | Multi-course regattas, start-boat flag signaling, vision assist |
+| [docs/deployment-lifecycle.md](./docs/deployment-lifecycle.md) | GitHub + Docker CI/CD, Pi deploy, race freeze, shore PC |
+| [deploy/README.md](./deploy/README.md) | Env templates, digest locks, guardrails checklist |
+| [adr/0001-system-architecture-and-technology-choices.md](./adr/0001-system-architecture-and-technology-choices.md) | Architecture Decision Record for core platform choices |
+| [adr/0008-github-docker-deployment-lifecycle.md](./adr/0008-github-docker-deployment-lifecycle.md) | CI/CD, GHCR, Compose, Watchtower, gaming PC SLA-S |
 
 ## Goal
 
@@ -25,11 +27,13 @@ Help sailors **win races** by combining real-time onboard sensor data, historica
 | **SLA-1** | On-boat telemetry (Signal K, InfluxDB) | Dedicated Pi + PiCAN-M |
 | **SLA-2** | Race & competitor info (Neo4j, GRIB, polars, AIS, wind zones) | Separate Pi (or shared with SLA-3) |
 | **SLA-3** | Sail performance vision (GoPro HERO13, Coral, vision LLM) | Separate Pi with Coral dongle |
-| **SLA-S** | Onshore TrimTransformer training (GPU servers, harbor export) | Shore only — not at sea |
+| **SLA-S** | Onshore TrimTransformer training (gaming PC + CUDA) | Home — harbor only |
 
 Each onboard tier has its own Docker Compose stack and may run on a **different Raspberry Pi**. See [spec.md §5](./spec.md#5-three-tier-sla-architecture).
 
-**GoPro + ML loop:** HERO13 cameras capture sail/boom imagery → geometry & condition matching onboard → harbor export trains **TrimTransformer** onshore → quantized model returns to boat. See [spec.md §7.9–7.11](./spec.md#79-gopro-hero13-black-fleet).
+**GoPro + ML loop:** HERO13 cameras → onboard geometry → harbor export → **TrimTransformer on gaming PC** → GHCR → boat. See [spec.md §7.9–7.11](./spec.md#79-gopro-hero13-black-fleet).
+
+**Delivery:** **GitHub Actions** builds arm64 images to **GHCR**; Pis run **Docker Compose** with harbor-only **Watchtower** ([§9](./spec.md#9-deployment-architecture), [ADR-0008](./adr/0008-github-docker-deployment-lifecycle.md)).
 
 **Wind & fleet:** GRIB refresh, polars, AIS, and wind-on-course analysis ([§7.12](./spec.md#712-grib-polars-ais--wind-on-course-analysis)).
 
@@ -48,4 +52,4 @@ Each onboard tier has its own Docker Compose stack and may run on a **different 
 
 This system evolves the [cognite-fholm](https://github.com/cognite-fholm) CogSail ecosystem, replacing cloud CDF dependencies with open, edge-native storage and adding competitive-sailing AI.
 
-See [spec.md § Lineage](./spec.md#9-lineage-from-cognite-fholm--cogsail) for the full mapping.
+See [spec.md §10 Lineage](./spec.md#10-lineage-from-cognite-fholm--cogsail) for the full mapping.

@@ -49,7 +49,9 @@ We will implement the **AI Sailing System** with the following architecture:
 | Edge ML (non-LLM) | **Google Coral** + TFLite |
 | Coach / analytics API | **Python** (FastAPI) |
 | Deployment | **Docker Compose** on `linux/arm64` |
-| Remote updates | **Watchtower** (harbor mode only) + GHCR images |
+| CI/CD | **GitHub Actions** → **GHCR** |
+| Remote updates | **Watchtower** (harbor mode only, SLA-2/3) + manual digest-pinned compose |
+| Shore training | **Gaming PC** (SLA-S) — see [ADR-0008](./0008-github-docker-deployment-lifecycle.md) |
 
 ### Architectural principles
 
@@ -60,6 +62,7 @@ We will implement the **AI Sailing System** with the following architecture:
 5. **LLaMA runs on CPU** via llama.cpp; Coral handles separate ML tasks, not transformer LLMs.
 6. **Offline by default** — cloud is optional; no runtime dependency on Cognite or external APIs during races.
 7. **Three SLA tiers** — see [ADR-0002](./0002-three-tier-sla-architecture.md); isolated containers, optional multi-Pi deployment.
+8. **GitHub + Docker for delivery** — Actions CI, GHCR registry, Compose on Pi; no cloud orchestration ([ADR-0008](./0008-github-docker-deployment-lifecycle.md)).
 
 ---
 
@@ -118,7 +121,8 @@ Industry standard pairing with InfluxDB; supports alerting, annotations (race st
 ### Why Docker Compose + Watchtower?
 
 - **Reproducible** arm64 images across dev and Pi.
-- **Remote upgrades:** push to GHCR; Watchtower pulls when `RACE_MODE=false` and network is available.
+- **Remote upgrades:** GitHub Actions publishes to GHCR; Watchtower pulls when `RACE_MODE=false` and network is available (SLA-2/3 only).
+- **Regatta freeze:** digest lock files in `deploy/locks/` — see ADR-0008.
 - **Signal K caveat:** use host networking for CAN/serial stability; restart only in harbor per spec §8.2.
 - **Offline fallback:** `docker load` from USB.
 

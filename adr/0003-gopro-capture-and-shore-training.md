@@ -17,8 +17,8 @@ Requirements:
 2. Programmatic trigger from the vision Pi without crew handling cameras.
 3. Tight alignment between images and SLA-1 telemetry.
 4. Onboard comparison without internet.
-5. Periodic harbor export to train larger **transformer models** on GPU servers.
-6. Deploy learned models back to the boat.
+5. Periodic harbor export to train larger **transformer models** on **local gaming PC** (SLA-S).
+6. Deploy learned models back to the boat via GHCR harbor pull.
 
 Generic USB cameras lack waterproof mounts, wide FOV options, and a documented machine API. **GoPro HERO13 Black** supports the official **Open GoPro** BLE/Wi-Fi API and is already used in marine-adjacent edge workflows.
 
@@ -34,13 +34,15 @@ Generic USB cameras lack waterproof mounts, wide FOV options, and a documented m
 4. Store **`BestTrimSnapshot`** and **`SailGeometry`** in SLA-2 Neo4j for condition-similarity lookup.
 5. Harbor-only **`training-export`** builds multimodal bundles with explicit **opt-in consent**.
 
-### Onshore (SLA-S)
+### Onshore (SLA-S) — gaming PC
 
-1. Train **TrimTransformer** — multimodal model with telemetry encoder + multi-view vision encoder + cross-attention fusion.
-2. Predict **`OptimalTrim`** vector: boom angle, mast heel, draft position, camber, twist, vang/cunningham/outhaul proxies.
-3. Label from top-decile VMG segments, expert annotation, and LLM-assisted pre-labeling.
-4. Quantize to **ONNX INT8** (`trim-predictor-lite`) for SLA-3 edge inference.
-5. Publish **`BestTrimSnapshot`** sets back to boat Neo4j after each training round.
+1. Train **TrimTransformer** on a **personal gaming PC** with NVIDIA GPU (CUDA) — not a cloud VM.
+2. Run `shore/docker-compose.sla-shore.yml` (dataset curator, trainer, evaluator, local MLflow).
+3. Predict **`OptimalTrim`** vector: boom angle, mast heel, draft position, camber, twist, vang/cunningham/outhaul proxies.
+4. Label from top-decile VMG segments, expert annotation, and LLM-assisted pre-labeling.
+5. Quantize to **ONNX INT8** (`trim-predictor-lite`) for SLA-3 edge inference.
+6. Publish to **GHCR**; harbor pull on `vision.local`.
+7. Export **`BestTrimSnapshot`** sets back to boat Neo4j after each training round.
 
 ---
 
@@ -68,11 +70,12 @@ Generic USB cameras lack waterproof mounts, wide FOV options, and a documented m
 - **TrimTransformer** generalizes to unseen condition combinations as fleet data grows.
 - Hybrid: neural predictor when artifact present; k-NN fallback when offline or low confidence.
 
-### Why shore training (not on Pi)?
+### Why shore training on gaming PC (not cloud GPU)?
 
 - Multi-view ViT + temporal encoder requires **GPU memory** impractical on Pi 5.
-- Training is **harbor-only**; inference is quantized on SLA-3.
-- Aligns with FR-31: no off-device transfer without opt-in export.
+- Training is **harbor-only** and infrequent — sunk-cost gaming PC beats recurring cloud GPU + egress.
+- Same Docker toolchain as edge; publish artifacts to GHCR from home network.
+- Aligns with FR-100 and ADR-0008 minimal-cost delivery model.
 
 ---
 
@@ -112,6 +115,10 @@ Generic USB cameras lack waterproof mounts, wide FOV options, and a documented m
 ### B. Train only on Pi (no shore)
 
 **Rejected.** Cannot fit multi-view transformer training on arm64 Pi; shore pipeline required for quality targets.
+
+### B2. Cloud GPU VM (Azure/AWS) for shore training
+
+**Rejected.** Gaming PC is more cost-effective for sporadic post-regatta training; GHCR still used for artifact delivery.
 
 ### C. Cloud SaaS vision API
 
