@@ -2,7 +2,7 @@
 
 Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, data stores, and reference products fit together. Normative detail remains in [spec.md](../spec.md) and [adr/](../adr/).
 
-**Last updated:** 2026-07-05 · **Spec version:** 0.13.0-draft
+**Last updated:** 2026-07-05 · **Spec version:** 0.17.0-draft
 
 ---
 
@@ -231,11 +231,19 @@ Bring a **laptop** on boat Wi‑Fi; Cursor connects to `race-mcp-gateway` at `ht
 
 ## Implementation status
 
+Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../spec.md#14-implementation-phases). ADR build order: [adr/README.md](../adr/README.md#implementation-order).
+
 | Phase | Status |
 |-------|--------|
-| **0 — Specification** | **Current** — spec, ADRs, data repo examples, skills, MCP gateway scaffold |
+| **0 — Foundation** | **Current** — spec v0.17, ADRs 0001–0017, deploy scaffolding |
 | **1 — SLA-1 telemetry** | Not started |
-| **2 — SLA-2 race** | Not started |
+| **2A — Shore race prep** | **Partial** — data repo skills, Færder examples; waypoint gaps remain |
+| **2B — Graph import** | Not started |
+| **2C — GRIB, polars, AIS** | Not started |
+| **2D — Courses & results** | Not started |
+| **2E — Race UX** | Not started |
+| **2F — Analytics & alerts** | Not started |
+| **2G — Laptop MCP** | Scaffold only (`race-mcp-gateway/`) |
 | **3 — SLA-3 vision** | Not started |
 | **4 — CI/CD multi-Pi** | Workflow stubs only |
 | **5 — Shore training** | Spec only |

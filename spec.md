@@ -1,7 +1,8 @@
 # AI Sailing System — Specification
 
-**Version:** 0.16.0-draft  
+**Version:** 0.17.0-draft  
 **Date:** 2026-07-05  
+**Changelog (0.17):** Implementation map — spec §1.1, §7.0, §14 phases; ADR index reordered by build sequence.  
 **Changelog (0.16):** Marine map GPX export bundle for chartplotter import (ADR-0017, §7.23).  
 **Changelog (0.15):** Fleet polar performance timeline for all boats in InfluxDB (ADR-0016, §7.22).  
 **Changelog (0.14):** Tactical insight alerts with UX feed and optional voice annunciation (ADR-0015, §7.21).  
@@ -32,11 +33,63 @@ The platform is organized into **three SLA tiers**, each running in **dedicated 
 
 **Marine map export:** [§7.23](#723-marine-map-gpx-export) — PredictWind-compatible GPX route zip per race for Navionics/chartplotter import ([ADR-0017](./adr/0017-marine-map-gpx-export.md)).
 
+**Implementing?** Read [§1.1 Implementation map](#11-implementation-map) and [§14 Implementation phases](#14-implementation-phases) first — §7 sections are grouped by *domain*, not build order.
+
 | Tier | Domain | SLA priority |
 |------|--------|----------------|
 | **SLA-1** | On-boat telemetry | Critical — must never fail during a race |
 | **SLA-2** | Race & competitor information | Important — tactical context; GRIB, polars, AIS, wind-on-course |
 | **SLA-3** | Sail performance (vision / LLM) | Analytical — best-effort; heaviest compute |
+
+### 1.1 Implementation map
+
+Normative detail stays in §7–§11 and ADRs. This table is the **recommended build sequence**. Shore prep (Phase 2A) can run in parallel with Phase 1 on a laptop.
+
+| Phase | What to build | ADRs | Spec §7 | FR §11 | Key services / artifacts |
+|-------|---------------|------|---------|--------|--------------------------|
+| **0** | Spec, repos, deploy scaffold | [0001](./adr/0001-system-architecture-and-technology-choices.md), [0002](./adr/0002-three-tier-sla-architecture.md), [0008](./adr/0008-github-docker-deployment-lifecycle.md), [0009](./adr/0009-dual-repository-race-data.md) | [§5](./spec.md#5-three-tier-sla-architecture), [§5.7](./spec.md#57-dual-repository-architecture), [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§9](./spec.md#9-deployment-architecture) | [11.6](./spec.md#116-operations) | Compose stubs, `race-data-sync` scaffold |
+| **1** | SLA-1 telemetry | [0001](./adr/0001-system-architecture-and-technology-choices.md), [0011](./adr/0011-bg-h5000-reference-model.md) (ingest) | [§7.1](./spec.md#71-signal-k-server-hub--sla-1-only), [§7.2](./spec.md#72-time-series--influxdb--sla-1-only), [§7.4](./spec.md#74-visualization--grafana) | [11.1](./spec.md#111-sla-1--telemetry) | `signalk-server`, `signalk-influx-bridge`, `grafana-telemetry` |
+| **2A** | Shore race prep (data repo) | [0009](./adr/0009-dual-repository-race-data.md), [0013](./adr/0013-orc-certificate-fleet-collection.md), [0014](./adr/0014-shore-weather-current-collection.md), [0017](./adr/0017-marine-map-gpx-export.md) | [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§7.19](./spec.md#719-orc-certificate-collection--fleet-enrichment), [§7.20](./spec.md#720-shore-weather--current-collection), [§7.23](./spec.md#723-marine-map-gpx-export) | [11.9](./spec.md#119-orc-certificate-collection-shore), [11.10](./spec.md#1110-shore-weather--current-collection), [11.13](./spec.md#1113-marine-map-gpx-export) | [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) skills, YAML, `export/marine-map/` |
+| **2B** | Graph import & sync | [0009](./adr/0009-dual-repository-race-data.md) | [§7.3](./spec.md#73-knowledge-graph--neo4j--sla-2-only), [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) (import) | `neo4j`, `race-data-sync`, `race-import` |
+| **2C** | GRIB, polars, AIS, wind | [0004](./adr/0004-grib-polars-ais-wind-analysis.md) | [§7.12](./spec.md#712-grib-polars-ais--wind-on-course-analysis) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-15–26 | `grib-ingest`, `grib-parser`, `polar-manager`, `polar-certificate-extractor`, `ais-collector`, `wind-field-analyzer` |
+| **2D** | Courses, handicaps, results | [0005](./adr/0005-course-parsing-handicaps-live-results.md), [0006](./adr/0006-start-boat-course-flags.md) | [§7.13](./spec.md#713-race-courses-waypoints--live-results), [§7.14](./spec.md#714-handicap-numbers--scoring) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-27–41 | `course-parser`, `course-editor`, `course-flag-detector`, `handicap-manager`, `live-results` |
+| **2E** | Race UX (iRegatta + H5000 parity) | [0010](./adr/0010-iregatta-reference-model.md), [0011](./adr/0011-bg-h5000-reference-model.md) | [§7.6](./spec.md#76-race-intelligence-service--sla-2-only), [§7.16](./spec.md#716-iregatta-reference-model--feature-traceability), [§7.17](./spec.md#717-bg-h5000-reference-model--integration) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-42–59, [11.7](./spec.md#117-bg-h5000-integration--display-parity) | `race-intelligence`, `grafana-race` (SailSteer, Start, Highway) |
+| **2F** | Fleet analytics & alerts | [0016](./adr/0016-fleet-polar-performance-influx.md), [0015](./adr/0015-tactical-insight-alerts-annunciation.md) | [§7.22](./spec.md#722-fleet-polar-performance-timeline), [§7.21](./spec.md#721-tactical-insight-alerts--annunciation), [§7.5](./spec.md#75-ai--llama--coral) (coach) | [11.11](./spec.md#1111-tactical-insight-alerts--annunciation), [11.12](./spec.md#1112-fleet-polar-performance-timeline-influxdb), [11.5](./spec.md#115-ai-coaching-cross-tier) | `fleet-performance-tracker`, `insight-alerts`, `tactical-coach` |
+| **2G** | Race laptop MCP | [0012](./adr/0012-race-side-mcp-laptop-cursor.md) | [§7.18](./spec.md#718-race-side-mcp--laptop-cursor) | [11.8](./spec.md#118-race-side-mcp-laptop-cursor) | `race-mcp-gateway` |
+| **3** | SLA-3 sail vision | [0003](./adr/0003-gopro-capture-and-shore-training.md) | [§7.9](./spec.md#79-gopro-hero13-black-fleet)–[§7.11](./spec.md#711-onshore-transformer-training-pipeline), [§7.7](./spec.md#77-sail-vision-service-sla-3) | [11.3](./spec.md#113-sla-3--sail-performance-vision-gopro-hero13), [11.4](./spec.md#114-onshore-training-sla-s) | `gopro-orchestrator`, `sail-geometry`, `sail-analysis-api`, Coral |
+| **4** | CI/CD & multi-Pi ops | [0008](./adr/0008-github-docker-deployment-lifecycle.md) | [§9](./spec.md#9-deployment-architecture) | [11.6](./spec.md#116-operations) | GitHub Actions → GHCR, Watchtower, harbor scripts |
+| **5** | Shore TrimTransformer (SLA-S) | [0003](./adr/0003-gopro-capture-and-shore-training.md) | [§7.11](./spec.md#711-onshore-transformer-training-pipeline), [§9.6](./spec.md#96-shore-training--gaming-pc-sla-s) | [11.4](./spec.md#114-onshore-training-sla-s) | Gaming PC, `trim-transformer-trainer`, GHCR `trim-predictor` |
+
+```mermaid
+flowchart LR
+  P0[Phase 0 Foundation]
+  P1[Phase 1 SLA-1]
+  P2A[Phase 2A Shore prep]
+  P2B[Phase 2B Import]
+  P2C[Phase 2C GRIB AIS]
+  P2D[Phase 2D Courses]
+  P2E[Phase 2E Race UX]
+  P2F[Phase 2F Analytics]
+  P2G[Phase 2G MCP]
+  P3[Phase 3 Vision]
+  P4[Phase 4 CI/CD]
+  P5[Phase 5 SLA-S]
+
+  P0 --> P1
+  P0 --> P2A
+  P1 --> P2B
+  P2A --> P2B
+  P2B --> P2C
+  P2C --> P2D
+  P2D --> P2E
+  P2E --> P2F
+  P2B --> P2G
+  P2F --> P3
+  P1 --> P4
+  P3 --> P5
+```
+
+ADR index by build order: [adr/README.md](./adr/README.md#implementation-order). §7 reading order: [§7.0](#70-implementation-order--section-index).
 
 The system is designed to:
 
@@ -651,6 +704,41 @@ stateDiagram-v2
 ---
 
 ## 7. Software components
+
+§7 sections below are ordered by **domain** (storage, vision, race logic, shore tools). For **build order**, use [§1.1](#11-implementation-map) and [§7.0](#70-implementation-order--section-index).
+
+### 7.0 Implementation order — section index
+
+Read and implement §7 subsections in this sequence (links stay stable):
+
+| Order | § | Topic | Phase |
+|-------|---|-------|-------|
+| 1 | [7.15](#715-race--boat-data-repository-ai-sailing-data) | Data repo model | 0, 2A |
+| 2 | [7.1](#71-signal-k-server-hub--sla-1-only) | Signal K | 1 |
+| 3 | [7.2](#72-time-series--influxdb--sla-1-only) | InfluxDB | 1 |
+| 4 | [7.4](#74-visualization--grafana) | Grafana (per tier) | 1+ |
+| 5 | [7.19](#719-orc-certificate-collection--fleet-enrichment) | ORC shore collection | 2A |
+| 6 | [7.20](#720-shore-weather--current-collection) | Weather shore collection | 2A |
+| 7 | [7.23](#723-marine-map-gpx-export) | Marine map GPX | 2A |
+| 8 | [7.3](#73-knowledge-graph--neo4j--sla-2-only) | Neo4j | 2B |
+| 9 | [7.12](#712-grib-polars-ais--wind-on-course-analysis) | GRIB, polars, AIS, wind | 2C |
+| 10 | [7.14](#714-handicap-numbers--scoring) | Handicaps | 2D |
+| 11 | [7.13](#713-race-courses-waypoints--live-results) | Courses & live results | 2D |
+| 12 | [7.6](#76-race-intelligence-service--sla-2-only) | Race intelligence | 2E |
+| 13 | [7.16](#716-iregatta-reference-model--feature-traceability) | iRegatta parity | 2E |
+| 14 | [7.17](#717-bg-h5000-reference-model--integration) | H5000 parity | 2E |
+| 15 | [7.22](#722-fleet-polar-performance-timeline) | Fleet polar % Influx | 2F |
+| 16 | [7.21](#721-tactical-insight-alerts--annunciation) | Tactical alerts | 2F |
+| 17 | [7.5](#75-ai--llama--coral) | LLM coach | 2F |
+| 18 | [7.18](#718-race-side-mcp--laptop-cursor) | Laptop MCP | 2G |
+| 19 | [7.9](#79-gopro-hero13-black-fleet)–[7.11](#711-onshore-transformer-training-pipeline) | GoPro & training | 3, 5 |
+| 20 | [7.7](#77-sail-vision-service-sla-3) | Sail vision API | 3 |
+| 21 | [7.10](#710-sail-geometry--condition-similarity) | Sail geometry | 3 |
+| 22 | [7.8](#78-web-crawler-integration-optional-online) | Web crawler (optional) | 2D+ |
+
+Reference-only sections ([§7.16](#716-iregatta-reference-model--feature-traceability), [§7.17](#717-bg-h5000-reference-model--integration)) inform Phase 2E dashboards and YAML in the data repo.
+
+---
 
 ### 7.1 Signal K Server (hub) — **SLA-1 only**
 
@@ -3838,6 +3926,20 @@ flowchart LR
 
 ## 11. Functional requirements
 
+FR subsections below follow **SLA tier** grouping. For **build order**, use [§1.1](#11-implementation-map):
+
+| Build phase | FR subsections |
+|-------------|----------------|
+| 0, 4 | [11.6](#116-operations) |
+| 1 | [11.1](#111-sla-1--telemetry) |
+| 2A | [11.9](#119-orc-certificate-collection-shore), [11.10](#1110-shore-weather--current-collection), [11.13](#1113-marine-map-gpx-export) |
+| 2B–2D | [11.2](#112-sla-2--race-competitors-grib-polars--wind) FR-10–41 |
+| 2E | [11.2](#112-sla-2--race-competitors-grib-polars--wind) FR-42–59, [11.7](#117-bg-h5000-integration--display-parity) |
+| 2F | [11.11](#1111-tactical-insight-alerts--annunciation), [11.12](#1112-fleet-polar-performance-timeline-influxdb), [11.5](#115-ai-coaching-cross-tier) |
+| 2G | [11.8](#118-race-side-mcp-laptop-cursor) |
+| 3 | [11.3](#113-sla-3--sail-performance-vision-gopro-hero13) |
+| 5 | [11.4](#114-onshore-training-sla-s) |
+
 ### 11.1 SLA-1 — Telemetry
 
 | ID | Requirement |
@@ -4189,41 +4291,93 @@ AI-sailing-system/
 
 ## 14. Implementation phases
 
-### Phase 0 — Specification (current)
+Phases match [§1.1 Implementation map](#11-implementation-map). Checklists are ordered for execution; ADR numbers stay chronological.
 
-- [x] Repository created; [spec.md](./spec.md) v0.11
+### Phase 0 — Foundation (current)
+
+- [x] Repository created; [spec.md](./spec.md) v0.17
 - [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
-- [x] ADR-0001 through ADR-0006, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013
-- [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide
-- [x] Reference models: iRegatta (§7.16), B&G H5000 (§7.17); ORC collection skill (§7.19); weather/current skills (§7.20); tactical insight alerts (§7.21); fleet polar performance Influx (§7.22); marine map GPX export (§7.23)
+- [x] ADR-0001 through ADR-0017 (see [adr/README.md](./adr/README.md#implementation-order))
+- [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide + user guides
 - [x] Deploy scaffolding, workflow stubs, harbor scripts
 - [ ] Runtime containers (Phase 1+)
 
 ### Phase 1 — SLA-1 telemetry (MVP)
+
+**ADR:** 0001, 0011 (ingest) · **§7:** 7.1, 7.2, 7.4 · **FR:** 11.1
+
 - [ ] Signal K on Pi with PiCAN-M
 - [ ] `docker-compose.sla-1.yml`
 - [ ] InfluxDB bridge
 - [ ] grafana-telemetry live dashboard
 
-### Phase 2 — SLA-2 race, GRIB, polars, AIS, courses & results
-- [ ] Neo4j schema (Vessel, Polar, GribModel, WindAdvantageZone, Waypoint, HandicapRating)
-- [ ] `docker-compose.sla-2.yml`
+### Phase 2A — Shore race prep (AI-sailing-data)
+
+**ADR:** 0009, 0013, 0014, 0017 · **§7:** 7.15, 7.19, 7.20, 7.23 · **FR:** 11.9, 11.10, 11.13
+
+Runs onshore (laptop); can parallel Phase 1.
+
+- [x] Race prep skills + `RACE_PREPARATION_GUIDE.md` in data repo
+- [x] ORC certificate collection skill (`orc-sailor-services`)
+- [x] MET GRIB, Oslofjord current plots, SMHI wind skills
+- [x] Marine map GPX export skill + Færder example
+- [ ] Complete waypoint lat/lon for all course variants
+- [ ] `prep-status.yaml` on all target races
+
+### Phase 2B — Graph import & sync
+
+**ADR:** 0009 · **§7:** 7.3, 7.15 · **FR:** 11.2 (import subset)
+
+- [ ] Neo4j schema (Vessel, Polar, GribModel, Waypoint, HandicapRating, …)
+- [ ] `docker-compose.sla-2.yml` (core services)
+- [ ] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
+
+### Phase 2C — GRIB, polars, AIS, wind
+
+**ADR:** 0004 · **§7:** 7.12 · **FR:** 11.2 FR-15–26
+
 - [ ] `ais-collector` + `polar-manager` (SLK + ORC PDF)
 - [ ] `grib-ingest` + `grib-parser` + `wind-field-analyzer`
+- [ ] Shore GRIB assets from data repo → runtime ingest
+
+### Phase 2D — Courses, handicaps, live results
+
+**ADR:** 0005, 0006 · **§7:** 7.13, 7.14 · **FR:** 11.2 FR-27–41
+
 - [ ] `course-parser` — Færderseilasen §11 PDF
 - [ ] `course-editor` — React/TS waypoint + Start Line flag/course selection UI
 - [ ] `course-flag-detector` — optional start-boat flag vision
 - [ ] `handicap-manager` — ORC certificate + WRS TCF
 - [ ] `live-results` — corrected-time standings + VMG
+
+### Phase 2E — Race UX (iRegatta + H5000 parity)
+
+**ADR:** 0010, 0011 · **§7:** 7.6, 7.16, 7.17 · **FR:** 11.2 FR-42–59, 11.7
+
+- [ ] `race-intelligence` — start line, lift, steering
+- [ ] grafana-race dashboards (SailSteer, Start, WindPlot, Highway)
+
+### Phase 2F — Fleet analytics & tactical alerts
+
+**ADR:** 0015, 0016 · **§7:** 7.21, 7.22, 7.5 · **FR:** 11.11, 11.12, 11.5
+
 - [ ] `fleet-performance-tracker` — fleet polar % timeline → Influx ([ADR-0016](./adr/0016-fleet-polar-performance-influx.md))
-- [ ] `race-intelligence` — start line, lift, steering (iRegatta + H5000 parity)
 - [ ] `insight-alerts` — tactical alert broker, Grafana/course-editor UX, optional Piper TTS ([ADR-0015](./adr/0015-tactical-insight-alerts-annunciation.md))
-- [ ] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
+- [ ] grafana-race **Alert feed** (§7.21) + **Fleet Performance** panel (§7.22)
+- [ ] `tactical-coach` — LLM context from alerts + telemetry
+
+### Phase 2G — Race laptop MCP
+
+**ADR:** 0012 · **§7:** 7.18 · **FR:** 11.8
+
 - [x] `race-mcp-gateway` scaffold — Neo4j + Influx MCP (`race-mcp-gateway/`)
-- [ ] Shore ORC pipeline documented — runtime uses data repo assets ([ADR-0013](./adr/0013-orc-certificate-fleet-collection.md))
-- [ ] grafana-race dashboards (SailSteer, Start, WindPlot, Highway, **Alert feed** per §7.17, §7.21, **Fleet Performance** per §7.22)
+- [ ] Auth, rate limits, read-only production profile
+- [ ] Cursor MCP config template in data repo (`race-laptop-mcp` skill)
 
 ### Phase 3 — SLA-3 GoPro sail vision
+
+**ADR:** 0003 · **§7:** 7.9–7.11, 7.7 · **FR:** 11.3
+
 - [ ] `docker-compose.sla-3.yml`
 - [ ] `gopro-orchestrator` — HERO13 fleet (Open GoPro)
 - [ ] `sail-geometry` + `condition-matcher`
@@ -4231,6 +4385,11 @@ AI-sailing-system/
 - [ ] grafana-sail dashboards (current vs best trim)
 
 ### Phase 4 — GitHub CI/CD & multi-Pi ops
+
+**ADR:** 0008 · **§9** · **FR:** 11.6
+
+Can start after Phase 1 stabilizes.
+
 - [ ] `.github/workflows/ci.yml` — lint + test on PR
 - [ ] `publish-sla-{1,2,3}.yml` — arm64 build → GHCR
 - [ ] `release.yml` — tag → `deploy/locks/{version}.env`
@@ -4240,6 +4399,9 @@ AI-sailing-system/
 - [ ] Migrate `cogsail-python` mapping utilities
 
 ### Phase 5 — Shore training (gaming PC / SLA-S)
+
+**ADR:** 0003 · **§7.11**, **§9.6** · **FR:** 11.4
+
 - [ ] `training-export` harbor bundles (opt-in)
 - [ ] `shore/docker-compose.sla-shore.yml` on **local gaming PC** (CUDA)
 - [ ] TrimTransformer train/eval → GHCR `trim-predictor`

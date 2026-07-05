@@ -4,7 +4,7 @@ An edge-first, AI-assisted competitive sailing platform built on [Signal K](http
 
 ## Status
 
-**Phase 0 — Specification.** Architecture, ADRs, deploy scaffolding, and GitHub Actions workflow stubs.
+**Phase 0 — Foundation.** Architecture, ADRs, deploy scaffolding, and GitHub Actions workflow stubs. **Build order:** [spec §1.1](./spec.md#11-implementation-map) · [adr/README](./adr/README.md#implementation-order).
 
 ## Documentation
 
