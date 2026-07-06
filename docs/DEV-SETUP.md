@@ -87,10 +87,10 @@ git clone https://github.com/cognite-fholm/AI-sailing-system.git
 cd C:\Repositories\boat_system\AI-sailing-system
 copy deploy\env\dev.env.example deploy\env\dev.env
 
-# SLA-1 — Signal K, InfluxDB, bridge, Grafana telemetry
+# SLA-1 — Signal K, InfluxDB, bridge, course sync, polar performance, Grafana telemetry
 docker compose -f docker-compose.sla-1.yml -f docker-compose.dev.yml --env-file deploy/env/dev.env up -d --build
 
-# SLA-2 — Neo4j, race-import, race-data-sync
+# SLA-2 — Neo4j, polar-manager, race-import, race-data-sync
 docker compose -f docker-compose.sla-2.yml -f docker-compose.dev-sla2.yml --env-file deploy/env/dev.env up -d --build
 
 # Import graph from mounted data repo
@@ -102,8 +102,11 @@ Invoke-RestMethod -Uri http://localhost:8080/import -Method Post -ContentType "a
 |---------|-----|
 | Grafana telemetry | http://localhost:3001 |
 | Signal K | http://localhost:3000 |
+| polar-manager health | http://localhost:8092/health |
 | Neo4j browser | http://localhost:7474 |
 | race-import health | http://localhost:8080/health |
+
+**Polar performance on laptop:** run **both** stacks so `signalk-polar-performance` can reach `polar-manager` at `host.docker.internal:8092` (default in `docker-compose.dev.yml`). On race Pis set `POLAR_MANAGER_URL` to the SLA-2 host (e.g. `http://192.168.4.2:8092`).
 
 ---
 

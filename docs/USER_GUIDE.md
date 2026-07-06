@@ -33,7 +33,7 @@ Three **SLA tiers** on Raspberry Pi (may be separate devices):
 
 | Tier | What you see | Typical URL |
 |------|--------------|-------------|
-| **SLA-1** | Instruments, SOG, wind, depth | Grafana telemetry `:3001`, Signal K `:3000` |
+| **SLA-1** | Instruments, SOG, wind, depth, course VMG/XTE, polar % | Grafana telemetry `:3001`, Signal K `:3000` |
 | **SLA-2** | Fleet map, standings, GRIB, polars, alerts | `race-ui` (primary helm UX), Grafana race `:3002` |
 | **SLA-3** | Sail camera / trim analysis | Grafana sail (when deployed) |
 
@@ -47,7 +47,7 @@ Hostname examples: `telemetry.local`, `race.local` (boat LAN).
    - Pi/Linux: `curl -sS -X POST http://localhost:8080/import -H "Content-Type: application/json" -d "{}"`
    - Windows laptop dev: `Invoke-RestMethod -Uri http://localhost:8080/import -Method Post -ContentType "application/json" -Body "{}"`
 4. **Copy:** GRIB to `/data/grib/`; GPX zip to phone/chartplotter
-5. **Verify:** Polar loads for `active_certificate_ref`
+5. **Verify:** Polar loads — `Invoke-RestMethod http://localhost:8092/health` (or `curl` on Pi); course sync logs in `course-sk-sync` container
 
 Detail: [deployment-lifecycle.md](./deployment-lifecycle.md) · [data repo: Harbor guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/HARBOR_AND_RACE_WEEK.md)
 

@@ -27,6 +27,28 @@ services:
       SIGNALK_WS_URL: ws://signalk-server:3000/signalk/v1/stream?subscribe=all
       INFLUX_URL: http://influxdb:8086
 
+  course-sk-sync:
+    network_mode: bridge
+    depends_on:
+      signalk-server:
+        condition: service_started
+    volumes:
+      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
+      - ${DATA_REPO_HOST_PATH:-../AI-sailing-data}:/opt/ai-sailing-data:ro
+    environment:
+      SIGNALK_URL: http://signalk-server:3000
+      DATA_REPO_PATH: /opt/ai-sailing-data
+
+  signalk-polar-performance:
+    network_mode: bridge
+    depends_on:
+      signalk-server:
+        condition: service_started
+    environment:
+      SIGNALK_URL: http://signalk-server:3000
+      SIGNALK_WS_URL: ws://signalk-server:3000/signalk/v1/stream?subscribe=all
+      POLAR_MANAGER_URL: ${POLAR_MANAGER_URL:-http://host.docker.internal:8092}
+
   influxdb:
     ports:
       - "${INFLUX_PORT:-8086}:8086"

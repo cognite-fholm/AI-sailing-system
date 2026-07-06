@@ -54,6 +54,24 @@ services:
       NEO4J_PASSWORD: ${NEO4J_PASSWORD:-change-me-neo4j}
       RACE_IMPORT_PORT: "8080"
 
+  polar-manager:
+    build:
+      context: ./polar-manager
+      dockerfile: Dockerfile
+    image: ${POLAR_MANAGER_IMAGE:-ghcr.io/cognite-fholm/polar-manager:local}
+    container_name: polar-manager
+    restart: unless-stopped
+    ports:
+      - "${POLAR_MANAGER_PORT:-8092}:8092"
+    volumes:
+      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
+      - ${DATA_REPO_HOST_PATH:-./data/ai-sailing-data}:/opt/ai-sailing-data:ro
+    environment:
+      DATA_REPO_CONFIG: /config/data-repo.yaml
+      DATA_REPO_PATH: /opt/ai-sailing-data
+      POLAR_MANAGER_PORT: "8092"
+      DEFAULT_VESSEL_ID: ${VESSEL_ID:-own-boat}
+
   race-data-sync:
     build:
       context: ./race-data-sync

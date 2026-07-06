@@ -2,7 +2,7 @@
 
 Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, data stores, and reference products fit together. Normative detail remains in [spec.md](../spec.md) and [adr/](../adr/).
 
-**Last updated:** 2026-07-05 · **Spec version:** 0.20.0-draft
+**Last updated:** 2026-07-06 · **Spec version:** 0.21.0-draft
 
 ---
 
@@ -129,6 +129,7 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0015](../adr/0015-tactical-insight-alerts-annunciation.md) | Tactical insight alerts, UX feed, optional voice (Piper TTS) |
 | [0016](../adr/0016-fleet-polar-performance-influx.md) | Fleet polar performance timeline in InfluxDB |
 | [0017](../adr/0017-marine-map-gpx-export.md) | Marine map GPX export (PredictWind-compatible zip) |
+| [0021](../adr/0021-sla1-signalk-plugin-strategy.md) | SLA-1 Signal K plugins — course geometry + polar performance |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -184,13 +185,27 @@ Detail: [data repo schema/README.md](https://github.com/cognite-fholm/AI-sailing
 
 ---
 
+## Key services (SLA-1)
+
+| Service | Responsibility |
+|---------|----------------|
+| `signalk-server` | NMEA hub + `@signalk/course-provider` (VMG, XTE, DTM) |
+| `course-sk-sync` | Active `WaypointList` YAML → `navigation.course` (SLA-2 offline OK) |
+| `signalk-polar-performance` | `performance.*` from `polar-manager` target speeds |
+| `signalk-influx-bridge` | WebSocket → Influx `signalk` bucket |
+| `grafana-telemetry` | SOG, wind, course calc values, polar % history |
+
+ADR: [0021](../adr/0021-sla1-signalk-plugin-strategy.md) · Spec: [§7.1](../spec.md#71-signal-k-server-hub--sla-1-only)
+
+---
+
 ## Key services (SLA-2)
 
 | Service | Responsibility |
 |---------|----------------|
 | `race-data-sync` | `git pull` data repo via LTE/Wi‑Fi |
 | `race-import` | MERGE `neo4j/*.yaml` bundles |
-| `polar-manager` | SLK polars + H5000 CSV interop |
+| `polar-manager` | ORC target-speeds API (`GET /polars/{id}/target`); full SLK parser in Phase 2C |
 | `race-intelligence` | Start line, lift, laylines, steering hints |
 | `live-results` | VMG, corrected-time fleet rank |
 | `fleet-performance-tracker` | Fleet polar % vs certificate — 30 s series in Influx `race` bucket |
@@ -235,11 +250,11 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 
 | Phase | Status |
 |-------|--------|
-| **0 — Foundation** | **Done** — spec v0.20, ADRs 0001–0020, BDD scaffold |
-| **1 — SLA-1 telemetry** | **Scaffold** — `docker-compose.sla-1.yml`, bridge, Grafana provisioning; PiCAN ingest pending |
+| **0 — Foundation** | **Done** — spec v0.21, ADRs 0001–0021, BDD scaffold |
+| **1 — SLA-1 telemetry** | **Scaffold** — `course-provider`, `course-sk-sync`, `signalk-polar-performance`, bridge, Grafana; PiCAN ingest pending |
 | **2A — Shore race prep** | **Partial** — data repo skills, Færder examples; waypoint gaps remain |
 | **2B — Graph import** | **Scaffold** — `docker-compose.sla-2.yml`, `race-import`, `race-data-sync` |
-| **2C — GRIB, polars, AIS** | Not started |
+| **2C — GRIB, polars, AIS** | **Stub** — `polar-manager` target-speeds API only |
 | **2D — Courses & results** | Not started |
 | **2E — Race UX** | Not started |
 | **2F — Analytics & alerts** | Not started |
@@ -254,8 +269,8 @@ Detail: [spec §14](../spec.md#14-implementation-phases) · BDD: [tests/bdd/READ
 
 | Compose | Services (v1) |
 |---------|-----------------|
-| `docker-compose.sla-1.yml` | `signalk-server`, `influxdb`, `signalk-influx-bridge`, `grafana-telemetry` |
-| `docker-compose.sla-2.yml` | `neo4j`, `race-import`, `race-data-sync`, `race-mcp-gateway` (profile `mcp`) |
+| `docker-compose.sla-1.yml` | `signalk-server`, `course-sk-sync`, `signalk-polar-performance`, `influxdb`, `signalk-influx-bridge`, `grafana-telemetry` |
+| `docker-compose.sla-2.yml` | `neo4j`, `polar-manager`, `race-import`, `race-data-sync`, `race-mcp-gateway` (profile `mcp`) |
 | `docker-compose.dev.yml` | SLA-1 laptop overlay — bridge network |
 | `docker-compose.dev-sla2.yml` | SLA-2 laptop overlay — data-repo mount, sync policy |
 | `docker-compose.harbor.yml` | Watchtower overlay (SLA-2/3 only) |

@@ -1,7 +1,8 @@
 # AI Sailing System — Specification
 
-**Version:** 0.20.0-draft  
-**Date:** 2026-07-05  
+**Version:** 0.21.0-draft  
+**Date:** 2026-07-06  
+**Changelog (0.21):** SLA-1 Signal K plugin strategy — `@signalk/course-provider`, `course-sk-sync`, `signalk-polar-performance`, `polar-manager` stub ([ADR-0021](./adr/0021-sla1-signalk-plugin-strategy.md)).  
 **Changelog (0.20):** course-editor as coordinate system of record; GPX/Neo4j/runtime derived from editor saves ([ADR-0020](./adr/0020-course-editor-coordinate-system-of-record.md)).  
 **Changelog (0.19):** Three-Pi race deploy; helm UX (`race-ui` + Grafana scope); dual speaker / H5000-only safety ([ADR-0018](./adr/0018-helm-ux-three-pi-dual-speaker.md)); PredictWind multi-model GRIB + onboard scoring ([ADR-0019](./adr/0019-predictwind-multi-model-grib.md)).  
 **Changelog (0.18):** Gherkin acceptance tests per implementation phase (`tests/bdd/features/`).  
@@ -53,10 +54,10 @@ Normative detail stays in §7–§11 and ADRs. This table is the **recommended b
 | Phase | What to build | ADRs | Spec §7 | FR §11 | Key services / artifacts |
 |-------|---------------|------|---------|--------|--------------------------|
 | **0** | Spec, repos, deploy scaffold | [0001](./adr/0001-system-architecture-and-technology-choices.md), [0002](./adr/0002-three-tier-sla-architecture.md), [0008](./adr/0008-github-docker-deployment-lifecycle.md), [0009](./adr/0009-dual-repository-race-data.md) | [§5](./spec.md#5-three-tier-sla-architecture), [§5.7](./spec.md#57-dual-repository-architecture), [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§9](./spec.md#9-deployment-architecture) | [11.6](./spec.md#116-operations) | Compose stubs, `race-data-sync` scaffold |
-| **1** | SLA-1 telemetry | [0001](./adr/0001-system-architecture-and-technology-choices.md), [0011](./adr/0011-bg-h5000-reference-model.md) (ingest) | [§7.1](./spec.md#71-signal-k-server-hub--sla-1-only), [§7.2](./spec.md#72-time-series--influxdb--sla-1-only), [§7.4](./spec.md#74-visualization--grafana) | [11.1](./spec.md#111-sla-1--telemetry) | `signalk-server`, `signalk-influx-bridge`, `grafana-telemetry` |
+| **1** | SLA-1 telemetry | [0001](./adr/0001-system-architecture-and-technology-choices.md), [0011](./adr/0011-bg-h5000-reference-model.md) (ingest), [0021](./adr/0021-sla1-signalk-plugin-strategy.md) | [§7.1](./spec.md#71-signal-k-server-hub--sla-1-only), [§7.2](./spec.md#72-time-series--influxdb--sla-1-only), [§7.4](./spec.md#74-visualization--grafana) | [11.1](./spec.md#111-sla-1--telemetry) | `signalk-server` (+ `course-provider`), `course-sk-sync`, `signalk-polar-performance`, `signalk-influx-bridge`, `grafana-telemetry` |
 | **2A** | Shore race prep (data repo) | [0009](./adr/0009-dual-repository-race-data.md), [0013](./adr/0013-orc-certificate-fleet-collection.md), [0014](./adr/0014-shore-weather-current-collection.md), [0017](./adr/0017-marine-map-gpx-export.md) | [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§7.19](./spec.md#719-orc-certificate-collection--fleet-enrichment), [§7.20](./spec.md#720-shore-weather--current-collection), [§7.23](./spec.md#723-marine-map-gpx-export) | [11.9](./spec.md#119-orc-certificate-collection-shore), [11.10](./spec.md#1110-shore-weather--current-collection), [11.13](./spec.md#1113-marine-map-gpx-export) | [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) skills, YAML, `export/marine-map/` |
 | **2B** | Graph import & sync | [0009](./adr/0009-dual-repository-race-data.md) | [§7.3](./spec.md#73-knowledge-graph--neo4j--sla-2-only), [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) (import) | `neo4j`, `race-data-sync`, `race-import` |
-| **2C** | GRIB, polars, AIS, wind | [0004](./adr/0004-grib-polars-ais-wind-analysis.md), [0019](./adr/0019-predictwind-multi-model-grib.md) | [§7.12](./spec.md#712-grib-polars-ais--wind-on-course-analysis) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-15–26, [11.10](./spec.md#1110-shore-weather--current-collection) | `grib-ingest`, `grib-parser`, `grib-model-scorer`, `polar-manager`, `polar-certificate-extractor`, `ais-collector`, `wind-field-analyzer` |
+| **2C** | GRIB, polars, AIS, wind | [0004](./adr/0004-grib-polars-ais-wind-analysis.md), [0019](./adr/0019-predictwind-multi-model-grib.md) | [§7.12](./spec.md#712-grib-polars-ais--wind-on-course-analysis) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-15–26, [11.10](./spec.md#1110-shore-weather--current-collection) | `grib-ingest`, `grib-parser`, `grib-model-scorer`, `polar-manager` (full SLK), `polar-certificate-extractor`, `ais-collector`, `wind-field-analyzer` |
 | **2D** | Courses, handicaps, results | [0005](./adr/0005-course-parsing-handicaps-live-results.md), [0006](./adr/0006-start-boat-course-flags.md) | [§7.13](./spec.md#713-race-courses-waypoints--live-results), [§7.14](./spec.md#714-handicap-numbers--scoring) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-27–41 | `course-parser`, `course-editor`, `course-flag-detector`, `handicap-manager`, `live-results` |
 | **2E** | Race UX (iRegatta + H5000 parity) | [0010](./adr/0010-iregatta-reference-model.md), [0011](./adr/0011-bg-h5000-reference-model.md), [0018](./adr/0018-helm-ux-three-pi-dual-speaker.md) | [§7.4.1](./spec.md#741-race-helm-ui-grafana--signalk-plugins), [§7.6](./spec.md#76-race-intelligence-service--sla-2-only), [§7.16](./spec.md#716-iregatta-reference-model--feature-traceability), [§7.17](./spec.md#717-bg-h5000-reference-model--integration) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-42–59, [11.7](./spec.md#117-bg-h5000-integration--display-parity) | `race-ui`, `race-intelligence`, `grafana-race` |
 | **2F** | Fleet analytics & alerts | [0016](./adr/0016-fleet-polar-performance-influx.md), [0015](./adr/0015-tactical-insight-alerts-annunciation.md) | [§7.22](./spec.md#722-fleet-polar-performance-timeline), [§7.21](./spec.md#721-tactical-insight-alerts--annunciation), [§7.5](./spec.md#75-ai--llama--coral) (coach) | [11.11](./spec.md#1111-tactical-insight-alerts--annunciation), [11.12](./spec.md#1112-fleet-polar-performance-timeline-influxdb), [11.5](./spec.md#115-ai-coaching-cross-tier) | `fleet-performance-tracker`, `insight-alerts`, `tactical-coach` |
@@ -751,20 +752,35 @@ Reference-only sections ([§7.16](#716-iregatta-reference-model--feature-traceab
 
 ### 7.1 Signal K Server (hub) — **SLA-1 only**
 
-**Language:** Node.js (TypeScript for custom plugins)  
-**Source:** [SignalK/signalk-server](https://github.com/SignalK/signalk-server)
+**Language:** Node.js (upstream Signal K); Python sidecars for course/polar sync  
+**Source:** [SignalK/signalk-server](https://github.com/SignalK/signalk-server)  
+**ADR:** [0021 — SLA-1 Signal K plugin strategy](./adr/0021-sla1-signalk-plugin-strategy.md)
 
 Signal K is the **single source of truth** for live marine data. It:
 
 - Reads NMEA 0183 and NMEA 2000 via PiCAN-M interfaces.
 - Exposes `ws://localhost:3000/signalk/v1/stream` for subscribers.
-- Hosts plugins for InfluxDB export, Neo4j event emission, and coach triggers.
+- Hosts **`@signalk/course-provider`** for geometric course metrics (VMG, XTE, DTM, BTM, TTG).
+- Receives active route waypoints from **`course-sk-sync`** (data-repo YAML → `navigation.course`).
+- Receives polar performance deltas from **`signalk-polar-performance`** (`performance.*` paths).
 
-**Custom plugins planned:**
+**SLA-1 plugin stack (ADR-0021):**
+
+| Component | Type | Responsibility |
+|-----------|------|----------------|
+| `@signalk/course-provider` | npm plugin in custom `signalk-server` image | Great-circle / rhumbline geometry from `navigation.course` |
+| `course-sk-sync` | Python sidecar | Push active `WaypointList` YAML → SK course points (works when SLA-2 offline) |
+| `signalk-polar-performance` | Python sidecar | `performance.polarSpeed`, `performance.polarSpeedRatio`, `performance.targetAngle` from `polar-manager` |
+| `signalk-influx-bridge` | Python sidecar | Persist raw nav/env + `navigation.course.calcValues.*` + `performance.*` |
+| `@signalk/calibration` | Optional npm plugin | Sensor correction when H5000 does not own a path |
+| `signalk-bandg-performance-plugin` | Optional npm plugin | Forward performance paths to B&G MFD (N2K) |
+
+**Rejected on SLA-1:** Node-RED; duplicate polar SoR inside Signal K admin.
+
+**Future plugins:**
 
 | Plugin | Responsibility |
 |--------|----------------|
-| `signalk-to-influxdb2` | Fork/adapt existing community plugin; map Signal K paths → Influx measurements |
 | `signalk-race-events` | Detect tacks, gybes, mark rounding; emit to Neo4j |
 | `signalk-ai-bridge` | Forward curated context windows to coach service |
 
@@ -861,7 +877,7 @@ Neo4j holds **context** (who, what, where, why); InfluxDB holds **telemetry** (h
 |---------|------------|---------|
 | **B&G H5000** | Factory displays + **safety speaker** | Instruments, SailSteer, StartLine, depth/BSP/wind alarms |
 | **`race-ui`** | **Node.js** + **TypeScript** (React or Svelte), Fastify/static | Start line, course confirm, laylines, steering bars, tactical alert ack, active GRIB model indicator |
-| **Signal K plugins** | `@signalk/*` or custom SK plugin bundle | Embed instrument-adjacent panels in Signal K Freeboard / instrument UI on boat LAN |
+| **Signal K plugins** | `@signalk/course-provider` + `course-sk-sync` + `signalk-polar-performance` | Course geometry (VMG/XTE/DTM) and polar % on standard SK paths — see [ADR-0021](./adr/0021-sla1-signalk-plugin-strategy.md) |
 | **`course-editor`** | React/TS (legacy port 3010 — may merge into `race-ui`) | Waypoint edit, Start Line flag/course selection at harbor |
 | **Grafana-race** | Grafana OSS | Wind/VMG history, fleet map heatmap, fleet polar % timeline, debrief |
 | **iRegatta (phone)** | iOS app | Optional; same NMEA feed |
@@ -4377,9 +4393,9 @@ Phases match [§1.1 Implementation map](#11-implementation-map). Checklists are 
 
 ### Phase 0 — Foundation
 
-- [x] Repository created; [spec.md](./spec.md) v0.20
+- [x] Repository created; [spec.md](./spec.md) v0.21
 - [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
-- [x] ADR-0001 through ADR-0020 (see [adr/README.md](./adr/README.md#implementation-order))
+- [x] ADR-0001 through ADR-0021 (see [adr/README.md](./adr/README.md#implementation-order))
 - [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide + user guides
 - [x] Deploy scaffolding, workflow stubs, harbor scripts
 - [x] Runtime containers — Phase 1 & 2B core (compose + services)
@@ -4387,11 +4403,14 @@ Phases match [§1.1 Implementation map](#11-implementation-map). Checklists are 
 
 ### Phase 1 — SLA-1 telemetry (MVP)
 
-**ADR:** 0001, 0011 (ingest) · **§7:** 7.1, 7.2, 7.4 · **FR:** 11.1
+**ADR:** 0001, 0011 (ingest), [0021](./adr/0021-sla1-signalk-plugin-strategy.md) · **§7:** 7.1, 7.2, 7.4 · **FR:** 11.1
 
 - [ ] Signal K on Pi with PiCAN-M
 - [x] `docker-compose.sla-1.yml`
-- [x] InfluxDB bridge (`signalk-influx-bridge`)
+- [x] Custom `signalk-server` image with `@signalk/course-provider`
+- [x] `course-sk-sync` — data-repo YAML → `navigation.course`
+- [x] `signalk-polar-performance` — `performance.*` from `polar-manager`
+- [x] InfluxDB bridge (`signalk-influx-bridge`) — includes `calcValues` + `performance` paths
 - [x] grafana-telemetry live dashboard (provisioning scaffold)
 
 ### Phase 2A — Shore race prep (AI-sailing-data)
@@ -4419,7 +4438,9 @@ Runs onshore (laptop); can parallel Phase 1.
 
 **ADR:** 0004 · **§7:** 7.12 · **FR:** 11.2 FR-15–26
 
-- [ ] `ais-collector` + `polar-manager` (SLK + ORC PDF)
+- [x] `polar-manager` stub — ORC `7710-target-speeds.txt` API (`GET /polars/{id}/target`)
+- [ ] `polar-manager` full SLK parser + fleet registry
+- [ ] `ais-collector`
 - [ ] `grib-ingest` + `grib-parser` + `wind-field-analyzer`
 - [ ] Shore GRIB assets from data repo → runtime ingest
 

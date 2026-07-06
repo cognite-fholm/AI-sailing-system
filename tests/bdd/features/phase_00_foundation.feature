@@ -7,18 +7,18 @@ Feature: Phase 0 — Foundation
     Given the AI Sailing System repository is checked out
 
   Scenario: Specification and implementation map are published
-    Then spec.md exists with version at least "0.18.0-draft"
+    Then spec.md exists with version at least "0.21.0-draft"
     And spec.md contains section "1.1 Implementation map"
     And spec.md contains section "7.0 Implementation order — section index"
     And spec.md contains section "14. Implementation phases"
 
-  Scenario: ADR index covers all accepted decisions through ADR-0020
+  Scenario: ADR index covers all accepted decisions through ADR-0021
     Then adr/README.md exists with implementation order section
-    And accepted ADR files exist from "0001" through "0020"
+    And accepted ADR files exist from "0001" through "0021"
 
   Scenario: Architecture documentation is linked from the spec
     Then file "docs/ARCHITECTURE.md" exists
-    And docs/ARCHITECTURE.md references spec version "0.20"
+    And docs/ARCHITECTURE.md references spec version "0.21"
 
   Scenario: Deploy and harbor scaffolding is present
     Then file "scripts/harbor-pull.sh" exists
@@ -38,11 +38,18 @@ Feature: Phase 0 — Foundation
 
   Scenario: Phase 1 SLA-1 runtime scaffolding is present
     Then file "signalk-influx-bridge/signalk_influx_bridge/bridge.py" exists
+    And file "signalk-server/Dockerfile" exists
+    And file "course-sk-sync/course_sk_sync/sync.py" exists
+    And file "signalk-polar-performance/signalk_polar_performance/performance.py" exists
     And file "config/signalk/settings.json" exists
     And directory "config/grafana/telemetry/provisioning" exists
     And file ".github/workflows/publish-sla-1.yml" exists
     And file "docs/DEV-SETUP.md" exists
     And file ".cursor/rules/dev-prerequisites.mdc" exists
+
+  Scenario: Phase 2C polar-manager stub is present
+    Then file "polar-manager/polar_manager/api.py" exists
+    And file "adr/0021-sla1-signalk-plugin-strategy.md" exists
 
   Scenario: Phase 2B graph import scaffolding is present
     Then file "race-import/race_import/importer.py" exists

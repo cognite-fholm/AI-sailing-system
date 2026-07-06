@@ -16,6 +16,7 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | | [0009](./0009-dual-repository-race-data.md) | Dual repo: AI-sailing-system + AI-sailing-data, Teltonika LTE sync |
 | **1 — SLA-1 telemetry** | [0001](./0001-system-architecture-and-technology-choices.md) | (stack — see Phase 0) |
 | | [0011](./0011-bg-h5000-reference-model.md) | B&G H5000 instrument and race-display reference (ingest paths) |
+| | [0021](./0021-sla1-signalk-plugin-strategy.md) | SLA-1 Signal K plugins — course-provider, course-sk-sync, polar performance |
 | **2A — Shore race prep** | [0009](./0009-dual-repository-race-data.md) | (data repo model — see Phase 0) |
 | | [0013](./0013-orc-certificate-fleet-collection.md) | Automated ORC certificate collection for race fleets |
 | | [0014](./0014-shore-weather-current-collection.md) | Shore weather and current collection (PredictWind GRIB, MET, SMHI) |
@@ -56,6 +57,7 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | [0018](./0018-helm-ux-three-pi-dual-speaker.md) | Helm UX — `race-ui`, Grafana scope, three-Pi, dual speaker, H5000-only safety | 0, 2E, 2F | Accepted |
 | [0019](./0019-predictwind-multi-model-grib.md) | PredictWind multi-model GRIB and onboard model scoring | 2A, 2C | Accepted |
 | [0020](./0020-course-editor-coordinate-system-of-record.md) | course-editor as coordinate system of record | 2A, 2D | Accepted |
+| [0021](./0021-sla1-signalk-plugin-strategy.md) | SLA-1 Signal K plugin strategy (course-provider, sidecars) | 1, 2C | Accepted |
 
 ## Format
 

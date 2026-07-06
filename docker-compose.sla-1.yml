@@ -8,7 +8,10 @@ name: ai-sailing-sla1
 
 services:
   signalk-server:
-    image: ${SIGNALK_IMAGE:-signalk/signalk-server:latest}
+    build:
+      context: ./signalk-server
+      dockerfile: Dockerfile
+    image: ${SIGNALK_IMAGE:-ghcr.io/cognite-fholm/signalk-server:local}
     container_name: signalk-server
     restart: unless-stopped
     network_mode: host
@@ -64,6 +67,44 @@ services:
       VESSEL_ID: ${VESSEL_ID:-own-boat}
       BRIDGE_BATCH_SIZE: ${BRIDGE_BATCH_SIZE:-100}
       BRIDGE_FLUSH_INTERVAL_S: ${BRIDGE_FLUSH_INTERVAL_S:-1.0}
+
+  course-sk-sync:
+    build:
+      context: ./course-sk-sync
+      dockerfile: Dockerfile
+    image: ${COURSE_SK_SYNC_IMAGE:-ghcr.io/cognite-fholm/course-sk-sync:local}
+    container_name: course-sk-sync
+    restart: unless-stopped
+    depends_on:
+      signalk-server:
+        condition: service_started
+    network_mode: host
+    volumes:
+      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
+      - ${DATA_REPO_HOST_PATH:-/opt/ai-sailing-data}:/opt/ai-sailing-data:ro
+    environment:
+      DATA_REPO_CONFIG: /config/data-repo.yaml
+      DATA_REPO_PATH: /opt/ai-sailing-data
+      SIGNALK_URL: ${SIGNALK_URL:-http://127.0.0.1:3000}
+      POLL_INTERVAL_S: ${COURSE_SYNC_POLL_S:-30}
+
+  signalk-polar-performance:
+    build:
+      context: ./signalk-polar-performance
+      dockerfile: Dockerfile
+    image: ${SIGNALK_POLAR_PERF_IMAGE:-ghcr.io/cognite-fholm/signalk-polar-performance:local}
+    container_name: signalk-polar-performance
+    restart: unless-stopped
+    depends_on:
+      signalk-server:
+        condition: service_started
+    network_mode: host
+    environment:
+      SIGNALK_URL: ${SIGNALK_URL:-http://127.0.0.1:3000}
+      SIGNALK_WS_URL: ${SIGNALK_WS_URL:-ws://127.0.0.1:3000/signalk/v1/stream?subscribe=all}
+      POLAR_MANAGER_URL: ${POLAR_MANAGER_URL:-http://127.0.0.1:8092}
+      VESSEL_ID: ${VESSEL_ID:-own-boat}
+      UPDATE_INTERVAL_S: ${POLAR_PERF_INTERVAL_S:-2}
 
   grafana-telemetry:
     image: ${GRAFANA_IMAGE:-grafana/grafana:11.4.0}

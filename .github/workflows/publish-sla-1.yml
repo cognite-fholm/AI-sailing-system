@@ -6,6 +6,9 @@ on:
     branches: [main]
     paths:
       - 'signalk-influx-bridge/**'
+      - 'signalk-server/**'
+      - 'course-sk-sync/**'
+      - 'signalk-polar-performance/**'
       - 'config/signalk/**'
       - 'config/grafana/telemetry/**'
       - 'docker-compose.sla-1.yml'
@@ -27,9 +30,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - service: signalk-server
+            context: signalk-server
+            dockerfile: signalk-server/Dockerfile
           - service: signalk-influx-bridge
             context: signalk-influx-bridge
             dockerfile: signalk-influx-bridge/Dockerfile
+          - service: course-sk-sync
+            context: course-sk-sync
+            dockerfile: course-sk-sync/Dockerfile
+          - service: signalk-polar-performance
+            context: signalk-polar-performance
+            dockerfile: signalk-polar-performance/Dockerfile
     steps:
       - uses: actions/checkout@v4
 

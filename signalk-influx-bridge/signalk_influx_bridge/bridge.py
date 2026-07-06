@@ -37,6 +37,15 @@ PATH_FIELD_MAP: dict[str, str] = {
     "navigation.log": "log",
     "heel": "heel",
     "attitude.roll": "heel",
+    "navigation.course.calcValues.vmg": "vmg",
+    "navigation.course.calcValues.xte": "xte",
+    "navigation.course.calcValues.dtm": "dtm",
+    "navigation.course.calcValues.bearingToMark": "btm",
+    "navigation.course.calcValues.distanceToMark": "dtm_mark",
+    "navigation.course.calcValues.timeToGo": "ttg",
+    "performance.polarSpeed": "polar_speed",
+    "performance.polarSpeedRatio": "polar_ratio",
+    "performance.targetAngle": "target_angle",
 }
 
 

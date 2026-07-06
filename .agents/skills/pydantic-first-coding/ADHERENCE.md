@@ -1,8 +1,8 @@
 # Pydantic adherence audit — AI-sailing-system
 
-Snapshot: **2026-07-05** · Skill: [SKILL.md](./SKILL.md)
+Snapshot: **2026-07-06** · Skill: [SKILL.md](./SKILL.md)
 
-**Verdict: not yet adherent** — scaffold services predate the Pydantic standard. Type hints are mostly present; contracts use `@dataclass` and raw `dict`.
+**Verdict: partially adherent** — new SLA-1/SLA-2 sidecars use Pydantic; legacy scaffold services still use `@dataclass`.
 
 ---
 
@@ -11,8 +11,8 @@ Snapshot: **2026-07-05** · Skill: [SKILL.md](./SKILL.md)
 | Area | Status |
 |------|--------|
 | Type hints on public APIs | **Mostly yes** |
-| `pydantic` in requirements | **No** |
-| Config via `BaseSettings` | **No** (3× `@dataclass`) |
+| `pydantic` in requirements | **Partial** (`course-sk-sync`, `polar-manager`, `signalk-polar-performance`) |
+| Config via `BaseSettings` | **Partial** (3× new sidecars; legacy `@dataclass`) |
 | YAML kinds as Pydantic models | **No** (`dict[str, Any]`) |
 | HTTP responses as models | **No** (raw dict → `JSONResponse`) |
 | FastAPI services (spec) | **Not implemented** |
@@ -32,6 +32,9 @@ Snapshot: **2026-07-05** · Skill: [SKILL.md](./SKILL.md)
 | `race-mcp-gateway/config.py` | `@dataclass` `GatewayConfig` | YAML → dict | `McpGatewaySettings` |
 | `race-mcp-gateway/influx_client.py` | — | Flux rows as `dict` | OK for query results |
 | `race-mcp-gateway/neo4j_client.py` | — | Cypher rows as `dict` | OK for query results |
+| `course-sk-sync/**` | `BaseSettings` | `Waypoint`, `ActiveRoute`, `SyncResult` | **Adherent** (Phase 1) |
+| `signalk-polar-performance/**` | `BaseSettings` | `TelemetrySnapshot`, `PublishResult` | **Adherent** (Phase 1) |
+| `polar-manager/**` | `BaseSettings` | `PolarGrid`, `TargetResponse`, API models | **Adherent** (stub) |
 | `tests/bdd/**` | — | — | Exempt |
 
 ---

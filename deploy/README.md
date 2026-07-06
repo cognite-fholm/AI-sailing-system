@@ -50,7 +50,7 @@ docker compose -f docker-compose.sla-2.yml -f docker-compose.dev-sla2.yml --env-
 Invoke-RestMethod -Uri http://localhost:8080/import -Method Post -ContentType "application/json" -Body "{}"
 ```
 
-Grafana telemetry: `http://localhost:3001` · Signal K: `http://localhost:3000` · Neo4j browser: `http://localhost:7474`
+Grafana telemetry: `http://localhost:3001` · Signal K: `http://localhost:3000` · polar-manager: `http://localhost:8092/health` · Neo4j browser: `http://localhost:7474`
 
 ## Guardrails (summary)
 
