@@ -25,6 +25,11 @@ def load_data_repo_config(path: Path, data_repo_path: Path | None = None) -> Dat
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if data_repo_path:
         raw.setdefault("data_repo", {})["local_path"] = str(data_repo_path)
+    raw["data_repo"] = {
+        key: str(value)
+        for key, value in raw.get("data_repo", {}).items()
+        if value is not None
+    }
     return DataRepoConfig.model_validate(raw)
 
 

@@ -1,5 +1,8 @@
-"""Phase 2B — live integration scenarios tagged @wip."""
+"""Phase 2B — scaffold + live @wip scenarios."""
 
 from pytest_bdd import scenarios
 
-scenarios("../features/phase_02b_graph_import.feature")
+scenarios(
+    "../features/phase_02b_graph_import.feature",
+    "../features/phase_02b_graph_import_live.feature",
+)

@@ -17,6 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout AI-sailing-data
+        uses: actions/checkout@v4
+        with:
+          repository: cognite-fholm/AI-sailing-data
+          path: AI-sailing-data
+
       - name: Validate YAML configs
         run: |
           python -c "
@@ -34,10 +40,12 @@ jobs:
           docker compose -f docker-compose.sla-1.yml -f docker-compose.dev.yml config --quiet
           docker compose -f docker-compose.sla-2.yml -f docker-compose.dev-sla2.yml config --quiet
 
-      - name: Run Phase 0 BDD tests
+      - name: Run acceptance and unit tests
+        env:
+          AI_SAILING_DATA_ROOT: ${{ github.workspace }}/AI-sailing-data
         run: |
           pip install -r requirements-dev.txt
-          pytest tests/bdd/steps/test_phase_00_foundation.py -q
+          pytest tests/bdd/steps tests/unit -m "not wip" -q --cov=course_sk_sync --cov=polar_manager --cov=signalk_influx_bridge --cov=signalk_polar_performance --cov-report=term-missing --cov-fail-under=45
 
       - name: Check ADR index
         run: test -f adr/README.md

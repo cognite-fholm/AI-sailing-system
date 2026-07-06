@@ -1,8 +1,8 @@
-"""Phase 4 — skipped until CI/CD compose files ship."""
+"""Phase 4 — CI/CD scaffold + live @wip scenarios."""
 
-import pytest
 from pytest_bdd import scenarios
 
-pytestmark = pytest.mark.skip(reason="Phase 4 CI/CD not implemented")
-
-scenarios("../features/phase_04_cicd.feature")
+scenarios(
+    "../features/phase_04_cicd.feature",
+    "../features/phase_04_cicd_live.feature",
+)

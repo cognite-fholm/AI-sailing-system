@@ -7,10 +7,29 @@ from pathlib import Path
 
 import pytest
 
-pytest_plugins = ["tests.bdd.steps.shared_steps"]
+pytest_plugins = [
+    "tests.bdd.steps.shared_steps",
+    "tests.bdd.steps.service_steps",
+]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FEATURES_DIR = Path(__file__).resolve().parent / "features"
+
+# Service packages live in subdirectories — add for step imports and unit tests.
+for _pkg in (
+    "course-sk-sync",
+    "polar-manager",
+    "signalk-polar-performance",
+    "signalk-influx-bridge",
+    "race-import",
+    "race-data-sync",
+):
+    _path = REPO_ROOT / _pkg
+    if _path.is_dir():
+        import sys
+
+        if str(_path) not in sys.path:
+            sys.path.insert(0, str(_path))
 
 
 @pytest.fixture(scope="session")
@@ -26,6 +45,11 @@ def data_repo_root() -> Path | None:
         return path if path.is_dir() else None
     sibling = REPO_ROOT.parent / "AI-sailing-data"
     return sibling if sibling.is_dir() else None
+
+
+@pytest.fixture
+def bdd_context() -> dict:
+    return {}
 
 
 def pytest_configure(config: pytest.Config) -> None:

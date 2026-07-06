@@ -1,29 +1,21 @@
-@phase_04 @wip
-Feature: Phase 4 — CI/CD and multi-Pi operations
-  GitHub Actions, GHCR images, harbor scripts, and race-mode guardrails.
-  See spec §9, FR-90–101, FR-105, ADR-0008.
+@phase_04
+Feature: Phase 4 — CI/CD (scaffold)
+  Compose files and publish workflows per spec §9 and ADR-0008.
+  Live release/harbor scenarios: phase_04_cicd_live.feature (@wip).
 
   Background:
-    Given the project uses GitHub Actions and GHCR for container delivery
-
-  Scenario: FR-96 arm64 images published to GHCR
-    When a release tag is pushed
-    Then publish workflows build linux/arm64 images to GHCR
-
-  Scenario: FR-99 digest-pinned deploy locks
-    When release.yml runs for tag vX.Y.Z
-    Then deploy/locks/vX.Y.Z.env records image digests or placeholders
-
-  Scenario: FR-92 RACE_MODE disables Watchtower
-    Given RACE_MODE is true in deploy environment
-    When harbor sync runs
-    Then Watchtower does not auto-update running containers
+    Given the AI Sailing System repository is checked out
 
   Scenario: FR-94 per-tier docker compose files
     Then file "docker-compose.sla-1.yml" exists
     And file "docker-compose.sla-2.yml" exists
-    And file "docker-compose.sla-3.yml" exists
+    And file "docker-compose.harbor.yml" exists
 
-  Scenario: FR-101 harbor sync separates images from models and data
-    When harbor-sync.sh runs in harbor
-    Then container pulls use harbor-pull.sh and models OKF and data repo sync separately
+  Scenario: Publish workflows exist for SLA-1 and SLA-2 images
+    Then file ".github/workflows/publish-sla-1.yml" exists
+    And file ".github/workflows/publish-sla-1.yml" contains service "signalk-server"
+    And file ".github/workflows/publish-sla-2.yml" exists
+    And file ".github/workflows/publish-sla-2.yml" contains service "polar-manager"
+
+  Scenario: CI validates compose and runs acceptance tests
+    Then file ".github/workflows/ci.yml" exists

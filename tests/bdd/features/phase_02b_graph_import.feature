@@ -1,24 +1,25 @@
-@phase_02b @wip
-Feature: Phase 2B — Graph import and sync
-  Neo4j schema and declarative import from AI-sailing-data.
+@phase_02b
+Feature: Phase 2B — Graph import and sync (scaffold)
+  Neo4j import services and sync contract from AI-sailing-data.
+  Live Neo4j scenarios: phase_02b_graph_import_live.feature (@wip).
   See spec §7.3, §7.15, FR-102–104, ADR-0009.
 
   Background:
-    Given the SLA-2 docker compose stack is deployed
-    And Neo4j is reachable on the race node
-    And AI-sailing-data is mounted for import
+    Given the AI Sailing System repository is checked out
 
-  Scenario: FR-104 race-import applies declarative YAML without clobbering runtime nodes
-    Given race-import manifest from the data repo for an active regatta
-    When race-import runs
-    Then Neo4j contains Vessel Polar and Waypoint nodes from the manifest
-    And runtime-only nodes such as InsightAlert are preserved
+  Scenario: SLA-2 compose includes graph import services
+    Then file "docker-compose.sla-2.yml" contains service "neo4j"
+    And file "docker-compose.sla-2.yml" contains service "race-import"
+    And file "docker-compose.sla-2.yml" contains service "race-data-sync"
 
-  Scenario: FR-103 race-data-sync pulls newer data from GitHub
-    Given a newer commit exists on the data repo remote
-    When race-data-sync runs with sync policy enabled
-    Then the local data repo checkout matches the remote ref
+  Scenario: FR-104 race-import HTTP API is defined
+    Then file "race-import/race_import/api.py" exists
+    And race-import exposes route "/health"
+    And race-import exposes route "/import"
 
-  Scenario: Neo4j core schema labels exist
-    When I query Neo4j for schema labels
-    Then labels include Vessel Polar GribModel Waypoint and HandicapRating
+  Scenario: FR-104 declarative importer module exists
+    Then file "race-import/race_import/importer.py" exists
+
+  Scenario: FR-103 race-data-sync service exists
+    Then file "race-data-sync/race_data_sync/sync.py" exists
+    And file "config/data-repo.yaml" exists

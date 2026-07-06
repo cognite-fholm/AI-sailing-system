@@ -4389,7 +4389,7 @@ AI-sailing-system/
 
 Phases match [§1.1 Implementation map](#11-implementation-map). Checklists are ordered for execution; ADR numbers stay chronological.
 
-**Acceptance tests:** [tests/bdd/README.md](./tests/bdd/README.md) — Gherkin scenarios per phase (`tests/bdd/features/phase_*.feature`).
+**Acceptance tests:** [tests/bdd/README.md](./tests/bdd/README.md) — Gherkin scenarios per phase; CI runs all non-`@wip` BDD + unit tests with coverage.
 
 ### Phase 0 — Foundation
 
