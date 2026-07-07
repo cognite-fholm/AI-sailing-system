@@ -10,7 +10,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fleet_performance_tracker.collector import collect_own_boat_point
+from fleet_performance_tracker.collector import collect_fleet_tick
 from fleet_performance_tracker.config import FleetTrackerConfig
 from fleet_performance_tracker.influx import InfluxFleetWriter
 from fleet_performance_tracker.lifecycle import lifecycle_allows_fleet_write
@@ -18,21 +18,18 @@ from fleet_performance_tracker.lifecycle import lifecycle_allows_fleet_write
 logger = logging.getLogger(__name__)
 
 
-def write_tick(writer: InfluxFleetWriter, config: FleetTrackerConfig) -> bool:
+def write_tick(writer: InfluxFleetWriter, config: FleetTrackerConfig) -> int:
     if not lifecycle_allows_fleet_write(config.lifecycle_state):
         logger.debug("Lifecycle phase — fleet write paused")
-        return False
-    point = collect_own_boat_point(config)
-    if point is None:
-        return False
-    writer.write_point(point, timestamp=datetime.now(UTC))
-    logger.info(
-        "Wrote fleet_polar_performance sail=%s perf=%.1f%% rank=%s",
-        point.sail_number,
-        point.performance_pct,
-        point.rank,
-    )
-    return True
+        return 0
+    points = collect_fleet_tick(config)
+    if not points:
+        return 0
+    now = datetime.now(UTC)
+    for point in points:
+        writer.write_point(point, timestamp=now)
+    logger.info("Wrote %s fleet_polar_performance point(s)", len(points))
+    return len(points)
 
 
 def main() -> None:

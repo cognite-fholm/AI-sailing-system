@@ -118,17 +118,42 @@ def commit_and_push(
     return commit_sha, "ok"
 
 
+def merge_live_branch(config: LiveSyncConfig) -> str:
+    """Merge race-live branch into main per ADR-0025."""
+    path = config.local_path
+    remote = _remote_url(config)
+    live_ref = f"origin/{config.live_branch}"
+    check = _run(["git", "rev-parse", "--verify", live_ref], path, check=False)
+    if check.returncode != 0:
+        logger.info("No remote live branch %s — skip merge", config.live_branch)
+        return "skipped_no_branch"
+    try:
+        _run(
+            ["git", "merge", "--no-edit", "-m", f"finalize: merge {config.live_branch}", live_ref],
+            path,
+        )
+        return "merged"
+    except subprocess.CalledProcessError:
+        logger.warning("Merge conflict — keeping finalize archive on main")
+        _run(["git", "merge", "--abort"], path, check=False)
+        return "merge_conflict_aborted"
+
+
 def commit_finalize(config: LiveSyncConfig) -> tuple[str, str]:
-    """Commit post-race archive on main and push."""
+    """Merge live branch, commit post-race archive on main, and push."""
     path = config.local_path
     configure_git_identity(config)
     rel_post = f"{config.race_folder.rstrip('/')}/post-race"
     rel_race = f"{config.race_folder.rstrip('/')}/race.yaml"
     _run(["git", "fetch", "origin"], path)
     _run(["git", "checkout", config.branch], path)
-    _run(["git", "pull", "--ff-only", _remote_url(config), config.branch], path, check=False)
+    _run(["git", "pull", "--ff-only", remote_url := _remote_url(config), config.branch], path, check=False)
+    merge_status = merge_live_branch(config)
     _run(["git", "add", rel_post, rel_race], path)
-    msg = f"post-race: {config.regatta_id} archived @ {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}"
+    msg = (
+        f"post-race: {config.regatta_id} archived @ "
+        f"{datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')} ({merge_status})"
+    )
     diff = _run(["git", "diff", "--cached", "--quiet"], path, check=False)
     if diff.returncode == 0:
         head = _run(["git", "rev-parse", "HEAD"], path).stdout.strip()
@@ -137,6 +162,6 @@ def commit_finalize(config: LiveSyncConfig) -> tuple[str, str]:
     commit_sha = _run(["git", "rev-parse", "HEAD"], path).stdout.strip()
     if not config.github_token:
         return commit_sha, "skipped_no_token"
-    _run(["git", "push", _remote_url(config), f"HEAD:{config.branch}"], path)
+    _run(["git", "push", remote_url, f"HEAD:{config.branch}"], path)
     logger.info("Finalize pushed %s to %s", commit_sha[:8], config.branch)
     return commit_sha, "ok"

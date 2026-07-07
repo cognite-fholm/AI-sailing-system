@@ -77,6 +77,10 @@ def test_build_snapshot_with_mocked_sources(tmp_path) -> None:
         patch("race_live_sync.export.query_standings", return_value=standings),
         patch("race_live_sync.export.query_fleet_performance_rollup", return_value=fleet),
         patch("race_live_sync.export.query_course_selection", return_value={"route_id": "r1", "leg_seq": 2}),
+        patch(
+            "race_live_sync.export.query_grib_scores",
+            return_value={"selected_model": "observed", "model_scores": {"observed": {"tws_kn": 8.0}}},
+        ),
     ):
         snap = build_snapshot(config, sequence=2, previous_fleet=[])
 
@@ -86,6 +90,7 @@ def test_build_snapshot_with_mocked_sources(tmp_path) -> None:
     assert len(spec["fleet_performance"]) == 3
     assert any(i["type"] == "polar_outperformers" for i in spec["insights"])
     assert spec["course_selection"]["route_id"] == "r1"
+    assert spec["grib_scores"]["selected_model"] == "observed"
 
 
 def test_build_deltas_own_boat() -> None:

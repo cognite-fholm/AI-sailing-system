@@ -119,6 +119,55 @@ services:
       RACE_LIFECYCLE_POLL_SECONDS: ${RACE_LIFECYCLE_POLL_SECONDS:-60}
       RACE_LIFECYCLE_STATE: /var/run/ai-sailing/race-lifecycle.json
 
+  ais-collector:
+    build:
+      context: .
+      dockerfile: ais-collector/Dockerfile
+    image: ${AIS_COLLECTOR_IMAGE:-ghcr.io/cognite-fholm/ais-collector:local}
+    container_name: ais-collector
+    restart: unless-stopped
+    depends_on:
+      race-lifecycle:
+        condition: service_started
+    environment:
+      SIGNALK_WS_URL: ${SIGNALK_WS_URL:-ws://signalk-server:3000/signalk/v1/stream?subscribe=all}
+      INFLUX_URL: ${INFLUX_URL:-http://influxdb:8086}
+      INFLUX_ORG: ${INFLUX_ORG:-ai-sailing}
+      INFLUX_AIS_BUCKET: ${INFLUX_AIS_BUCKET:-ais_tracks}
+      INFLUX_WRITE_TOKEN: ${INFLUX_WRITE_TOKEN:-}
+      ACTIVE_REGATTA_ID: ${ACTIVE_REGATTA_ID:-}
+      OWN_MMSI: ${OWN_MMSI:-}
+      RACE_LIFECYCLE_STATE: /var/run/ai-sailing/race-lifecycle.json
+    volumes:
+      - lifecycle-state:/var/run/ai-sailing
+
+  grib-model-scorer:
+    build:
+      context: .
+      dockerfile: grib-model-scorer/Dockerfile
+    image: ${GRIB_MODEL_SCORER_IMAGE:-ghcr.io/cognite-fholm/grib-model-scorer:local}
+    container_name: grib-model-scorer
+    restart: unless-stopped
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      race-lifecycle:
+        condition: service_started
+    volumes:
+      - lifecycle-state:/var/run/ai-sailing
+    environment:
+      INFLUX_URL: ${INFLUX_URL:-http://influxdb:8086}
+      INFLUX_ORG: ${INFLUX_ORG:-ai-sailing}
+      INFLUX_SIGNALK_BUCKET: ${INFLUX_SIGNALK_BUCKET:-signalk}
+      INFLUX_READ_TOKEN: ${INFLUX_READ_TOKEN:-}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-change-me-neo4j}
+      ACTIVE_REGATTA_ID: ${ACTIVE_REGATTA_ID:-}
+      VESSEL_ID: ${VESSEL_ID:-own-boat}
+      GRIB_SCORER_INTERVAL_SECONDS: ${GRIB_SCORER_INTERVAL_SECONDS:-300}
+      RACE_LIFECYCLE_STATE: /var/run/ai-sailing/race-lifecycle.json
+
   race-live-sync:
     build:
       context: .
@@ -167,6 +216,8 @@ services:
         condition: service_healthy
       polar-manager:
         condition: service_started
+      ais-collector:
+        condition: service_started
       race-lifecycle:
         condition: service_started
     volumes:
@@ -183,8 +234,10 @@ services:
       INFLUX_ORG: ${INFLUX_ORG:-ai-sailing}
       INFLUX_BUCKET: ${INFLUX_BUCKET:-race}
       INFLUX_SIGNALK_BUCKET: ${INFLUX_SIGNALK_BUCKET:-signalk}
+      INFLUX_AIS_BUCKET: ${INFLUX_AIS_BUCKET:-ais_tracks}
       INFLUX_WRITE_TOKEN: ${INFLUX_WRITE_TOKEN:-}
       INFLUX_READ_TOKEN: ${INFLUX_READ_TOKEN:-}
+      POLAR_MANAGER_URL: http://polar-manager:8092
       ACTIVE_REGATTA_ID: ${ACTIVE_REGATTA_ID:-}
       OWN_SAIL_NUMBER: ${OWN_SAIL_NUMBER:-NOR-10133}
       VESSEL_ID: ${VESSEL_ID:-own-boat}

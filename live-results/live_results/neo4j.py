@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -38,6 +39,25 @@ ORDER BY cs.selected_at DESC
 LIMIT 1
 """
 
+FLEET_VESSELS_QUERY = """
+MATCH (v:Vessel)
+RETURN v.mmsi AS mmsi,
+       v.sail_number AS sail_number,
+       v.name AS name,
+       coalesce(v.is_own, false) AS is_own
+ORDER BY v.sail_number
+"""
+
+GRIB_MODEL_SCORE_QUERY = """
+MATCH (g:GribModelScore)
+RETURN g.model_scores AS model_scores,
+       g.selected_model AS selected_model,
+       g.validation_notes AS validation_notes,
+       g.updated_at AS updated_at
+ORDER BY g.updated_at DESC
+LIMIT 1
+"""
+
 
 class Neo4jRaceReader:
     def __init__(self, uri: str, user: str, password: str) -> None:
@@ -61,6 +81,13 @@ class Neo4jRaceReader:
         rows = self.run_read(COURSE_SELECTION_QUERY)
         return rows[0] if rows else None
 
+    def fetch_fleet_vessels(self) -> list[dict[str, Any]]:
+        return self.run_read(FLEET_VESSELS_QUERY)
+
+    def fetch_grib_model_score(self) -> dict[str, Any] | None:
+        rows = self.run_read(GRIB_MODEL_SCORE_QUERY)
+        return rows[0] if rows else None
+
 
 def course_selection_to_snapshot(row: dict[str, Any] | None) -> dict[str, Any] | None:
     if not row:
@@ -70,4 +97,21 @@ def course_selection_to_snapshot(row: dict[str, Any] | None) -> dict[str, Any] |
         "route_name": row.get("route_name"),
         "leg_seq": row.get("leg_seq"),
         "selected_at": row.get("selected_at"),
+    }
+
+
+def grib_score_to_snapshot(row: dict[str, Any] | None) -> dict[str, Any]:
+    if not row:
+        return {}
+    model_scores = row.get("model_scores") or {}
+    if isinstance(model_scores, str):
+        try:
+            model_scores = json.loads(model_scores)
+        except json.JSONDecodeError:
+            model_scores = {}
+    return {
+        "selected_model": row.get("selected_model"),
+        "model_scores": model_scores,
+        "validation_notes": row.get("validation_notes"),
+        "updated_at": row.get("updated_at"),
     }

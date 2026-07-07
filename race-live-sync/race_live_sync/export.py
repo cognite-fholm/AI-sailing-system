@@ -33,6 +33,7 @@ from fleet_performance_tracker.rollup import (  # noqa: E402
 from live_results.neo4j import (  # noqa: E402
     Neo4jRaceReader,
     course_selection_to_snapshot,
+    grib_score_to_snapshot,
 )
 from live_results.standings import standings_from_neo4j_rows  # noqa: E402
 
@@ -113,6 +114,19 @@ def query_fleet_performance_rollup(
         reader.close()
 
 
+def query_grib_scores(config: LiveSyncConfig) -> dict[str, Any]:
+    if not config.neo4j_password:
+        return {}
+    reader = Neo4jRaceReader(config.neo4j_uri, config.neo4j_user, config.neo4j_password)
+    try:
+        return grib_score_to_snapshot(reader.fetch_grib_model_score())
+    except Exception:
+        logger.exception("Neo4j grib score query failed")
+        return {}
+    finally:
+        reader.close()
+
+
 def build_snapshot(
     config: LiveSyncConfig,
     sequence: int,
@@ -136,6 +150,7 @@ def build_snapshot(
 
     insights = build_insights(fleet_performance, standings, previous_fleet=previous_fleet)
     course_selection = query_course_selection(config)
+    grib_scores = query_grib_scores(config)
     deltas = build_deltas(
         sequence,
         fleet_performance,
@@ -165,7 +180,7 @@ def build_snapshot(
             "fleet_performance": fleet_performance,
             "course_selection": course_selection,
             "insights": insights,
-            "grib_scores": {},
+            "grib_scores": grib_scores,
             "deltas": deltas,
         },
     }

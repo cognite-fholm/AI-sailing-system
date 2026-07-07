@@ -114,3 +114,20 @@ def test_run_finalize_writes_archive(tmp_path, monkeypatch) -> None:
     assert (config.local_path / config.race_folder / "post-race" / "results.yaml").is_file()
     race_doc = yaml.safe_load((config.local_path / config.race_folder / "race.yaml").read_text())
     assert race_doc["spec"]["status"] == "archived"
+
+
+def test_merge_live_branch_skips_missing_remote(tmp_path, monkeypatch) -> None:
+    from race_live_sync.git_push import merge_live_branch
+
+    config = _config(tmp_path)
+
+    def fake_run(cmd, cwd, check=True):
+        class Result:
+            returncode = 1 if "rev-parse" in cmd else 0
+            stdout = ""
+            stderr = ""
+
+        return Result()
+
+    monkeypatch.setattr("race_live_sync.git_push._run", fake_run)
+    assert merge_live_branch(config) == "skipped_no_branch"

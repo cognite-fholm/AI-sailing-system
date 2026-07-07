@@ -185,8 +185,10 @@ Defer implementation until Layer 1–2 are stable.
 | `RaceLiveSnapshot` schema extension | AI-sailing-data `schema/neo4j-mapping.yaml` | Done |
 | `race-live/current.yaml.example` | AI-sailing-data `races/.../race-live/` | Done (fixture) |
 | `live-results` — corrected-time standings | AI-sailing-system `live-results/` | Partial (Neo4j reader + rank) |
-| `fleet-performance-tracker` — 30 s Influx rollup | AI-sailing-system `fleet-performance-tracker/` | Partial (own-boat collector + compose) |
-| `race_live_sync/finalize.py` | AI-sailing-system | Done (post-race archive + main push) |
+| `fleet-performance-tracker` — fleet AIS rollup | AI-sailing-system `fleet-performance-tracker/` | Partial (own + AIS competitors) |
+| `ais-collector` — Signal K → `ais_tracks` | AI-sailing-system `ais-collector/` | Done (v1) |
+| `grib-model-scorer` — observed wind baseline | AI-sailing-system `grib-model-scorer/` | Partial (Neo4j GribModelScore) |
+| `race_live_sync/finalize.py` merge live branch | AI-sailing-system | Done |
 | `race-live-sync` CLI `finalize` / `once` | AI-sailing-system | Done |
 | `race_live_sync/export.py` — 5 min rollup | AI-sailing-system `race-live-sync/` | Done (insights, deltas, policy) |
 | Unit + BDD tests | AI-sailing-system `tests/unit`, `tests/bdd/features/phase_02h_*` | Done |

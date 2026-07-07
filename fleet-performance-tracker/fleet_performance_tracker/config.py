@@ -26,6 +26,8 @@ class FleetTrackerConfig:
     vessel_id: str
     interval_seconds: int
     lifecycle_state: Path
+    influx_ais_bucket: str
+    polar_manager_url: str
 
     @classmethod
     def from_yaml(cls, path: Path) -> FleetTrackerConfig:
@@ -68,4 +70,6 @@ class FleetTrackerConfig:
             lifecycle_state=Path(
                 os.environ.get("RACE_LIFECYCLE_STATE", "/var/run/ai-sailing/race-lifecycle.json")
             ),
+            influx_ais_bucket=os.environ.get("INFLUX_AIS_BUCKET", influx.get("ais_bucket", "ais_tracks")),
+            polar_manager_url=os.environ.get("POLAR_MANAGER_URL", "http://polar-manager:8092"),
         )

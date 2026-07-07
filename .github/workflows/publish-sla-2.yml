@@ -11,6 +11,8 @@ on:
       - 'polar-manager/**'
       - 'live-results/**'
       - 'fleet-performance-tracker/**'
+      - 'ais-collector/**'
+      - 'grib-model-scorer/**'
       - 'race-live-sync/**'
       - 'race-lifecycle/**'
       - 'course-editor/**'
@@ -54,6 +56,12 @@ jobs:
           - service: fleet-performance-tracker
             context: .
             dockerfile: fleet-performance-tracker/Dockerfile
+          - service: ais-collector
+            context: .
+            dockerfile: ais-collector/Dockerfile
+          - service: grib-model-scorer
+            context: .
+            dockerfile: grib-model-scorer/Dockerfile
           - service: race-lifecycle
             context: .
             dockerfile: race-lifecycle/Dockerfile

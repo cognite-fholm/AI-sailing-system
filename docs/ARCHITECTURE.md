@@ -313,7 +313,7 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 | **1 — SLA-1 telemetry** | **Scaffold** — `course-provider`, `course-sk-sync`, `signalk-polar-performance`, bridge, Grafana; PiCAN ingest pending |
 | **2A — Shore race prep** | **Partial** — data repo skills, Færder examples, **YAML-LD** (ADR-0022); waypoint gaps remain |
 | **2B — Graph import** | **Scaffold** — `docker-compose.sla-2.yml`, `race-import`, `race-data-sync`, `race-live-sync` |
-| **2C — GRIB, polars, AIS** | **Stub** — `polar-manager` target-speeds API only |
+| **2C — GRIB, polars, AIS** | **Partial** — `polar-manager`, `ais-collector`, `grib-model-scorer` (observed baseline); full GRIB ingest deferred |
 | **2D — Courses & results** | Not started |
 | **2E — Race UX** | Not started |
 | **2F — Analytics & alerts** | Not started |

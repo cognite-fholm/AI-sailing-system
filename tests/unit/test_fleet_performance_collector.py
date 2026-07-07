@@ -40,6 +40,8 @@ def test_collect_own_boat_point_from_signalk() -> None:
         vessel_id="own-boat",
         interval_seconds=30,
         lifecycle_state=__import__("pathlib").Path("/tmp/none"),
+        influx_ais_bucket="ais_tracks",
+        polar_manager_url="http://localhost:8092",
     )
     sk = {
         "polar_ratio": 0.98,
