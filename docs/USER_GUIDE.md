@@ -11,6 +11,8 @@ Guide for **sailors and crew** using the onboard platform. Race **content** (cou
 
 Deploy **both** to the boat.
 
+**Data format:** Race and boat facts in AI-sailing-data use **[YAML-LD](https://w3c.github.io/yaml-ld/)** (linked YAML) so boats, certificates, and courses reference each other unambiguously. See [YAML_LD.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/YAML_LD.md) · [ADR-0022](../adr/0022-yaml-ld-interconnected-data.md).
+
 ## Shore preparation (start here)
 
 **New laptop?** Install WSL2 + Docker Desktop before running local stacks: [DEV-SETUP.md](./DEV-SETUP.md).
@@ -25,6 +27,7 @@ All detailed user guides live in the **data repo**:
 | [Race preparation guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md) | 12-phase workflow |
 | [Boats and certificates](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/BOATS_AND_CERTIFICATES.md) | ORC, SLK, fleet |
 | [Harbor and race week](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/HARBOR_AND_RACE_WEEK.md) | Sync, GPX, Grafana, MCP |
+| [YAML-LD (linked data)](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/YAML_LD.md) | How boat/race YAML files link together |
 | [Troubleshooting](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/TROUBLESHOOTING.md) | Common fixes |
 
 ## Onboard system overview
@@ -86,6 +89,7 @@ Full setup: [race-laptop-mcp.md](./race-laptop-mcp.md) · [mcp-neo4j-influx.md](
 | [DEV-SETUP.md](./DEV-SETUP.md) | **New laptop** — WSL2, Docker, local compose |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Architecture index |
 | [spec.md](./spec.md) | Full specification |
+| [spec §7.15.8](./spec.md#7158-yaml-ld-linked-data-format) | YAML-LD normative spec section |
 | [adr/README.md](../adr/README.md) | Architecture decisions |
 | [deploy/README.md](../deploy/README.md) | Env files, race freeze |
 

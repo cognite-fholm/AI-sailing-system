@@ -14,6 +14,8 @@ Works with the workspace **cog-python** rule: type hints, `pathlib`, `ruff` — 
 
 **Schema source of truth for YAML:** [AI-sailing-data `schema/`](https://github.com/cognite-fholm/AI-sailing-data/tree/main/schema) — mirror kinds as Pydantic models in Python.
 
+**YAML format:** All interconnected fact YAML in AI-sailing-data follows **[W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/)** ([ADR-0022](../../adr/0022-yaml-ld-interconnected-data.md)). Load with [.agents/skills/yaml-ld-read/SKILL.md](../yaml-ld-read/SKILL.md) — never treat linked files as opaque dicts.
+
 ---
 
 ## Core rule

@@ -55,8 +55,8 @@ Normative detail stays in §7–§11 and ADRs. This table is the **recommended b
 |-------|---------------|------|---------|--------|--------------------------|
 | **0** | Spec, repos, deploy scaffold | [0001](./adr/0001-system-architecture-and-technology-choices.md), [0002](./adr/0002-three-tier-sla-architecture.md), [0008](./adr/0008-github-docker-deployment-lifecycle.md), [0009](./adr/0009-dual-repository-race-data.md) | [§5](./spec.md#5-three-tier-sla-architecture), [§5.7](./spec.md#57-dual-repository-architecture), [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§9](./spec.md#9-deployment-architecture) | [11.6](./spec.md#116-operations) | Compose stubs, `race-data-sync` scaffold |
 | **1** | SLA-1 telemetry | [0001](./adr/0001-system-architecture-and-technology-choices.md), [0011](./adr/0011-bg-h5000-reference-model.md) (ingest), [0021](./adr/0021-sla1-signalk-plugin-strategy.md) | [§7.1](./spec.md#71-signal-k-server-hub--sla-1-only), [§7.2](./spec.md#72-time-series--influxdb--sla-1-only), [§7.4](./spec.md#74-visualization--grafana) | [11.1](./spec.md#111-sla-1--telemetry) | `signalk-server` (+ `course-provider`), `course-sk-sync`, `signalk-polar-performance`, `signalk-influx-bridge`, `grafana-telemetry` |
-| **2A** | Shore race prep (data repo) | [0009](./adr/0009-dual-repository-race-data.md), [0013](./adr/0013-orc-certificate-fleet-collection.md), [0014](./adr/0014-shore-weather-current-collection.md), [0017](./adr/0017-marine-map-gpx-export.md) | [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§7.19](./spec.md#719-orc-certificate-collection--fleet-enrichment), [§7.20](./spec.md#720-shore-weather--current-collection), [§7.23](./spec.md#723-marine-map-gpx-export) | [11.9](./spec.md#119-orc-certificate-collection-shore), [11.10](./spec.md#1110-shore-weather--current-collection), [11.13](./spec.md#1113-marine-map-gpx-export) | [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) skills, YAML, `export/marine-map/` |
-| **2B** | Graph import & sync | [0009](./adr/0009-dual-repository-race-data.md) | [§7.3](./spec.md#73-knowledge-graph--neo4j--sla-2-only), [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) (import) | `neo4j`, `race-data-sync`, `race-import` |
+| **2A** | Shore race prep (data repo) | [0009](./adr/0009-dual-repository-race-data.md), [0013](./adr/0013-orc-certificate-fleet-collection.md), [0014](./adr/0014-shore-weather-current-collection.md), [0017](./adr/0017-marine-map-gpx-export.md), [0022](./adr/0022-yaml-ld-interconnected-data.md) | [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§7.15.8](./spec.md#7158-yaml-ld-linked-data-format), [§7.19](./spec.md#719-orc-certificate-collection--fleet-enrichment), [§7.20](./spec.md#720-shore-weather--current-collection), [§7.23](./spec.md#723-marine-map-gpx-export) | [11.9](./spec.md#119-orc-certificate-collection-shore), [11.10](./spec.md#1110-shore-weather--current-collection), [11.13](./spec.md#1113-marine-map-gpx-export), [11.14](./spec.md#1114-yaml-ld-linked-data-ai-sailing-data) | [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) skills, YAML-LD, `schema/yaml-ld/`, `export/marine-map/` |
+| **2B** | Graph import & sync | [0009](./adr/0009-dual-repository-race-data.md), [0022](./adr/0022-yaml-ld-interconnected-data.md) | [§7.3](./spec.md#73-knowledge-graph--neo4j--sla-2-only), [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§7.15.8](./spec.md#7158-yaml-ld-linked-data-format) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) (import), [11.14](./spec.md#1114-yaml-ld-linked-data-ai-sailing-data) | `neo4j`, `race-data-sync`, `race-import` |
 | **2C** | GRIB, polars, AIS, wind | [0004](./adr/0004-grib-polars-ais-wind-analysis.md), [0019](./adr/0019-predictwind-multi-model-grib.md) | [§7.12](./spec.md#712-grib-polars-ais--wind-on-course-analysis) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-15–26, [11.10](./spec.md#1110-shore-weather--current-collection) | `grib-ingest`, `grib-parser`, `grib-model-scorer`, `polar-manager` (full SLK), `polar-certificate-extractor`, `ais-collector`, `wind-field-analyzer` |
 | **2D** | Courses, handicaps, results | [0005](./adr/0005-course-parsing-handicaps-live-results.md), [0006](./adr/0006-start-boat-course-flags.md) | [§7.13](./spec.md#713-race-courses-waypoints--live-results), [§7.14](./spec.md#714-handicap-numbers--scoring) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-27–41 | `course-parser`, `course-editor`, `course-flag-detector`, `handicap-manager`, `live-results` |
 | **2E** | Race UX (iRegatta + H5000 parity) | [0010](./adr/0010-iregatta-reference-model.md), [0011](./adr/0011-bg-h5000-reference-model.md), [0018](./adr/0018-helm-ux-three-pi-dual-speaker.md) | [§7.4.1](./spec.md#741-race-helm-ui-grafana--signalk-plugins), [§7.6](./spec.md#76-race-intelligence-service--sla-2-only), [§7.16](./spec.md#716-iregatta-reference-model--feature-traceability), [§7.17](./spec.md#717-bg-h5000-reference-model--integration) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-42–59, [11.7](./spec.md#117-bg-h5000-integration--display-parity) | `race-ui`, `race-intelligence`, `grafana-race` |
@@ -161,6 +161,7 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G29 | **Tactical insight alerts** — raise and display performance alerts (trim, course, fleet rank); optional voice annunciation — [§7.21](#721-tactical-insight-alerts--annunciation), [ADR-0015](./adr/0015-tactical-insight-alerts-annunciation.md) |
 | G30 | **Fleet polar performance timeline** — all boats vs certificate polar and active race handicap, stored in InfluxDB for Grafana/MCP — [§7.22](#722-fleet-polar-performance-timeline), [ADR-0016](./adr/0016-fleet-polar-performance-influx.md) |
 | G31 | **Marine map GPX export** — chartplotter-ready route zip from race course YAML — [§7.23](#723-marine-map-gpx-export), [ADR-0017](./adr/0017-marine-map-gpx-export.md) |
+| G32 | **YAML-LD linked data** — interconnected fact YAML in AI-sailing-data follows [W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/) for verifiable cross-document references — [§7.15.8](#7158-yaml-ld-linked-data-format), [ADR-0022](./adr/0022-yaml-ld-interconnected-data.md) |
 
 ### 3.2 Non-goals (v1)
 
@@ -2342,8 +2343,9 @@ Legacy `AI-sailing-system/config/*.yaml` files are **deprecated** in favor of `A
 ### 7.15 Race & boat data repository (AI-sailing-data)
 
 **Repository:** [github.com/cognite-fholm/AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)  
-**ADR:** [0009](./adr/0009-dual-repository-race-data.md)  
-**Schema:** `schema/README.md` in data repo
+**ADR:** [0009](./adr/0009-dual-repository-race-data.md), [0022](./adr/0022-yaml-ld-interconnected-data.md)  
+**Schema:** `schema/README.md` in data repo  
+**Linked Data format:** [W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/) — `schema/yaml-ld/context.jsonld`, agent skills `yaml-ld-write` / `yaml-ld-read`
 
 #### 7.15.1 Purpose — onshore planning
 
@@ -2391,22 +2393,29 @@ Folder name: `{year}-{month}-{slug}`. Manifest: `race.yaml` (`kind: Race`).
 
 #### 7.15.4 Neo4j YAML import format
 
-Declarative files use `apiVersion: sailing.cognite-fholm/v1`:
+Declarative files use `apiVersion: sailing.cognite-fholm/v1` and **YAML-LD** headers ([§7.15.8](#7158-yaml-ld-linked-data-format)):
 
 ```yaml
+"@context":
+  - "https://sailing.cognite-fholm/schema/v1/context.jsonld"
+  - "@base": "https://sailing.cognite-fholm/data/v1/"
+"@id": "boats/NOR-10133/neo4j/nodes/vessel.yaml"
+"@type": "sailing:Neo4jNode"
+apiVersion: sailing.cognite-fholm/v1
 kind: Neo4jNode
 metadata:
-  ref: vessel-7710
+  "@id": "urn:sailing:entity:vessel-xbox"
+  ref: vessel-xbox
 spec:
   labels: [Vessel]
   merge_keys: [id]
   properties:
     id: own-boat
-    sail_number: "7710"
+    sail_number: "NOR-10133"
     is_own: true
 ```
 
-`race-import` resolves `from_ref` / `to_ref` in relationship files and executes idempotent `MERGE`. **Runtime-only** labels (`LiveStanding`, `CourseSelection`, `AisTrack`) are never imported from git.
+`race-import` resolves `from` / `to` entity node objects (or legacy `from_ref` / `to_ref`) in relationship files and executes idempotent `MERGE`. **Runtime-only** labels (`LiveStanding`, `CourseSelection`, `AisTrack`) are never imported from git.
 
 #### 7.15.5 `race-data-sync` service
 
@@ -2439,7 +2448,76 @@ race-import apply --boat 7710 --year 2026
 
 Loads boats referenced in `fleet.yaml`, then race `neo4j/import-order.yaml`. Validates against `schema/README.md` before MERGE.
 
-#### 7.15.7 Dual-repo deployment
+Loads boats referenced in `fleet.yaml`, then race `neo4j/import-order.yaml`. Validates against `schema/README.md` and YAML-LD rules ([§7.15.8](#7158-yaml-ld-linked-data-format)) before MERGE.
+
+#### 7.15.8 YAML-LD linked data format
+
+**Standard:** [W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/) — Basic profile, UTF-8, YAML 1.2+  
+**ADR:** [0022](./adr/0022-yaml-ld-interconnected-data.md)  
+**Normative detail:** [AI-sailing-data `schema/yaml-ld/README.md`](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/yaml-ld/README.md)  
+**User guide:** [AI-sailing-data `docs/YAML_LD.md`](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/YAML_LD.md)
+
+All **interconnected fact YAML** under `boats/`, `races/`, and Neo4j templates in AI-sailing-data MUST be valid YAML-LD documents: convertible to JSON-LD without semantic loss.
+
+##### 7.15.8.1 Why YAML-LD
+
+| Before | After (YAML-LD) |
+|--------|-----------------|
+| `metadata.ref` strings matched by convention | Entity `@id` URNs (`urn:sailing:entity:{ref}`) |
+| Cross-file links as bare strings | Typed node objects `{"@id": "...", "@type": "sailing:..."}` |
+| No document identity | Document `@id` = repo-relative path under `@base` |
+| YAML 1.1 `NO`/`yes` boolean traps | YAML 1.2 + quoted strings — [Norway problem](https://w3c.github.io/yaml-ld/#interoperability-considerations) avoided |
+
+The Kubernetes-style envelope (`apiVersion`, `kind`, `metadata`, `spec`) is **retained** for human editing and Pydantic models.
+
+##### 7.15.8.2 Required document headers
+
+| Key | Value |
+|-----|-------|
+| `@context` | `https://sailing.cognite-fholm/schema/v1/context.jsonld` + `@base` |
+| `@id` | Repo-relative path, e.g. `boats/NOR-10133/boat.yaml` |
+| `@type` | `sailing:{Kind}` — must match `kind` |
+| `metadata["@id"]` | `urn:sailing:entity:{metadata.ref}` |
+| `apiVersion` | `sailing.cognite-fholm/v1` |
+
+Shared vocabulary: [`schema/yaml-ld/context.jsonld`](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/yaml-ld/context.jsonld).
+
+##### 7.15.8.3 Cross-document references
+
+**Entity link** (same graph node across files):
+
+```yaml
+active_certificate:
+  "@type": "sailing:OrcCertificate"
+  "@id": "urn:sailing:entity:cert-international-034400038T6"
+```
+
+**Document link** (whole file is the target):
+
+```yaml
+polar_document:
+  "@type": "sailing:PolarSource"
+  "@id": "boats/NOR-10133/2024/certificates/international-034400038T6/polar.yaml"
+```
+
+##### 7.15.8.4 Agent and runtime enforcement
+
+| Role | Mechanism |
+|------|-----------|
+| Shore authoring | Cursor skills `yaml-ld-write` / `yaml-ld-read` in AI-sailing-data |
+| Runtime services | `yaml-ld-read` skill + Pydantic models in AI-sailing-system |
+| `race-preparation` | Must invoke `yaml-ld-write` for all emitted fact YAML |
+| CI (planned) | JSON-LD expansion against `context.jsonld` on PR |
+
+##### 7.15.8.5 Legacy files
+
+Files without `@context` are **legacy**. Services and agents apply [legacy fallback](https://github.com/cognite-fholm/AI-sailing-data/blob/main/.cursor/skills/yaml-ld-read/SKILL.md#legacy-fallback) until migrated. New or substantively edited files without YAML-LD headers are **non-conformant**.
+
+##### 7.15.8.6 Excluded files
+
+Not YAML-LD: `collected/**/*.json`, binary assets, OKF markdown, wiki prose, `docker-compose*.yml`, `deploy/env/*`.
+
+#### 7.15.9 Dual-repo deployment
 
 | Step | System repo | Data repo |
 |------|-------------|-----------|
@@ -4021,8 +4099,8 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 |-------------|----------------|
 | 0, 4 | [11.6](#116-operations) |
 | 1 | [11.1](#111-sla-1--telemetry) |
-| 2A | [11.9](#119-orc-certificate-collection-shore), [11.10](#1110-shore-weather--current-collection), [11.13](#1113-marine-map-gpx-export) |
-| 2B–2D | [11.2](#112-sla-2--race-competitors-grib-polars--wind) FR-10–41 |
+| 2A | [11.9](#119-orc-certificate-collection-shore), [11.10](#1110-shore-weather--current-collection), [11.13](#1113-marine-map-gpx-export), [11.14](#1114-yaml-ld-linked-data-ai-sailing-data) |
+| 2B–2D | [11.2](#112-sla-2--race-competitors-grib-polars--wind) FR-10–41, [11.14](#1114-yaml-ld-linked-data-ai-sailing-data) |
 | 2E | [11.2](#112-sla-2--race-competitors-grib-polars--wind) FR-42–59, [11.7](#117-bg-h5000-integration--display-parity) |
 | 2F | [11.11](#1111-tactical-insight-alerts--annunciation), [11.12](#1112-fleet-polar-performance-timeline-influxdb), [11.5](#115-ai-coaching-cross-tier) |
 | 2G | [11.8](#118-race-side-mcp-laptop-cursor) |
@@ -4272,6 +4350,21 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 | FR-188 | Hand-editing `waypoints[].lat/lon` in git is discouraged; `prep-status` phase 5 complete when all routes pass editor validation |
 | FR-180 | Documented import path for Navionics, PredictWind Marine, OpenCPN |
 
+### 11.14 YAML-LD linked data (AI-sailing-data)
+
+**ADR:** [0022](./adr/0022-yaml-ld-interconnected-data.md) · **Spec:** [§7.15.8](./spec.md#7158-yaml-ld-linked-data-format) · **Standard:** [W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/)
+
+| ID | Requirement |
+|----|-------------|
+| FR-189 | All interconnected fact YAML in AI-sailing-data conforms to YAML-LD 1.0 **Basic profile** (UTF-8, YAML 1.2+) |
+| FR-190 | Every fact document declares `@context`, `@id`, `@type`, and `metadata["@id"]` per [schema/yaml-ld](https://github.com/cognite-fholm/AI-sailing-data/tree/main/schema/yaml-ld) |
+| FR-191 | Cross-entity references use JSON-LD node objects with `@id` and `@type` — not bare slug strings (new/edited files) |
+| FR-192 | Shared vocabulary published at `schema/yaml-ld/context.jsonld` with one `sailing:{Kind}` term per registered `kind` |
+| FR-193 | Cursor agents use `yaml-ld-write` / `yaml-ld-read` skills with documented do/don't enforcement |
+| FR-194 | Runtime services (`race-import`, `course-sk-sync`, `polar-manager`) resolve links via YAML-LD rules with legacy fallback |
+| FR-195 | CI validates YAML-LD expand/compatibility on PR (Phase 2B follow-up) |
+| FR-196 | `kind` MUST equal local name of `@type`; mismatch is a validation error |
+
 ---
 
 ## 12. Non-functional requirements
@@ -4395,7 +4488,7 @@ Phases match [§1.1 Implementation map](#11-implementation-map). Checklists are 
 
 - [x] Repository created; [spec.md](./spec.md) v0.21
 - [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
-- [x] ADR-0001 through ADR-0021 (see [adr/README.md](./adr/README.md#implementation-order))
+- [x] ADR-0001 through ADR-0022 (see [adr/README.md](./adr/README.md#implementation-order))
 - [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide + user guides
 - [x] Deploy scaffolding, workflow stubs, harbor scripts
 - [x] Runtime containers — Phase 1 & 2B core (compose + services)
@@ -4415,7 +4508,7 @@ Phases match [§1.1 Implementation map](#11-implementation-map). Checklists are 
 
 ### Phase 2A — Shore race prep (AI-sailing-data)
 
-**ADR:** 0009, 0013, 0014, 0017 · **§7:** 7.15, 7.19, 7.20, 7.23 · **FR:** 11.9, 11.10, 11.13
+**ADR:** 0009, 0013, 0014, 0017, **0022** · **§7:** 7.15, 7.15.8, 7.19, 7.20, 7.23 · **FR:** 11.9, 11.10, 11.13, **11.14**
 
 Runs onshore (laptop); can parallel Phase 1.
 
@@ -4423,16 +4516,19 @@ Runs onshore (laptop); can parallel Phase 1.
 - [x] ORC certificate collection skill (`orc-sailor-services`)
 - [x] MET GRIB, Oslofjord current plots, SMHI wind skills
 - [x] Marine map GPX export skill + Færder example
+- [x] YAML-LD standard — `schema/yaml-ld/`, ADR-0022, `yaml-ld-write` / `yaml-ld-read` skills, [docs/YAML_LD.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/YAML_LD.md)
+- [ ] Bulk migration of legacy YAML files to `@context` headers
 - [ ] Complete waypoint lat/lon for all course variants — **via `course-editor`** (SoR); then re-export marine map
 - [ ] `prep-status.yaml` on all target races
 
 ### Phase 2B — Graph import & sync
 
-**ADR:** 0009 · **§7:** 7.3, 7.15 · **FR:** 11.2 (import subset)
+**ADR:** 0009, **0022** · **§7:** 7.3, 7.15, 7.15.8 · **FR:** 11.2 (import), **11.14**
 
 - [ ] Neo4j schema (Vessel, Polar, GribModel, Waypoint, HandicapRating, …)
 - [x] `docker-compose.sla-2.yml` (core services)
 - [x] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
+- [ ] YAML-LD CI validation (FR-195) — JSON-LD expand on PR
 
 ### Phase 2C — GRIB, polars, AIS, wind
 

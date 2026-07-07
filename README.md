@@ -20,6 +20,7 @@ Cursor reads [`.cursor/rules/dev-prerequisites.mdc`](./.cursor/rules/dev-prerequ
 |----------|---------|
 | **[docs/DEV-SETUP.md](./docs/DEV-SETUP.md)** | **New laptop** — WSL2, Docker Desktop, local `docker compose` |
 | [docs/USER_GUIDE.md](./docs/USER_GUIDE.md) | **User guide** — shore prep links + onboard overview |
+| [docs/YAML_LD.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/YAML_LD.md) | Data repo — YAML-LD linked data (via data repo) |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Architecture index — repos, tiers, ADRs |
 | [spec.md](./spec.md) | Full system specification |
 | [tests/bdd/](./tests/bdd/README.md) | Gherkin acceptance tests per implementation phase |
@@ -46,7 +47,7 @@ Help sailors **win races** by combining real-time onboard sensor data, historica
 
 Each onboard tier has its own Docker Compose stack and may run on a **different Raspberry Pi**. See [spec.md §5](./spec.md#5-three-tier-sla-architecture) and [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
-**Data repo:** Race and boat YAML live in [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) — synced onboard via `race-data-sync`.
+**Data repo:** Race and boat **YAML-LD** ([W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/)) live in [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) — synced onboard via `race-data-sync`. See [ADR-0022](./adr/0022-yaml-ld-interconnected-data.md).
 
 **GoPro + ML loop:** HERO13 cameras → onboard geometry → harbor export → **TrimTransformer on gaming PC** → GHCR → boat. See [spec.md §7.9–7.11](./spec.md#79-gopro-hero13-black-fleet).
 

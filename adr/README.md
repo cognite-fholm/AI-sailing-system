@@ -18,6 +18,7 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | | [0011](./0011-bg-h5000-reference-model.md) | B&G H5000 instrument and race-display reference (ingest paths) |
 | | [0021](./0021-sla1-signalk-plugin-strategy.md) | SLA-1 Signal K plugins — course-provider, course-sk-sync, polar performance |
 | **2A — Shore race prep** | [0009](./0009-dual-repository-race-data.md) | (data repo model — see Phase 0) |
+| | [0022](./0022-yaml-ld-interconnected-data.md) | YAML-LD for interconnected data (W3C) |
 | | [0013](./0013-orc-certificate-fleet-collection.md) | Automated ORC certificate collection for race fleets |
 | | [0014](./0014-shore-weather-current-collection.md) | Shore weather and current collection (PredictWind GRIB, MET, SMHI) |
 | | [0017](./0017-marine-map-gpx-export.md) | Marine map GPX export bundle (PredictWind-compatible) |
@@ -58,6 +59,7 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | [0019](./0019-predictwind-multi-model-grib.md) | PredictWind multi-model GRIB and onboard model scoring | 2A, 2C | Accepted |
 | [0020](./0020-course-editor-coordinate-system-of-record.md) | course-editor as coordinate system of record | 2A, 2D | Accepted |
 | [0021](./0021-sla1-signalk-plugin-strategy.md) | SLA-1 Signal K plugin strategy (course-provider, sidecars) | 1, 2C | Accepted |
+| [0022](./0022-yaml-ld-interconnected-data.md) | YAML-LD for interconnected data in AI-sailing-data | 2A, 2B | Accepted |
 
 ## Format
 
@@ -69,4 +71,4 @@ Each ADR follows the structure:
 4. **Consequences** — positive, negative, risks
 5. **Alternatives considered**
 
-New decisions should use the next sequential number: `0021-short-title.md`.
+New decisions should use the next sequential number: `0023-short-title.md`.

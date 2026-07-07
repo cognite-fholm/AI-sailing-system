@@ -11,7 +11,9 @@ Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, d
 | Repository | Role | Onboard path |
 |------------|------|--------------|
 | **[AI-sailing-system](https://github.com/cognite-fholm/AI-sailing-system)** (this repo) | Code, Docker images, CI/CD, ADRs, spec | `/opt/ai-sailing-system/` |
-| **[AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)** | Races, boats, ORC certs, planning YAML, Neo4j templates | `/opt/ai-sailing-data/` |
+| **[AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)** | Races, boats, ORC certs, planning **YAML-LD**, Neo4j templates | `/opt/ai-sailing-data/` |
+
+**YAML format:** Interconnected facts use [W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/) — [ADR-0022](../adr/0022-yaml-ld-interconnected-data.md) · [data repo schema/yaml-ld](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/yaml-ld/README.md)
 
 **Rule:** Prepare regattas in **AI-sailing-data** on shore (Cursor + Git). Freeze **both** git refs and system image digests before a race ([ADR-0009](../adr/0009-dual-repository-race-data.md)).
 
@@ -130,6 +132,7 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0016](../adr/0016-fleet-polar-performance-influx.md) | Fleet polar performance timeline in InfluxDB |
 | [0017](../adr/0017-marine-map-gpx-export.md) | Marine map GPX export (PredictWind-compatible zip) |
 | [0021](../adr/0021-sla1-signalk-plugin-strategy.md) | SLA-1 Signal K plugins — course geometry + polar performance |
+| [0022](../adr/0022-yaml-ld-interconnected-data.md) | YAML-LD linked data (AI-sailing-data) |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -252,7 +255,7 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 |-------|--------|
 | **0 — Foundation** | **Done** — spec v0.21, ADRs 0001–0021, BDD scaffold |
 | **1 — SLA-1 telemetry** | **Scaffold** — `course-provider`, `course-sk-sync`, `signalk-polar-performance`, bridge, Grafana; PiCAN ingest pending |
-| **2A — Shore race prep** | **Partial** — data repo skills, Færder examples; waypoint gaps remain |
+| **2A — Shore race prep** | **Partial** — data repo skills, Færder examples, **YAML-LD** (ADR-0022); waypoint gaps remain |
 | **2B — Graph import** | **Scaffold** — `docker-compose.sla-2.yml`, `race-import`, `race-data-sync` |
 | **2C — GRIB, polars, AIS** | **Stub** — `polar-manager` target-speeds API only |
 | **2D — Courses & results** | Not started |
