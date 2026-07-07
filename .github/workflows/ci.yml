@@ -18,10 +18,21 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Checkout AI-sailing-data
+        id: data
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
           repository: cognite-fholm/AI-sailing-data
           path: AI-sailing-data
+          # Required for private sibling repo. Fine-grained PAT: contents read on AI-sailing-data.
+          # Repo secret: AI_SAILING_DATA_CHECKOUT_TOKEN (see deploy/README.md).
+          token: ${{ secrets.AI_SAILING_DATA_CHECKOUT_TOKEN }}
+
+      - name: Note data-repo checkout
+        if: steps.data.outcome != 'success'
+        run: |
+          echo "::warning::AI-sailing-data checkout skipped — add repo secret AI_SAILING_DATA_CHECKOUT_TOKEN for full cross-repo validation."
+          echo "YAML-LD/SHACL still runs in AI-sailing-data CI."
 
       - name: Validate YAML configs
         run: |
@@ -31,6 +42,11 @@ jobs:
               yaml.safe_load(p.read_text(encoding='utf-8'))
               print('OK', p)
           "
+
+      - name: Prepare compose secret stub
+        run: |
+          mkdir -p deploy/secrets
+          echo "ci-placeholder-not-a-real-token" > deploy/secrets/github_token
 
       - name: Validate Docker Compose files
         run: |
@@ -42,12 +58,13 @@ jobs:
 
       - name: Run acceptance and unit tests
         env:
-          AI_SAILING_DATA_ROOT: ${{ github.workspace }}/AI-sailing-data
+          AI_SAILING_DATA_ROOT: ${{ steps.data.outcome == 'success' && format('{0}/AI-sailing-data', github.workspace) }}
         run: |
           pip install -r requirements-dev.txt
           pytest tests/bdd/steps tests/unit -m "not wip" -q --cov=course_sk_sync --cov=polar_manager --cov=signalk_influx_bridge --cov=signalk_polar_performance --cov-report=term-missing --cov-fail-under=45
 
       - name: Validate AI-sailing-data YAML-LD and SHACL
+        if: steps.data.outcome == 'success'
         run: |
           pip install -r AI-sailing-data/requirements-dev.txt
           python AI-sailing-data/scripts/sync_hosted_context.py
