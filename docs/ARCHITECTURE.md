@@ -318,7 +318,7 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 | **2E — Race UX** | Not started |
 | **2F — Analytics & alerts** | Not started |
 | **2G — Laptop MCP** | Scaffold only (`race-mcp-gateway/`) |
-| **2H — Live sync & archive** | **Spec + scaffold** — ADR-0024/0025/0026/0027/0028, `race-live-sync`, `race-lifecycle` |
+| **2H — Live sync & archive** | **Partial** — ADR-0024–0028; enriched `race-live-sync` rollup; `live-results` + `fleet-performance-tracker` libs; `race-lifecycle` |
 | **3 — SLA-3 vision** | Not started |
 | **4 — CI/CD multi-Pi** | **Partial** — CI + publish-sla-1/2 + release; publish-sla-3 pending |
 | **5 — Shore training** | Spec only |

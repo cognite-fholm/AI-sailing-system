@@ -26,6 +26,10 @@ class LiveSyncConfig:
     neo4j_uri: str
     neo4j_user: str
     neo4j_password: str
+    influx_url: str
+    influx_org: str
+    influx_bucket: str
+    influx_token: str
 
     @classmethod
     def from_yaml(cls, path: Path) -> LiveSyncConfig:
@@ -34,12 +38,23 @@ class LiveSyncConfig:
         active = raw.get("active", {})
         sync = raw.get("live_sync", {})
         neo4j = raw.get("neo4j", {})
+        influx = raw.get("influx", {})
 
         regatta_id = active.get("regatta_id", os.environ.get("ACTIVE_REGATTA_ID", ""))
+        race_folder = (
+            active.get("race_folder")
+            or active.get("race_path")
+            or os.environ.get("ACTIVE_RACE_PATH", "")
+        )
+
         token_file = os.environ.get("GITHUB_TOKEN_FILE", "/run/secrets/github_token")
         token = os.environ.get("GITHUB_TOKEN", "")
         if not token and Path(token_file).is_file():
             token = Path(token_file).read_text(encoding="utf-8").strip()
+
+        influx_token = os.environ.get("INFLUX_READ_TOKEN") or os.environ.get(
+            "INFLUX_WRITE_TOKEN", influx.get("token", "")
+        )
 
         live_branch = sync.get("branch_pattern", "race-live/{regatta_id}").format(
             regatta_id=regatta_id
@@ -51,7 +66,7 @@ class LiveSyncConfig:
             branch=repo.get("branch", "main"),
             live_branch=os.environ.get("RACE_LIVE_BRANCH", live_branch),
             regatta_id=regatta_id,
-            race_folder=active.get("race_folder", ""),
+            race_folder=str(race_folder).rstrip("/"),
             interval_minutes=int(
                 os.environ.get(
                     "RACE_LIVE_SYNC_INTERVAL_MINUTES",
@@ -74,4 +89,8 @@ class LiveSyncConfig:
             neo4j_uri=os.environ.get("NEO4J_URI", neo4j.get("uri", "bolt://neo4j:7687")),
             neo4j_user=os.environ.get("NEO4J_USER", neo4j.get("user", "neo4j")),
             neo4j_password=os.environ.get("NEO4J_PASSWORD", neo4j.get("password", "")),
+            influx_url=os.environ.get("INFLUX_URL", influx.get("url", "http://influxdb:8086")),
+            influx_org=os.environ.get("INFLUX_ORG", influx.get("org", "ai-sailing")),
+            influx_bucket=os.environ.get("INFLUX_BUCKET", influx.get("bucket", "race")),
+            influx_token=influx_token,
         )

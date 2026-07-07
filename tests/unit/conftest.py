@@ -16,6 +16,9 @@ for _pkg in (
     "signalk-polar-performance",
     "signalk-influx-bridge",
     "race-import",
+    "live-results",
+    "fleet-performance-tracker",
+    "race-live-sync",
 ):
     _path = REPO_ROOT / _pkg
     if _path.is_dir() and str(_path) not in sys.path:

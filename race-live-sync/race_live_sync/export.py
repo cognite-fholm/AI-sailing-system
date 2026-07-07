@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -10,30 +12,37 @@ from typing import Any
 import yaml
 
 from race_live_sync.config import LiveSyncConfig
+from race_live_sync.deltas import build_deltas, read_previous_fleet_performance
+from race_live_sync.insights import build_insights
+from race_live_sync.policy import load_live_sync_policy
 
 logger = logging.getLogger(__name__)
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+for _pkg in ("live-results", "fleet-performance-tracker"):
+    _path = _REPO_ROOT / _pkg
+    if _path.is_dir() and str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
+
+from fleet_performance_tracker.influx import InfluxFleetReader  # noqa: E402
+from fleet_performance_tracker.rollup import (  # noqa: E402
+    apply_rank_deltas,
+    rollup_fleet_performance,
+)
+from live_results.neo4j import (  # noqa: E402
+    Neo4jRaceReader,
+    course_selection_to_snapshot,
+)
+from live_results.standings import standings_from_neo4j_rows  # noqa: E402
 
 CONTEXT = [
     "https://sailing.cognite-fholm/schema/v1/context.jsonld",
     {"@base": "https://sailing.cognite-fholm/data/v1/"},
 ]
 
-POLAR_ABOVE_PCT = 105.0
-POLAR_BELOW_PCT = 90.0
-
 
 def _utc_now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _polar_outlier(performance_pct: float | None) -> str:
-    if performance_pct is None:
-        return "neutral"
-    if performance_pct >= POLAR_ABOVE_PCT:
-        return "above"
-    if performance_pct <= POLAR_BELOW_PCT:
-        return "below"
-    return "neutral"
 
 
 def read_sequence(manifest_path: Path) -> int:
@@ -45,63 +54,93 @@ def read_sequence(manifest_path: Path) -> int:
     return int(doc.get("spec", {}).get("last_sequence", 0))
 
 
-def query_standings(_config: LiveSyncConfig) -> list[dict[str, Any]]:
-    """Corrected-time standings if race finished now — from live-results / Neo4j."""
-    # TODO: Cypher per schema/neo4j-mapping.yaml
-    return []
+def query_standings(config: LiveSyncConfig) -> list[dict[str, Any]]:
+    if not config.neo4j_password:
+        logger.warning("Neo4j password not set — standings empty")
+        return []
+    reader = Neo4jRaceReader(config.neo4j_uri, config.neo4j_user, config.neo4j_password)
+    try:
+        rows = reader.fetch_standings()
+        return standings_from_neo4j_rows(rows)
+    except Exception:
+        logger.exception("Neo4j standings query failed")
+        return []
+    finally:
+        reader.close()
 
 
-def query_fleet_performance_rollup(_config: LiveSyncConfig, _window_minutes: int) -> list[dict[str, Any]]:
-    """5 min mean from Influx fleet_polar_performance per sail_number."""
-    # TODO: Flux query + join AIS positions
-    return []
+def query_course_selection(config: LiveSyncConfig) -> dict[str, Any] | None:
+    if not config.neo4j_password:
+        return None
+    reader = Neo4jRaceReader(config.neo4j_uri, config.neo4j_user, config.neo4j_password)
+    try:
+        return course_selection_to_snapshot(reader.fetch_course_selection())
+    except Exception:
+        logger.exception("Neo4j course selection query failed")
+        return None
+    finally:
+        reader.close()
 
 
-def build_insights(fleet_performance: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Precompute tactical insight blocks for shore agents."""
-    insights: list[dict[str, Any]] = []
-    outperformers = [f for f in fleet_performance if f.get("polar_outlier") == "above"]
-    underperformers = [f for f in fleet_performance if f.get("polar_outlier") == "below"]
-    if outperformers:
-        insights.append(
-            {
-                "type": "polar_outperformers",
-                "vessels": [f.get("sail_number") for f in outperformers],
-                "summary": f"{len(outperformers)} boat(s) above polar threshold",
-            }
+def query_fleet_performance_rollup(
+    config: LiveSyncConfig,
+    window_minutes: int,
+    *,
+    policy_above: float = 105.0,
+    policy_below: float = 90.0,
+) -> list[dict[str, Any]]:
+    if not config.influx_token:
+        logger.warning("Influx token not set — fleet_performance empty")
+        return []
+    reader = InfluxFleetReader(
+        config.influx_url,
+        config.influx_token,
+        config.influx_org,
+        config.influx_bucket,
+    )
+    try:
+        records = reader.fetch_window(config.regatta_id, window_minutes)
+        return rollup_fleet_performance(
+            records,
+            above_threshold=policy_above,
+            below_threshold=policy_below,
         )
-    if underperformers:
-        insights.append(
-            {
-                "type": "polar_underperformers",
-                "vessels": [f.get("sail_number") for f in underperformers],
-                "summary": f"{len(underperformers)} boat(s) below polar threshold",
-            }
-        )
-    if fleet_performance:
-        vmg_leader = max(fleet_performance, key=lambda f: f.get("vmg_actual") or 0.0)
-        insights.append(
-            {
-                "type": "vmg_leaders_leg",
-                "leg_seq": vmg_leader.get("leg_seq"),
-                "leader": vmg_leader.get("sail_number"),
-                "vmg_actual": vmg_leader.get("vmg_actual"),
-            }
-        )
-    return insights
+    except Exception:
+        logger.exception("Influx fleet rollup failed")
+        return []
+    finally:
+        reader.close()
 
 
-def build_snapshot(config: LiveSyncConfig, sequence: int) -> dict[str, Any]:
-    """Query Neo4j + Influx and map to RaceLiveSnapshot."""
+def build_snapshot(
+    config: LiveSyncConfig,
+    sequence: int,
+    *,
+    previous_fleet: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     observed_at = _utc_now()
     race_folder = config.race_folder.rstrip("/")
     ref_suffix = config.regatta_id.replace("-", "_")[:32]
 
+    policy = load_live_sync_policy(config.local_path, race_folder)
     standings = query_standings(config)
-    fleet_performance = query_fleet_performance_rollup(config, config.interval_minutes)
-    for entry in fleet_performance:
-        entry.setdefault("polar_outlier", _polar_outlier(entry.get("performance_pct")))
-    insights = build_insights(fleet_performance)
+    fleet_performance = query_fleet_performance_rollup(
+        config,
+        config.interval_minutes,
+        policy_above=policy.polar_above_pct,
+        policy_below=policy.polar_below_pct,
+    )
+    if previous_fleet:
+        fleet_performance = apply_rank_deltas(fleet_performance, previous_fleet)
+
+    insights = build_insights(fleet_performance, standings, previous_fleet=previous_fleet)
+    course_selection = query_course_selection(config)
+    deltas = build_deltas(
+        sequence,
+        fleet_performance,
+        standings,
+        previous_fleet or [],
+    )
 
     return {
         "@context": CONTEXT,
@@ -123,10 +162,10 @@ def build_snapshot(config: LiveSyncConfig, sequence: int) -> dict[str, Any]:
             },
             "standings": standings,
             "fleet_performance": fleet_performance,
-            "course_selection": None,
+            "course_selection": course_selection,
             "insights": insights,
             "grib_scores": {},
-            "deltas": {"sequence_prev": sequence - 1 if sequence > 1 else None},
+            "deltas": deltas,
         },
     }
 
@@ -169,8 +208,9 @@ def write_live_files(config: LiveSyncConfig) -> tuple[Path, Path, int, str]:
 
     manifest_path = live_dir / "sync-manifest.yaml"
     sequence = read_sequence(manifest_path) + 1
+    previous_fleet = read_previous_fleet_performance(live_dir)
 
-    snapshot = build_snapshot(config, sequence)
+    snapshot = build_snapshot(config, sequence, previous_fleet=previous_fleet)
     observed_at = snapshot["spec"]["observed_at"]
 
     current_path = live_dir / "current.yaml"

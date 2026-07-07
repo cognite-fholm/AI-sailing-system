@@ -180,12 +180,19 @@ Defer implementation until Layer 1–2 are stable.
 
 ## Implementation artifacts
 
-| Artifact | Repository |
-|----------|------------|
-| `RaceLiveSnapshot` schema extension | AI-sailing-data `schema/neo4j-mapping.yaml` |
-| `race_live_sync/export.py` rollup | AI-sailing-system |
-| `docs/RACE_LIVE_SYNC.md` | AI-sailing-data |
-| Spec §7.27, §11.20 | AI-sailing-system |
+| Artifact | Repository | Status |
+|----------|------------|--------|
+| `RaceLiveSnapshot` schema extension | AI-sailing-data `schema/neo4j-mapping.yaml` | Done |
+| `race-live/current.yaml.example` | AI-sailing-data `races/.../race-live/` | Done (fixture) |
+| `live-results` — corrected-time standings | AI-sailing-system `live-results/` | Partial (Neo4j reader + rank) |
+| `fleet-performance-tracker` — 30 s Influx rollup | AI-sailing-system `fleet-performance-tracker/` | Partial (rollup + writer scaffold) |
+| `race_live_sync/export.py` — 5 min rollup | AI-sailing-system `race-live-sync/` | Done (insights, deltas, policy) |
+| Unit + BDD tests | AI-sailing-system `tests/unit`, `tests/bdd/features/phase_02h_*` | Done |
+| `docs/RACE_LIVE_SYNC.md` | AI-sailing-data | Done |
+| Spec §7.27, §11.20 | AI-sailing-system | Done |
+| Layer 3 Dolt dual-write | — | Deferred |
+
+**Loop engineering:** Layer 1 (30 s Influx) and Layer 2 (5 min git) ship first; Dolt row diffs follow when rollups are stable in production.
 
 ---
 

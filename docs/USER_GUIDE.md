@@ -81,6 +81,20 @@ Export structured insights from Neo4j to **GitHub** during and after the race ([
 
 `race-live-sync` pushes `race-live/current.yaml` to branch `race-live/{regatta_id}` **every 5 minutes** when `ONLINE_MODE=true`. Configure `GITHUB_TOKEN` via Docker secret — never in the image.
 
+Each tick is an **enriched snapshot** ([ADR-0028](../adr/0028-enriched-live-snapshot-fleet-performance-temporal.md)) that answers five tactical questions without VPN to the boat:
+
+| Question | Read in `current.yaml` |
+|----------|------------------------|
+| Results if the race finished **now**? | `spec.standings[]` — corrected seconds, rank, Δ leader |
+| Who sails **above** polar? | `spec.insights[]` type `polar_outperformers` + `fleet_performance[]` |
+| Who sails **below** polar? | `spec.insights[]` type `polar_underperformers` |
+| Who has better **course / VMG** toward the mark? | `spec.insights[]` `vmg_leaders_leg`, `course_progress_leaders` |
+| Who has **better wind** on the course? | `spec.insights[]` `wind_advantage` |
+
+**30 s** fleet polar data stays in Influx on the boat; git stores **5 min rollups** only. Thresholds default to 105% / 90% (`planning/runtime-policy.yaml`).
+
+Example fixture: [race-live/current.yaml.example](https://github.com/cognite-fholm/AI-sailing-data/blob/main/races/2026/2026-06-faerderseilasen/race-live/current.yaml.example)
+
 | Guide | Topic |
 |-------|-------|
 | [Race live sync](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_LIVE_SYNC.md) | LTE push, secrets, cloud AI, git playback |

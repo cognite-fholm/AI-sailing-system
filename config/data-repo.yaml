@@ -26,3 +26,21 @@ active:
   active_certificate_ref: cert-international-034400038T6
   certificate_year: 2024
   index_file: index.yaml
+
+live_sync:
+  enabled: true
+  interval_minutes: 5
+  branch_pattern: "race-live/{regatta_id}"
+  online_required: true
+  git_user_name: race-live-sync
+  git_user_email: race-live-sync@boats.local
+
+neo4j:
+  uri: bolt://neo4j:7687
+  user: neo4j
+  password: change-me-neo4j
+
+influx:
+  url: http://influxdb:8086
+  org: ai-sailing
+  bucket: race
