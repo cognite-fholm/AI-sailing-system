@@ -1,9 +1,9 @@
 FROM python:3.12-slim-bookworm
 
 WORKDIR /app
-COPY requirements.txt .
+COPY race-lifecycle/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-COPY race_lifecycle/ race_lifecycle/
+COPY race-lifecycle/race_lifecycle/ race_lifecycle/
 COPY scripts/sync_active_context.py scripts/sync_active_context.py
 
 ENV PYTHONUNBUFFERED=1

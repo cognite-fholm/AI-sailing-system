@@ -155,6 +155,42 @@ services:
       GIT_USER_EMAIL: ${GIT_USER_EMAIL:-race-live-sync@boats.local}
       RACE_LIFECYCLE_STATE: /var/run/ai-sailing/race-lifecycle.json
 
+  fleet-performance-tracker:
+    build:
+      context: .
+      dockerfile: fleet-performance-tracker/Dockerfile
+    image: ${FLEET_PERF_TRACKER_IMAGE:-ghcr.io/cognite-fholm/fleet-performance-tracker:local}
+    container_name: fleet-performance-tracker
+    restart: unless-stopped
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      polar-manager:
+        condition: service_started
+      race-lifecycle:
+        condition: service_started
+    volumes:
+      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
+      - ${DATA_REPO_HOST_PATH:-./data/ai-sailing-data}:/opt/ai-sailing-data
+      - lifecycle-state:/var/run/ai-sailing
+    environment:
+      DATA_REPO_CONFIG: /config/data-repo.yaml
+      DATA_REPO_PATH: /opt/ai-sailing-data
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-change-me-neo4j}
+      INFLUX_URL: ${INFLUX_URL:-http://influxdb:8086}
+      INFLUX_ORG: ${INFLUX_ORG:-ai-sailing}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-race}
+      INFLUX_SIGNALK_BUCKET: ${INFLUX_SIGNALK_BUCKET:-signalk}
+      INFLUX_WRITE_TOKEN: ${INFLUX_WRITE_TOKEN:-}
+      INFLUX_READ_TOKEN: ${INFLUX_READ_TOKEN:-}
+      ACTIVE_REGATTA_ID: ${ACTIVE_REGATTA_ID:-}
+      OWN_SAIL_NUMBER: ${OWN_SAIL_NUMBER:-NOR-10133}
+      VESSEL_ID: ${VESSEL_ID:-own-boat}
+      FLEET_PERF_INTERVAL_SECONDS: ${FLEET_PERF_INTERVAL_SECONDS:-30}
+      RACE_LIFECYCLE_STATE: /var/run/ai-sailing/race-lifecycle.json
+
   race-mcp-gateway:
     build:
       context: ./race-mcp-gateway

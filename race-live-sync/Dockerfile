@@ -19,4 +19,4 @@ COPY fleet-performance-tracker/fleet_performance_tracker/ fleet_performance_trac
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
-CMD ["python", "-m", "race_live_sync.sync"]
+CMD ["python", "-m", "race_live_sync"]

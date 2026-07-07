@@ -35,6 +35,11 @@ def given_file_exists_in_system_repo(repo_root: Path, path: str) -> None:
     assert (repo_root / path).is_file(), f"Missing file: {path}"
 
 
+@then(parsers.parse('the file "{path}" exists in the system repo'))
+def then_file_exists_in_system_repo(repo_root: Path, path: str) -> None:
+    assert (repo_root / path).is_file(), f"Missing file: {path}"
+
+
 @then(parsers.parse('the file "{path}" contains "{text}"'))
 def file_contains_text(repo_root: Path, path: str, text: str) -> None:
     content = (repo_root / path).read_text(encoding="utf-8")

@@ -1,4 +1,4 @@
-"""Periodic fleet polar performance writer (ADR-0016) — 30 s loop scaffold."""
+"""Periodic fleet polar performance writer (ADR-0016) — 30 s own-boat loop."""
 
 from __future__ import annotations
 
@@ -8,39 +8,51 @@ import signal
 import sys
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 
+from fleet_performance_tracker.collector import collect_own_boat_point
+from fleet_performance_tracker.config import FleetTrackerConfig
 from fleet_performance_tracker.influx import InfluxFleetWriter
-from fleet_performance_tracker.models import FleetPerformancePoint
+from fleet_performance_tracker.lifecycle import lifecycle_allows_fleet_write
 
 logger = logging.getLogger(__name__)
 
 
-def write_sample_tick(writer: InfluxFleetWriter, race_id: str) -> None:
-    """Placeholder until live-results + AIS integration lands."""
-    point = FleetPerformancePoint(
-        race_id=race_id,
-        sail_number=os.environ.get("OWN_SAIL_NUMBER", "NOR-10133"),
-        is_own=True,
-        performance_pct=100.0,
-        vmg_pct=95.0,
-    )
+def write_tick(writer: InfluxFleetWriter, config: FleetTrackerConfig) -> bool:
+    if not lifecycle_allows_fleet_write(config.lifecycle_state):
+        logger.debug("Lifecycle phase — fleet write paused")
+        return False
+    point = collect_own_boat_point(config)
+    if point is None:
+        return False
     writer.write_point(point, timestamp=datetime.now(UTC))
+    logger.info(
+        "Wrote fleet_polar_performance sail=%s perf=%.1f%% rank=%s",
+        point.sail_number,
+        point.performance_pct,
+        point.rank,
+    )
+    return True
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    token = os.environ.get("INFLUX_WRITE_TOKEN", "")
-    if not token:
+    config_path = Path(os.environ.get("DATA_REPO_CONFIG", "/config/data-repo.yaml"))
+    if not config_path.is_file():
+        logger.error("Missing config: %s", config_path)
+        sys.exit(1)
+
+    config = FleetTrackerConfig.from_yaml(config_path)
+    if not config.influx_write_token:
         logger.error("INFLUX_WRITE_TOKEN required")
         sys.exit(1)
+
     writer = InfluxFleetWriter(
-        url=os.environ.get("INFLUX_URL", "http://influxdb:8086"),
-        token=token,
-        org=os.environ.get("INFLUX_ORG", "ai-sailing"),
-        bucket=os.environ.get("INFLUX_BUCKET", "race"),
+        config.influx_url,
+        config.influx_write_token,
+        config.influx_org,
+        config.influx_bucket,
     )
-    race_id = os.environ.get("ACTIVE_REGATTA_ID", "")
-    interval = int(os.environ.get("FLEET_PERF_INTERVAL_SECONDS", "30"))
     running = True
 
     def stop(*_args: object) -> None:
@@ -49,12 +61,19 @@ def main() -> None:
 
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
-    logger.info("fleet-performance-tracker race_id=%s interval=%ss", race_id, interval)
+    logger.info(
+        "fleet-performance-tracker race_id=%s interval=%ss sail=%s",
+        config.regatta_id,
+        config.interval_seconds,
+        config.own_sail_number,
+    )
     try:
         while running:
-            if race_id:
-                write_sample_tick(writer, race_id)
-            for _ in range(interval):
+            try:
+                write_tick(writer, config)
+            except Exception:
+                logger.exception("Fleet performance tick failed")
+            for _ in range(config.interval_seconds):
                 if not running:
                     break
                 time.sleep(1)

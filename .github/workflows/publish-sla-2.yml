@@ -10,6 +10,9 @@ on:
       - 'course-parser/**'
       - 'polar-manager/**'
       - 'live-results/**'
+      - 'fleet-performance-tracker/**'
+      - 'race-live-sync/**'
+      - 'race-lifecycle/**'
       - 'course-editor/**'
       - 'race-import/**'
       - 'race-data-sync/**'
@@ -45,6 +48,15 @@ jobs:
           - service: race-mcp-gateway
             context: race-mcp-gateway
             dockerfile: race-mcp-gateway/Dockerfile
+          - service: race-live-sync
+            context: .
+            dockerfile: race-live-sync/Dockerfile
+          - service: fleet-performance-tracker
+            context: .
+            dockerfile: fleet-performance-tracker/Dockerfile
+          - service: race-lifecycle
+            context: .
+            dockerfile: race-lifecycle/Dockerfile
     steps:
       - uses: actions/checkout@v4
 

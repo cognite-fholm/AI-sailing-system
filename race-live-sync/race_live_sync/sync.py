@@ -14,21 +14,14 @@ import yaml
 
 from race_live_sync.config import LiveSyncConfig
 from race_live_sync.export import build_manifest, write_live_files
+from race_live_sync.finalize import run_finalize
 from race_live_sync.git_push import commit_and_push, probe_github
+from race_live_sync.lifecycle import (
+    lifecycle_allows_live_sync,
+    lifecycle_requests_finalize,
+)
 
 logger = logging.getLogger(__name__)
-
-LIFECYCLE_STATE = Path(os.environ.get("RACE_LIFECYCLE_STATE", "/var/run/ai-sailing/race-lifecycle.json"))
-
-
-def lifecycle_allows_live_sync() -> bool:
-    if not LIFECYCLE_STATE.is_file():
-        return True
-    try:
-        state = json.loads(LIFECYCLE_STATE.read_text(encoding="utf-8"))
-        return bool(state.get("race_live_sync_enabled", True))
-    except (json.JSONDecodeError, OSError):
-        return True
 
 
 def write_status(path: Path, status: dict[str, object]) -> None:
@@ -37,6 +30,10 @@ def write_status(path: Path, status: dict[str, object]) -> None:
 
 
 def run_tick(config: LiveSyncConfig) -> dict[str, object]:
+    if lifecycle_requests_finalize():
+        logger.info("Lifecycle requested finalize")
+        return run_finalize(config)
+
     if not config.enabled:
         return {"skipped": True, "reason": "RACE_LIVE_SYNC_ENABLED=false"}
 

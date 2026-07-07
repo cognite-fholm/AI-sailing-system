@@ -14,6 +14,7 @@ import yaml
 from race_live_sync.config import LiveSyncConfig
 from race_live_sync.deltas import build_deltas, read_previous_fleet_performance
 from race_live_sync.insights import build_insights
+from race_live_sync.lifecycle import lifecycle_race_phase
 from race_live_sync.policy import load_live_sync_policy
 
 logger = logging.getLogger(__name__)
@@ -155,7 +156,7 @@ def build_snapshot(
         "spec": {
             "observed_at": observed_at,
             "sequence": sequence,
-            "race_phase": "racing",
+            "race_phase": lifecycle_race_phase(),
             "regatta": {
                 "@type": "sailing:Regatta",
                 "@id": f"urn:sailing:entity:regatta-{ref_suffix}",

@@ -31,3 +31,14 @@ services:
     environment:
       SYNC_AUTO_PULL: "false"
       SYNC_AUTO_IMPORT: "true"
+
+  race-live-sync:
+    environment:
+      RACE_LIVE_SYNC_ENABLED: ${RACE_LIVE_SYNC_ENABLED:-true}
+      ONLINE_MODE: ${ONLINE_MODE:-true}
+
+  fleet-performance-tracker:
+    volumes:
+      - ./config/data-repo.yaml:/config/data-repo.yaml:ro
+      - ${DATA_REPO_HOST_PATH:-../AI-sailing-data}:/opt/ai-sailing-data
+      - lifecycle-state:/var/run/ai-sailing
