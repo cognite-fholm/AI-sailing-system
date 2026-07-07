@@ -26,15 +26,16 @@ Full checklist: **[docs/DEV-SETUP.md](../docs/DEV-SETUP.md)**. Clone **[AI-saili
 
 | State | Env file | Watchtower |
 |-------|----------|------------|
-| Harbor (default) | `deploy/env/harbor.env` | SLA-2/3 via `docker-compose.harbor.yml` |
-| Racing | `deploy/env/race.env` | **Disabled** |
+| Harbor (default) | `deploy/env/harbor.env` | Off when `WATCHTOWER_NO_PULL=true` (competition default) |
+| Racing | **Same** `harbor.env` — lifecycle drives policy | **No** env swap ([ADR-0027](../adr/0027-data-repo-runtime-policy-zero-pi-config.md)) |
 | Dev / laptop | `deploy/env/dev.env` | **Disabled** — use `docker-compose.dev.yml` overlay |
+
+`race.env` is **deprecated** for competition boats — see [ADR-0027](../adr/0027-data-repo-runtime-policy-zero-pi-config.md).
 
 Copy examples:
 
 ```powershell
 copy deploy\env\harbor.env.example deploy\env\harbor.env
-copy deploy\env\race.env.example deploy\env\race.env
 copy deploy\env\dev.env.example deploy\env\dev.env
 ```
 
@@ -65,14 +66,41 @@ Grafana telemetry: `http://localhost:3001` · Signal K: `http://localhost:3000` 
 
 ## Race freeze checklist
 
+**Shore (per regatta):**
+
+1. Set `index.yaml` `spec.active.regatta_id` and `race.yaml` `spec.schedule` in AI-sailing-data
+2. Optional: `planning/runtime-policy.yaml`
+3. `git push` to `main`
+
+**Boat (once per system upgrade, not per regatta):**
+
 1. Tag release: `git tag v0.4.0 && git push --tags`
 2. Wait for `release.yml` → `deploy/locks/v0.4.0.env`
 3. On each Pi: `cp deploy/locks/v0.4.0.env deploy/locks/current.env`
 4. `./scripts/harbor-sync.sh` (models, OKF, config)
 5. `./scripts/harbor-pull.sh --tier 3` then `--tier 2` then `--tier 1` if needed
 6. Pre-flight: Signal K `candump`, Grafana health, Neo4j auth
-7. Switch to `deploy/env/race.env` (`RACE_MODE=true`)
-8. `docker compose` without harbor overlay (no Watchtower)
+7. Confirm `deploy/secrets/github_token` exists (long-lived PAT — [ADR-0027](../adr/0027-data-repo-runtime-policy-zero-pi-config.md))
+8. Stacks run with **`harbor.env` only** — `race-lifecycle` handles race mode at `start_at`
+
+**Do not** switch to `race.env` before the start gun.
+
+## GitHub token for race live sync
+
+`race-live-sync` needs **write** access to **AI-sailing-data** to push `race-live/` during the race ([ADR-0025](../adr/0025-race-live-sync-github-temporal.md)).
+
+| Method | Setup |
+|--------|-------|
+| **Docker secret** (preferred) | Create `deploy/secrets/github_token` on the Pi (mode `600`); reference in compose `secrets:` → `/run/secrets/github_token` |
+| **harbor.env** | `GITHUB_TOKEN=ghp_...` in gitignored `deploy/env/harbor.env` (fallback) |
+
+Install **once** per boat — long-lived fine-grained PAT is acceptable ([ADR-0027](../adr/0027-data-repo-runtime-policy-zero-pi-config.md)). `race.env` is deprecated.
+
+**Never** pass the token as a Docker build `ARG`/`ENV`. Rotate per regatta.
+
+Fine-grained PAT scopes: **Contents: Read and write** on `cognite-fholm/AI-sailing-data` only.
+
+User guide: [AI-sailing-data RACE_LIVE_SYNC.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_LIVE_SYNC.md)
 
 ## Lock files (`deploy/locks/`)
 

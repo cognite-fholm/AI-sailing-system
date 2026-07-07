@@ -4,7 +4,7 @@ Runtime code, Docker Compose, CI/CD, and ADRs for the AI Sailing System.
 
 **Human user guide:** [docs/USER_GUIDE.md](docs/USER_GUIDE.md)  
 **New laptop / Docker setup:** [docs/DEV-SETUP.md](docs/DEV-SETUP.md) — **required before `docker compose` on Windows**  
-**Race content (YAML-LD):** [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) — clone as sibling repo; facts follow [W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/) ([ADR-0022](adr/0022-yaml-ld-interconnected-data.md), [ADR-0023](adr/0023-shacl-neo4j-projection-no-fuseki.md), [ADR-0024](adr/0024-post-race-neo4j-export-to-data-repo.md)). **How it fits together:** [DATA_SCHEMA.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/DATA_SCHEMA.md) · [POST_RACE_ANALYSIS.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/POST_RACE_ANALYSIS.md)
+**Race content (YAML-LD):** [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) — clone as sibling repo; facts follow [W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/) ([ADR-0022](adr/0022-yaml-ld-interconnected-data.md), [ADR-0023](adr/0023-shacl-neo4j-projection-no-fuseki.md), [ADR-0024](adr/0024-post-race-neo4j-export-to-data-repo.md), [ADR-0025](adr/0025-race-live-sync-github-temporal.md)). **How it fits together:** [DATA_SCHEMA.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/DATA_SCHEMA.md) · [RACE_LIVE_SYNC.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_LIVE_SYNC.md)
 
 ## Read order
 

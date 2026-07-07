@@ -90,7 +90,7 @@ copy deploy\env\dev.env.example deploy\env\dev.env
 # SLA-1 — Signal K, InfluxDB, bridge, course sync, polar performance, Grafana telemetry
 docker compose -f docker-compose.sla-1.yml -f docker-compose.dev.yml --env-file deploy/env/dev.env up -d --build
 
-# SLA-2 — Neo4j, polar-manager, race-import, race-data-sync
+# SLA-2 — Neo4j, polar-manager, race-import, race-data-sync, race-live-sync
 docker compose -f docker-compose.sla-2.yml -f docker-compose.dev-sla2.yml --env-file deploy/env/dev.env up -d --build
 
 # Import graph from mounted data repo

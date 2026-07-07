@@ -13,6 +13,12 @@ sync:
   auto_import_neo4j: false
   online_required: true
 
+# race-lifecycle reads spec.schedule from active race.yaml (ADR-0026)
+lifecycle:
+  enabled: true
+  poll_seconds: 60
+  state_file: /var/run/ai-sailing/race-lifecycle.json
+
 active:
   regatta_id: faerderseilasen-2026
   race_path: races/2026/2026-06-faerderseilasen

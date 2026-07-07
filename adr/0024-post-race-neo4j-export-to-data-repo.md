@@ -3,7 +3,9 @@
 **Status:** Accepted  
 **Date:** 2026-07-07  
 **Deciders:** cognite-fholm  
-**Related:** [ADR-0009](./0009-dual-repository-race-data.md), [ADR-0022](./0022-yaml-ld-interconnected-data.md), [ADR-0023](./0023-shacl-neo4j-projection-no-fuseki.md), [spec §7.24](../spec.md#724-post-race-analysis-export), [spec §11.16](../spec.md#1116-post-race-analysis-export)
+**Related:** [ADR-0009](./0009-dual-repository-race-data.md), [ADR-0022](./0022-yaml-ld-interconnected-data.md), [ADR-0023](./0023-shacl-neo4j-projection-no-fuseki.md), [ADR-0025](./0025-race-live-sync-github-temporal.md) (live sync during race), [spec §7.24](../spec.md#724-race-live-sync-and-archive), [spec §11.16](../spec.md#1116-post-race-analysis-export)
+
+> **Amended by [ADR-0025](./0025-race-live-sync-github-temporal.md):** During the race, `race-live-sync` pushes `race-live/current.yaml` to GitHub every 5 minutes on branch `race-live/{regatta_id}`. This ADR covers **finalize** → `post-race/*.yaml` archive kinds on `main`.
 
 ---
 
@@ -32,9 +34,9 @@ Goals:
 
 ## Decision
 
-### 1. Reverse projection: Neo4j → YAML-LD (shore/harbor only)
+### 1. Reverse projection: Neo4j → YAML-LD (finalize / harbor)
 
-Add service **`race-export`** (SLA-2, system repo) that:
+Add service **`race-live-sync`** (SLA-2, system repo) — see [ADR-0025](./0025-race-live-sync-github-temporal.md) for the **during-race** git push loop. **Finalize** mode of the same service:
 
 1. Queries Neo4j for **whitelisted runtime labels** for one `race_id`.
 2. Maps graph nodes to **new post-race YAML `kind`s** (see below).
@@ -46,10 +48,10 @@ Add service **`race-export`** (SLA-2, system repo) that:
 
 ```text
 Pre-race:  AI-sailing-data (git) ──race-import──► Neo4j (boat)
-Post-race: Neo4j (boat) ──race-export──► AI-sailing-data (git) ──push──► GitHub
+Post-race: Neo4j (boat) ──race-live-sync finalize──► AI-sailing-data post-race/ on main
 ```
 
-`race-export` is the **inverse contract** of `race-import`, documented in `schema/neo4j-mapping.yaml` → `export_projections`.
+`race-live-sync` finalize is the **inverse contract** of `race-import` for archive kinds, documented in `schema/neo4j-mapping.yaml` → `export_projections`. Live push uses `live_projections` ([ADR-0025](./0025-race-live-sync-github-temporal.md)).
 
 ### 2. Post-race folder layout (AI-sailing-data)
 
@@ -104,7 +106,7 @@ Standings rows reference `urn:sailing:entity:vessel-*` where fleet boats were im
 | Step | Actor | Action |
 |------|-------|--------|
 | 1 | Crew | Set `RACE_MODE=false` or explicit harbor mode |
-| 2 | `race-export` | `POST /export` or CLI with `race_id` |
+| 2 | `race-live-sync finalize` | CLI or `POST /finalize` with `race_id` |
 | 3 | Crew / agent | Review `post-race/*.yaml`; edit `wiki/debrief.md` |
 | 4 | Shore | `git commit` + `push` AI-sailing-data |
 | 5 | Future prep | `race-preparation` reads archived races for competitor history |
@@ -175,13 +177,13 @@ Portal results **supplement** `RaceResults`; Neo4j export is authoritative for *
 
 | Artifact | Repository |
 |----------|------------|
-| `race-export` service (planned) | AI-sailing-system |
+| `race-live-sync` service (planned) | AI-sailing-system — live loop + finalize |
 | `schema/neo4j-mapping.yaml` → `export_projections` | AI-sailing-data |
 | `schema/yaml-ld/context.jsonld` — new kinds | AI-sailing-data |
 | `schema/shacl/post-race.shacl.ttl` | AI-sailing-data |
+| `docs/RACE_LIVE_SYNC.md` | AI-sailing-data |
 | `docs/POST_RACE_ANALYSIS.md` | AI-sailing-data |
-| Spec §7.24, §11.16, G34 | AI-sailing-system |
-| `.cursor/skills/post-race-export/` (future) | AI-sailing-data |
+| `.cursor/skills/post-race-export/` | AI-sailing-data |
 
 ---
 

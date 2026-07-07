@@ -2,7 +2,7 @@
 
 Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, data stores, and reference products fit together. Normative detail remains in [spec.md](../spec.md) and [adr/](../adr/).
 
-**Last updated:** 2026-07-07 · **Spec version:** 0.22.0-draft
+**Last updated:** 2026-07-07 · **Spec version:** 0.24.0-draft
 
 ---
 
@@ -13,9 +13,9 @@ Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, d
 | **[AI-sailing-system](https://github.com/cognite-fholm/AI-sailing-system)** (this repo) | Code, Docker images, CI/CD, ADRs, spec | `/opt/ai-sailing-system/` |
 | **[AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)** | Races, boats, ORC certs, planning **YAML-LD**, Neo4j templates | `/opt/ai-sailing-data/` |
 
-**YAML format:** Interconnected facts use [W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/) — [ADR-0022](../adr/0022-yaml-ld-interconnected-data.md) · [ADR-0023](../adr/0023-shacl-neo4j-projection-no-fuseki.md) · [data repo schema/yaml-ld](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/yaml-ld/README.md)
+**YAML format:** Interconnected facts use [W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/) — [ADR-0022](../adr/0022-yaml-ld-interconnected-data.md) · [ADR-0023](../adr/0023-shacl-neo4j-projection-no-fuseki.md) · [ADR-0024](../adr/0024-post-race-neo4j-export-to-data-repo.md) · [ADR-0025](../adr/0025-race-live-sync-github-temporal.md) · [data repo schema/yaml-ld](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/yaml-ld/README.md)
 
-**Rule:** Prepare regattas in **AI-sailing-data** on shore (Cursor + Git). Freeze **both** git refs and system image digests before a race ([ADR-0009](../adr/0009-dual-repository-race-data.md)).
+**Rule:** Prepare regattas in **AI-sailing-data** on shore (Cursor + Git). Freeze **both** git refs and system image digests before a race ([ADR-0009](../adr/0009-dual-repository-race-data.md)). **`race-lifecycle`** drives harbor pull/import, race mode, and live sync from `race.yaml` `spec.schedule` + `index.yaml` active regatta ([ADR-0026](../adr/0026-race-lifecycle-scheduled-harbor-automation.md)). **One `harbor.env` on the Pi** — no per-regatta env swap ([ADR-0027](../adr/0027-data-repo-runtime-policy-zero-pi-config.md)). During the race, **`race-live-sync`** pushes Neo4j summaries to GitHub every 5 minutes on LTE ([ADR-0025](../adr/0025-race-live-sync-github-temporal.md)).
 
 **User guide:** [Race preparation guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md) (data repo).
 
@@ -57,12 +57,13 @@ flowchart TB
   subgraph data [AI-sailing-data Git]
     YAML[YAML + OKF]
     YAML -->|race-import| NEO
-    NEO -->|race-export| YAML
+    NEO -->|race-live-sync| YAML
   end
 
-  subgraph shore [Shore / LTE]
+  subgraph shore [Shore / LTE / GitHub]
     GIT[GitHub]
-    GIT -->|race-data-sync| data
+    GIT -->|race-data-sync pull| data
+    NEO -->|race-live-sync push| GIT
   end
 
   subgraph laptop [Navigator laptop]
@@ -89,10 +90,12 @@ Spec: [§5 Three-tier SLA](../spec.md#5-three-tier-sla-architecture) · [§6 Dat
 | **InfluxDB** | 1 | High-frequency telemetry |
 | **Neo4j** | 2 | Races, vessels, courses, runtime standings |
 | **Grafana** | 1–3 | Dashboards per tier |
-| **Git (data repo)** | Shore → boat | Plans, certificates, static graph templates |
+| **Git (data repo)** | Shore ↔ boat | Pre-race YAML; **during race** `race-live/` on branch `race-live/{regatta_id}`; **after race** `post-race/` on `main` |
 | **OKF bundles** | 2–3 | LLM concept context |
 
-**Not in git (runtime only):** Live AIS tracks, per-second standing history, raw GRIB binaries. **Archived after race:** Summarized standings, course outcome, insights in `post-race/*.yaml` ([ADR-0024](../adr/0024-post-race-neo4j-export-to-data-repo.md)).
+**Git temporal model ([ADR-0025](../adr/0025-race-live-sync-github-temporal.md)):** `race-live-sync` commits `race-live/current.yaml` every 5 min when LTE is up. Git history on `race-live/{regatta_id}` is the playback timeline. Finalize merges archive kinds to `post-race/*.yaml` on `main`.
+
+**Not in git (raw runtime):** Live AIS tracks, per-second standing history, raw GRIB binaries. **Summarized in git:** standings, course, insights via `race-live/` and `post-race/` ([ADR-0024](../adr/0024-post-race-neo4j-export-to-data-repo.md)).
 
 ---
 
@@ -106,7 +109,39 @@ The Pi stack **extends** familiar sailing tools; it does not replace helm instru
 | **[B&G H5000](https://www.bandg.com/bg/series/h5000/)** | [0011](../adr/0011-bg-h5000-reference-model.md) | [§7.17](../spec.md#717-bg-h5000-reference-model--integration) | Signal K ingest, SailSteer/Start Grafana pages, `InstrumentProfile` YAML |
 | **Laptop Cursor + MCP** | [0012](../adr/0012-race-side-mcp-laptop-cursor.md) | [§7.18](../spec.md#718-race-side-mcp--laptop-cursor) | `race-mcp-gateway` on boat LAN |
 
-**Beyond reference products:** AIS fleet, live ORC corrected standings, GRIB wind zones, SI PDF courses, start-boat flags, LLM coach, GoPro trim vision, **race-side MCP**.
+**Beyond reference products:** AIS fleet, live ORC corrected standings, GRIB wind zones, SI PDF courses, start-boat flags, LLM coach, **race-side MCP**, **cloud AI via GitHub live sync**.
+
+---
+
+## Bidirectional git sync (AI-sailing-data)
+
+| Direction | Service | When | Branch |
+|-----------|---------|------|--------|
+| GitHub → boat | `race-data-sync` | Harbor; optional ashore updates during week | `main` |
+| Boat → GitHub | `race-live-sync` | Every 5 min when LTE up during race | `race-live/{regatta_id}` |
+| Finalize | `race-live-sync finalize` | After race | merge → `main` |
+
+```mermaid
+flowchart LR
+  subgraph github [GitHub]
+    MAIN[main]
+    LIVE[race-live/regatta_id]
+  end
+
+  subgraph pi [SLA-2 Pi]
+    PULL[race-data-sync]
+    NEO[(Neo4j)]
+    PUSH[race-live-sync]
+  end
+
+  MAIN --> PULL --> NEO
+  NEO --> PUSH --> LIVE
+  LIVE -->|finalize| MAIN
+```
+
+**Secrets:** `GITHUB_TOKEN` via Docker secret or `deploy/env/race.env` — never baked into images ([ADR-0025](../adr/0025-race-live-sync-github-temporal.md)).
+
+User guide: [AI-sailing-data RACE_LIVE_SYNC.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_LIVE_SYNC.md) · [POST_RACE_ANALYSIS.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/POST_RACE_ANALYSIS.md)
 
 Manuals: [docs/references/README.md](./references/README.md)
 
@@ -135,7 +170,10 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0021](../adr/0021-sla1-signalk-plugin-strategy.md) | SLA-1 Signal K plugins — course geometry + polar performance |
 | [0022](../adr/0022-yaml-ld-interconnected-data.md) | YAML-LD linked data (AI-sailing-data) |
 | [0023](../adr/0023-shacl-neo4j-projection-no-fuseki.md) | SHACL constraints + Neo4j projection (shore CI) |
-| [0024](../adr/0024-post-race-neo4j-export-to-data-repo.md) | Post-race Neo4j → data repo export (learning loop) |
+| [0024](../adr/0024-post-race-neo4j-export-to-data-repo.md) | Post-race finalize → data repo archive kinds |
+| [0025](../adr/0025-race-live-sync-github-temporal.md) | Race live sync — 5 min Neo4j → GitHub on LTE |
+| [0026](../adr/0026-race-lifecycle-scheduled-harbor-automation.md) | Race lifecycle — schedule-driven harbor automation |
+| [0027](../adr/0027-data-repo-runtime-policy-zero-pi-config.md) | Data-repo runtime policy — zero per-race Pi env |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -184,6 +222,8 @@ Detail: [spec §7.19](../spec.md#719-orc-certificate-collection--fleet-enrichmen
 | `Boat`, `BoatSeason`, `OrcCertificate`, `PolarSource` | `boats/{sail_number}/` |
 | `InstrumentProfile`, `InstrumentCalibration` | `boats/{sail}/instrumentation/` |
 | `Race`, `Fleet`, `CourseCatalog`, `WaypointList` | `races/{year}/{race}/` |
+| `RaceLiveSnapshot`, `RaceLiveSyncManifest` | `races/.../race-live/` (during race, git timeline) |
+| `RaceResults`, `RaceOutcome`, … | `races/.../post-race/` (after finalize) |
 | `LaylinePreferences`, `StartLinePreferences`, `GribPlan`, `WeatherCollection`, `InsightAlertProfile`, `MarineMapExport` | `races/.../planning/`, `collected/weather/`, `export/marine-map/` |
 | `H5000VariableMap` | `schema/h5000-variable-map.yaml` |
 
@@ -221,7 +261,8 @@ ADR: [0021](../adr/0021-sla1-signalk-plugin-strategy.md) · Spec: [§7.1](../spe
 |---------|----------------|
 | `race-data-sync` | `git pull` data repo via LTE/Wi‑Fi |
 | `race-import` | MERGE `neo4j/*.yaml` bundles |
-| `race-export` | Export Neo4j post-race insights → data repo `post-race/*.yaml` ([ADR-0024](../adr/0024-post-race-neo4j-export-to-data-repo.md)) |
+| `race-lifecycle` | Poll `race.yaml` schedule; write `/var/run/ai-sailing/race-lifecycle.json`; trigger import at harbor time ([ADR-0026](../adr/0026-race-lifecycle-scheduled-harbor-automation.md)) |
+| `race-live-sync` | Export Neo4j → `race-live/*.yaml` + git push every 5 min on LTE; finalize → `post-race/` ([ADR-0025](../adr/0025-race-live-sync-github-temporal.md)) |
 | `polar-manager` | ORC target-speeds API (`GET /polars/{id}/target`); full SLK parser in Phase 2C |
 | `race-intelligence` | Start line, lift, laylines, steering hints |
 | `live-results` | VMG, corrected-time fleet rank |
@@ -257,7 +298,7 @@ Bring a **laptop** on boat Wi‑Fi; Cursor connects to `race-mcp-gateway` at `ht
 | [spec §9](../spec.md#9-deployment-architecture) | Full deployment architecture |
 
 **Harbor:** `harbor-pull.sh` (images) + `harbor-sync.sh` (models, OKF, data repo).  
-**Race:** `RACE_MODE=true` — no Watchtower, no auto-pull.
+**Race:** Lifecycle `race_mode` — no Watchtower, no `race-data-sync` pull during racing; **`race-live-sync` push** when phase is `armed`/`racing` and LTE is up.
 
 ---
 
@@ -270,12 +311,13 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 | **0 — Foundation** | **Done** — spec v0.21, ADRs 0001–0021, BDD scaffold |
 | **1 — SLA-1 telemetry** | **Scaffold** — `course-provider`, `course-sk-sync`, `signalk-polar-performance`, bridge, Grafana; PiCAN ingest pending |
 | **2A — Shore race prep** | **Partial** — data repo skills, Færder examples, **YAML-LD** (ADR-0022); waypoint gaps remain |
-| **2B — Graph import** | **Scaffold** — `docker-compose.sla-2.yml`, `race-import`, `race-data-sync` |
+| **2B — Graph import** | **Scaffold** — `docker-compose.sla-2.yml`, `race-import`, `race-data-sync`, `race-live-sync` |
 | **2C — GRIB, polars, AIS** | **Stub** — `polar-manager` target-speeds API only |
 | **2D — Courses & results** | Not started |
 | **2E — Race UX** | Not started |
 | **2F — Analytics & alerts** | Not started |
 | **2G — Laptop MCP** | Scaffold only (`race-mcp-gateway/`) |
+| **2H — Live sync & archive** | **Spec + scaffold** — ADR-0024/0025/0026/0027, `race-live-sync`, `race-lifecycle` |
 | **3 — SLA-3 vision** | Not started |
 | **4 — CI/CD multi-Pi** | **Partial** — CI + publish-sla-1/2 + release; publish-sla-3 pending |
 | **5 — Shore training** | Spec only |
@@ -287,7 +329,7 @@ Detail: [spec §14](../spec.md#14-implementation-phases) · BDD: [tests/bdd/READ
 | Compose | Services (v1) |
 |---------|-----------------|
 | `docker-compose.sla-1.yml` | `signalk-server`, `course-sk-sync`, `signalk-polar-performance`, `influxdb`, `signalk-influx-bridge`, `grafana-telemetry` |
-| `docker-compose.sla-2.yml` | `neo4j`, `polar-manager`, `race-import`, `race-data-sync`, `race-mcp-gateway` (profile `mcp`) |
+| `docker-compose.sla-2.yml` | `neo4j`, `polar-manager`, `race-import`, `race-data-sync`, `race-lifecycle`, `race-live-sync`, `race-mcp-gateway` (profile `mcp`) |
 | `docker-compose.dev.yml` | SLA-1 laptop overlay — bridge network |
 | `docker-compose.dev-sla2.yml` | SLA-2 laptop overlay — data-repo mount, sync policy |
 | `docker-compose.harbor.yml` | Watchtower overlay (SLA-2/3 only) |

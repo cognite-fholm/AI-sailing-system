@@ -26,7 +26,9 @@ All detailed user guides live in the **data repo**:
 | [Cursor guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/CURSOR_GUIDE.md) | Guided `race-preparation` agent |
 | [Race preparation guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md) | 12-phase workflow |
 | [Boats and certificates](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/BOATS_AND_CERTIFICATES.md) | ORC, SLK, fleet |
-| [Harbor and race week](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/HARBOR_AND_RACE_WEEK.md) | Sync, GPX, Grafana, MCP |
+| [Harbor and race week](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/HARBOR_AND_RACE_WEEK.md) | Sync, GPX, Grafana, MCP, live sync |
+| [Race live sync](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_LIVE_SYNC.md) | 5 min LTE push, GitHub token, cloud AI |
+| [Post-race archive](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/POST_RACE_ANALYSIS.md) | Finalize → `post-race/` on `main` |
 | [YAML-LD (linked data)](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/YAML_LD.md) | How boat/race YAML files link together |
 | [**Data schema (ontology + Neo4j)**](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/DATA_SCHEMA.md) | How YAML-LD, SHACL, and Neo4j fit together |
 | [Troubleshooting](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/TROUBLESHOOTING.md) | Common fixes |
@@ -55,6 +57,10 @@ Hostname examples: `telemetry.local`, `race.local` (boat LAN).
 
 Detail: [deployment-lifecycle.md](./deployment-lifecycle.md) · [data repo: Harbor guide](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/HARBOR_AND_RACE_WEEK.md)
 
+**Automated harbor (optional):** Set `index.yaml` `spec.active.regatta_id` and `race.yaml` `spec.schedule` on shore. The `race-lifecycle` service on the Pi runs pull + import at `harbor_sync_at`, arms live sync before the start, and enables race mode at `start_at` — [ADR-0026](../adr/0026-race-lifecycle-scheduled-harbor-automation.md) · [ADR-0027](../adr/0027-data-repo-runtime-policy-zero-pi-config.md) · [RACE_LIFECYCLE.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_LIFECYCLE.md).
+
+**No `race.env` swap:** Competition boats keep a single `harbor.env` + long-lived GitHub secret on the Pi.
+
 ## During the race
 
 | Tool | Use |
@@ -65,23 +71,28 @@ Detail: [deployment-lifecycle.md](./deployment-lifecycle.md) · [data repo: Harb
 | **Laptop + Cursor MCP** | Ad hoc standings, Influx, Neo4j — [race-laptop-mcp.md](./race-laptop-mcp.md) |
 | **tactical-coach** | Onboard LLM advisory (Pi) |
 
-**Race mode:** `RACE_MODE=true` — containers do not auto-update mid-regatta.
+**Race mode:** Lifecycle sets `race_mode` at `start_at` — containers do not auto-update mid-regatta (`WATCHTOWER_NO_PULL=true` in `harbor.env`).
 
 ## After the race
 
-Export structured insights from Neo4j back into **AI-sailing-data** for future regatta preparation ([ADR-0024](../adr/0024-post-race-neo4j-export-to-data-repo.md), [spec §7.24](../spec.md#724-post-race-analysis-export)).
+Export structured insights from Neo4j to **GitHub** during and after the race ([ADR-0024](../adr/0024-post-race-neo4j-export-to-data-repo.md), [ADR-0025](../adr/0025-race-live-sync-github-temporal.md), [spec §7.24](../spec.md#724-race-live-sync-and-archive)).
 
-1. Set `RACE_MODE=false` (or harbor mode)
-2. Run **`race-export`**: `curl -X POST http://localhost:8081/export` (port per deploy)
-3. Review `post-race/*.yaml` on the boat; add `wiki/debrief.md`
-4. `git commit` + `push` from `/opt/ai-sailing-data`
+### During the race (automatic on LTE)
+
+`race-live-sync` pushes `race-live/current.yaml` to branch `race-live/{regatta_id}` **every 5 minutes** when `ONLINE_MODE=true`. Configure `GITHUB_TOKEN` via Docker secret — never in the image.
 
 | Guide | Topic |
 |-------|-------|
-| [Post-race analysis](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/POST_RACE_ANALYSIS.md) | YAML kinds, workflow, validation |
-| [Harbor guide — after the race](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/HARBOR_AND_RACE_WEEK.md#after-the-race) | Checklist on the boat |
+| [Race live sync](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_LIVE_SYNC.md) | LTE push, secrets, cloud AI, git playback |
+| [Harbor — after the race](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/HARBOR_AND_RACE_WEEK.md#after-the-race) | Finalize checklist |
 
-**Not exported:** Influx telemetry, AIS tracks, raw GRIB — only summaries and standings.
+### After the race
+
+1. `race-live-sync finalize --race {id}` — writes `post-race/*.yaml`, merges to `main`
+2. Add `wiki/debrief.md`; review `git diff`
+3. `git push` if finalize ran on boat with pending commits
+
+**Not exported:** Influx telemetry, AIS tracks, raw GRIB.
 
 ## Laptop at the regatta (Cursor + MCP)
 

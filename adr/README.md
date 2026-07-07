@@ -33,7 +33,7 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | **2E — Race UX** | [0010](./0010-iregatta-reference-model.md), [0011](./0011-bg-h5000-reference-model.md), [0018](./0018-helm-ux-three-pi-dual-speaker.md) | iRegatta/H5000 parity in `race-ui` + Grafana |
 | **2F — Analytics & alerts** | [0016](./0016-fleet-polar-performance-influx.md) | Fleet polar performance timeline stored in InfluxDB |
 | | [0015](./0015-tactical-insight-alerts-annunciation.md) | Tactical insight alerts, UX feed, and optional voice annunciation |
-| **2H — Post-race archive** | [0024](./0024-post-race-neo4j-export-to-data-repo.md) | Neo4j → AI-sailing-data export for learning loop |
+| **2H — Race live sync & archive** | [0024](./0024-post-race-neo4j-export-to-data-repo.md), [0025](./0025-race-live-sync-github-temporal.md), [0026](./0026-race-lifecycle-scheduled-harbor-automation.md), [0027](./0027-data-repo-runtime-policy-zero-pi-config.md) | Live sync + lifecycle + zero Pi config |
 | **2G — Laptop MCP** | [0012](./0012-race-side-mcp-laptop-cursor.md) | Race-side MCP for laptop Cursor and ad hoc analysis |
 | **3 — SLA-3 vision** | [0003](./0003-gopro-capture-and-shore-training.md) | GoPro HERO13 fleet capture and onshore TrimTransformer training |
 | **4 — CI/CD** | [0008](./0008-github-docker-deployment-lifecycle.md) | (deployment lifecycle — see Phase 0) |
@@ -66,6 +66,9 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | [0022](./0022-yaml-ld-interconnected-data.md) | YAML-LD for interconnected data in AI-sailing-data | 2A, 2B | Accepted |
 | [0023](./0023-shacl-neo4j-projection-no-fuseki.md) | SHACL constraints and Neo4j projection (no Fuseki on Pi) | 2A, 2B | Accepted |
 | [0024](./0024-post-race-neo4j-export-to-data-repo.md) | Post-race export — Neo4j insights to AI-sailing-data | 2H, 2F | Accepted |
+| [0025](./0025-race-live-sync-github-temporal.md) | Race live sync — 5 min Neo4j → GitHub on LTE | 2H | Accepted |
+| [0026](./0026-race-lifecycle-scheduled-harbor-automation.md) | Race lifecycle — schedule-driven harbor import & race mode | 2H | Accepted |
+| [0027](./0027-data-repo-runtime-policy-zero-pi-config.md) | Data-repo runtime policy — zero per-race Pi env | 2H | Accepted |
 
 ## Format
 
@@ -77,4 +80,4 @@ Each ADR follows the structure:
 4. **Consequences** — positive, negative, risks
 5. **Alternatives considered**
 
-New decisions should use the next sequential number: `0025-short-title.md`.
+New decisions should use the next sequential number: `0028-short-title.md`.

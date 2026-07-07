@@ -38,6 +38,12 @@ if [[ "${RACE_MODE:-false}" == "true" ]]; then
   exit 1
 fi
 
+LIFECYCLE_STATE="${RACE_LIFECYCLE_STATE:-/var/run/ai-sailing/race-lifecycle.json}"
+if [[ -f "$LIFECYCLE_STATE" ]] && grep -q '"race_mode": true' "$LIFECYCLE_STATE" 2>/dev/null; then
+  echo "ERROR: lifecycle race_mode=true — refuse pull (ADR-0027). Wait until regatta archived."
+  exit 1
+fi
+
 COMPOSE_FILE="docker-compose.sla-${TIER}.yml"
 if [[ ! -f "$COMPOSE_FILE" ]]; then
   echo "Missing $COMPOSE_FILE (Phase 1+)"

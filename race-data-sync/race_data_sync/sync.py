@@ -17,6 +17,18 @@ from race_data_sync.config import SyncConfig
 
 logger = logging.getLogger(__name__)
 
+LIFECYCLE_STATE = Path(os.environ.get("RACE_LIFECYCLE_STATE", "/var/run/ai-sailing/race-lifecycle.json"))
+
+
+def lifecycle_allows_pull() -> bool:
+    if not LIFECYCLE_STATE.is_file():
+        return True
+    try:
+        state = json.loads(LIFECYCLE_STATE.read_text(encoding="utf-8"))
+        return bool(state.get("sync_auto_pull", True))
+    except (json.JSONDecodeError, OSError):
+        return True
+
 
 def clone_or_pull(config: SyncConfig) -> dict[str, str | bool]:
     path = config.local_path
@@ -75,6 +87,9 @@ def run_once(config: SyncConfig) -> dict[str, object]:
 
     if not config.auto_pull:
         return {"skipped": True, "reason": "auto_pull disabled"}
+
+    if not lifecycle_allows_pull():
+        return {"skipped": True, "reason": "lifecycle: sync_auto_pull=false"}
 
     result = clone_or_pull(config)
     status: dict[str, object] = {
