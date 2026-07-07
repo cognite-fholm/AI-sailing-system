@@ -100,11 +100,11 @@ Install **once** per boat — long-lived fine-grained PAT is acceptable ([ADR-00
 
 Fine-grained PAT scopes: **Contents: Read and write** on `cognite-fholm/AI-sailing-data` only.
 
-### CI cross-repo checkout
+### CI cross-repo checkout (optional)
 
-GitHub Actions in **AI-sailing-system** checks out **AI-sailing-data** for integration tests and optional SHACL re-validation. The default `GITHUB_TOKEN` cannot read a private sibling repo.
+YAML-LD and SHACL validation runs in **[AI-sailing-data CI](https://github.com/cognite-fholm/AI-sailing-data/actions)**. **AI-sailing-system** CI runs system tests without checking out the private data repo.
 
-Add repo secret **`AI_SAILING_DATA_CHECKOUT_TOKEN`** (fine-grained PAT, **contents: read** on `AI-sailing-data` only). Without it, CI still runs system tests (data-dependent cases skip) and YAML-LD/SHACL runs in [AI-sailing-data CI](https://github.com/cognite-fholm/AI-sailing-data/actions).
+To re-enable combined validation in system CI, add repo secret **`AI_SAILING_DATA_CHECKOUT_TOKEN`** (fine-grained PAT, **contents: read** on `AI-sailing-data`) and restore the checkout steps in `.github/workflows/ci.yml`.
 
 User guide: [AI-sailing-data RACE_LIVE_SYNC.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_LIVE_SYNC.md)
 
