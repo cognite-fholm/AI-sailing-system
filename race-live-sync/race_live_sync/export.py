@@ -1,4 +1,4 @@
-"""Build RaceLiveSnapshot YAML from Neo4j (stub until Neo4j queries land)."""
+"""Build RaceLiveSnapshot YAML from Neo4j + Influx rollup (ADR-0028)."""
 
 from __future__ import annotations
 
@@ -18,9 +18,22 @@ CONTEXT = [
     {"@base": "https://sailing.cognite-fholm/data/v1/"},
 ]
 
+POLAR_ABOVE_PCT = 105.0
+POLAR_BELOW_PCT = 90.0
+
 
 def _utc_now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _polar_outlier(performance_pct: float | None) -> str:
+    if performance_pct is None:
+        return "neutral"
+    if performance_pct >= POLAR_ABOVE_PCT:
+        return "above"
+    if performance_pct <= POLAR_BELOW_PCT:
+        return "below"
+    return "neutral"
 
 
 def read_sequence(manifest_path: Path) -> int:
@@ -32,13 +45,64 @@ def read_sequence(manifest_path: Path) -> int:
     return int(doc.get("spec", {}).get("last_sequence", 0))
 
 
+def query_standings(_config: LiveSyncConfig) -> list[dict[str, Any]]:
+    """Corrected-time standings if race finished now — from live-results / Neo4j."""
+    # TODO: Cypher per schema/neo4j-mapping.yaml
+    return []
+
+
+def query_fleet_performance_rollup(_config: LiveSyncConfig, _window_minutes: int) -> list[dict[str, Any]]:
+    """5 min mean from Influx fleet_polar_performance per sail_number."""
+    # TODO: Flux query + join AIS positions
+    return []
+
+
+def build_insights(fleet_performance: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Precompute tactical insight blocks for shore agents."""
+    insights: list[dict[str, Any]] = []
+    outperformers = [f for f in fleet_performance if f.get("polar_outlier") == "above"]
+    underperformers = [f for f in fleet_performance if f.get("polar_outlier") == "below"]
+    if outperformers:
+        insights.append(
+            {
+                "type": "polar_outperformers",
+                "vessels": [f.get("sail_number") for f in outperformers],
+                "summary": f"{len(outperformers)} boat(s) above polar threshold",
+            }
+        )
+    if underperformers:
+        insights.append(
+            {
+                "type": "polar_underperformers",
+                "vessels": [f.get("sail_number") for f in underperformers],
+                "summary": f"{len(underperformers)} boat(s) below polar threshold",
+            }
+        )
+    if fleet_performance:
+        vmg_leader = max(fleet_performance, key=lambda f: f.get("vmg_actual") or 0.0)
+        insights.append(
+            {
+                "type": "vmg_leaders_leg",
+                "leg_seq": vmg_leader.get("leg_seq"),
+                "leader": vmg_leader.get("sail_number"),
+                "vmg_actual": vmg_leader.get("vmg_actual"),
+            }
+        )
+    return insights
+
+
 def build_snapshot(config: LiveSyncConfig, sequence: int) -> dict[str, Any]:
-    """Query Neo4j and map to RaceLiveSnapshot. Placeholder until Cypher wired."""
+    """Query Neo4j + Influx and map to RaceLiveSnapshot."""
     observed_at = _utc_now()
     race_folder = config.race_folder.rstrip("/")
     ref_suffix = config.regatta_id.replace("-", "_")[:32]
 
-    # TODO: query Neo4j per schema/neo4j-mapping.yaml live_projections
+    standings = query_standings(config)
+    fleet_performance = query_fleet_performance_rollup(config, config.interval_minutes)
+    for entry in fleet_performance:
+        entry.setdefault("polar_outlier", _polar_outlier(entry.get("performance_pct")))
+    insights = build_insights(fleet_performance)
+
     return {
         "@context": CONTEXT,
         "@id": f"{race_folder}/race-live/current.yaml",
@@ -57,10 +121,12 @@ def build_snapshot(config: LiveSyncConfig, sequence: int) -> dict[str, Any]:
                 "@type": "sailing:Regatta",
                 "@id": f"urn:sailing:entity:regatta-{ref_suffix}",
             },
-            "standings": [],
+            "standings": standings,
+            "fleet_performance": fleet_performance,
             "course_selection": None,
-            "insights": [],
+            "insights": insights,
             "grib_scores": {},
+            "deltas": {"sequence_prev": sequence - 1 if sequence > 1 else None},
         },
     }
 

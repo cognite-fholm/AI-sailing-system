@@ -174,6 +174,7 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0025](../adr/0025-race-live-sync-github-temporal.md) | Race live sync — 5 min Neo4j → GitHub on LTE |
 | [0026](../adr/0026-race-lifecycle-scheduled-harbor-automation.md) | Race lifecycle — schedule-driven harbor automation |
 | [0027](../adr/0027-data-repo-runtime-policy-zero-pi-config.md) | Data-repo runtime policy — zero per-race Pi env |
+| [0028](../adr/0028-enriched-live-snapshot-fleet-performance-temporal.md) | Enriched live snapshot — fleet performance 5 min rollup |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -317,7 +318,7 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 | **2E — Race UX** | Not started |
 | **2F — Analytics & alerts** | Not started |
 | **2G — Laptop MCP** | Scaffold only (`race-mcp-gateway/`) |
-| **2H — Live sync & archive** | **Spec + scaffold** — ADR-0024/0025/0026/0027, `race-live-sync`, `race-lifecycle` |
+| **2H — Live sync & archive** | **Spec + scaffold** — ADR-0024/0025/0026/0027/0028, `race-live-sync`, `race-lifecycle` |
 | **3 — SLA-3 vision** | Not started |
 | **4 — CI/CD multi-Pi** | **Partial** — CI + publish-sla-1/2 + release; publish-sla-3 pending |
 | **5 — Shore training** | Spec only |

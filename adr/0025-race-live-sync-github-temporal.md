@@ -223,4 +223,5 @@ The planned `race-export` service is subsumed by **`race-live-sync`** (`finalize
 
 - [ADR-0009 Dual repository](./0009-dual-repository-race-data.md)
 - [ADR-0024 Post-race export](./0024-post-race-neo4j-export-to-data-repo.md)
+- [ADR-0028 Enriched live snapshot](./0028-enriched-live-snapshot-fleet-performance-temporal.md) — amends snapshot content
 - [ADR-0008 Deployment lifecycle](./0008-github-docker-deployment-lifecycle.md)

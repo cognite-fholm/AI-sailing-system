@@ -1,7 +1,8 @@
 # AI Sailing System — Specification
 
-**Version:** 0.26.0-draft  
+**Version:** 0.27.0-draft  
 **Date:** 2026-07-07  
+**Changelog (0.27):** Enriched live snapshot — fleet performance rollup every 5 min for tactical fleet questions ([ADR-0028](./adr/0028-enriched-live-snapshot-fleet-performance-temporal.md), §7.27, §11.20).  
 **Changelog (0.26):** Data-repo runtime policy — single `harbor.env` on Pi, no per-regatta `race.env` switch ([ADR-0027](./adr/0027-data-repo-runtime-policy-zero-pi-config.md), §7.26, §11.19).  
 **Changelog (0.25):** Race lifecycle automation — schedule-driven harbor import and race mode from active context ([ADR-0026](./adr/0026-race-lifecycle-scheduled-harbor-automation.md), §7.25, §11.18).  
 **Changelog (0.24):** Race live sync — 5-minute Neo4j → GitHub push on LTE ([ADR-0025](./adr/0025-race-live-sync-github-temporal.md), §7.24, §11.17). Amends ADR-0024 finalize workflow.  
@@ -173,6 +174,7 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G35 | **Race live sync** — every 5 min on LTE, push `race-live/current.yaml` to GitHub for cloud AI and git playback — [§7.24](#724-race-live-sync-and-archive), [ADR-0025](./adr/0025-race-live-sync-github-temporal.md) |
 | G36 | **Scheduled harbor automation** — `race-lifecycle` drives pull/import/race-mode/finalize from `race.yaml` schedule + `index.yaml` active — [§7.25](#725-race-lifecycle-automation), [ADR-0026](./adr/0026-race-lifecycle-scheduled-harbor-automation.md) |
 | G37 | **Zero per-race Pi config** — runtime policy from AI-sailing-data; one `harbor.env` + long-lived GitHub secret on boat — [§7.26](#726-data-repo-runtime-policy), [ADR-0027](./adr/0027-data-repo-runtime-policy-zero-pi-config.md) |
+| G38 | **Enriched live snapshot** — 5 min git tick answers corrected-time, polar outliers, VMG leaders, wind advantage — [§7.27](#727-enriched-live-snapshot), [ADR-0028](./adr/0028-enriched-live-snapshot-fleet-performance-temporal.md) |
 
 ### 3.2 Non-goals (v1)
 
@@ -3788,7 +3790,7 @@ races/{year}/{year}-{month}-{slug}/
 | `RaceLiveSnapshot` | `race-live/current.yaml` | `spec.observed_at`, `spec.sequence`, `spec.race_phase` |
 | `RaceLiveSyncManifest` | `race-live/sync-manifest.yaml` | `spec.last_push_at`, `spec.last_commit_sha`, `spec.branch` |
 
-`RaceLiveSnapshot.spec` consolidates: `standings`, `course_selection`, `insights`, `grib_scores`, entity links to regatta/vessels/routes.
+`RaceLiveSnapshot.spec` consolidates: `standings`, `fleet_performance`, `course_selection`, `insights`, `grib_scores`, `deltas`, entity links to regatta/vessels/routes. See [§7.27](#727-enriched-live-snapshot) and [ADR-0028](./adr/0028-enriched-live-snapshot-fleet-performance-temporal.md).
 
 **Archive (after finalize):** `RaceResults`, `RaceOutcome`, `RaceInsightArchive`, `GribModelOutcome`, `PostRaceExport` — split from final snapshot per [ADR-0024](./adr/0024-post-race-neo4j-export-to-data-repo.md).
 
@@ -3971,6 +3973,48 @@ Competition boats use **one** compose env file (`deploy/env/harbor.env`). Per-re
 2. Ensure `race.yaml` `spec.schedule`
 3. Optional `planning/runtime-policy.yaml`
 4. `git push`
+
+---
+
+### 7.27 Enriched live snapshot
+
+**ADR:** [0028](./adr/0028-enriched-live-snapshot-fleet-performance-temporal.md)  
+**Related:** [§7.24](#724-race-live-sync-and-archive), [§7.22](#722-fleet-polar-performance-timeline), [ADR-0016](./adr/0016-fleet-polar-performance-influx.md)
+
+The 5-minute git push ([ADR-0025](./adr/0025-race-live-sync-github-temporal.md)) MUST answer tactical fleet questions, not only store an empty standings list.
+
+#### 7.27.1 Three layers
+
+| Layer | Cadence | Store | Role |
+|-------|---------|-------|------|
+| 1 | 30 s | Influx `fleet_polar_performance` | High-resolution SoT on boat |
+| 2 | 5 min | `RaceLiveSnapshot` in git | Rollup + deltas + insights for shore |
+| 3 (opt.) | 5 min | Dolt tables | Row-level `DOLT_DIFF` between sequences |
+
+#### 7.27.2 Extended `RaceLiveSnapshot.spec`
+
+| Field | Purpose |
+|-------|---------|
+| `standings[]` | Corrected-time rank **if race finished now** — `corrected_seconds`, `delta_to_leader_s`, `course_pct`, `leg_seq` |
+| `fleet_performance[]` | Per-boat rollup: `performance_pct`, `vmg_pct`, `vmg_actual`, position, TWS/TWA, `polar_outlier` |
+| `insights[]` | Precomputed: `polar_outperformers`, `polar_underperformers`, `vmg_leaders_leg`, `wind_advantage`, … |
+| `deltas` | vs previous `sequence` — fleet rank changes, own-boat summary |
+
+Polar outlier thresholds (defaults): **above** ≥ 105% `performance_pct`; **below** ≤ 90%.
+
+#### 7.27.3 Tactical questions
+
+| Question | Answer from snapshot |
+|----------|----------------------|
+| Results if finished now? | `standings[]` by `corrected_seconds` |
+| Who beats polar — where, conditions? | `fleet_performance` + `insights[polar_outperformers]` |
+| Who is under polar? | `polar_outlier: below` + `polar_underperformers` |
+| Better course/speed to mark? | `vmg_actual` / `vmg_pct` on active `leg_seq`; `vmg_leaders_leg` |
+| Better wind/current? | `wind_advantage` insight; GRIB + position-group TWS comparison |
+
+#### 7.27.4 Rollup pipeline
+
+`race-live-sync` each tick: query Influx (last 5 min mean per boat) + `live-results` / Neo4j → write YAML → git commit. Does not duplicate 30 s AIS in git.
 
 ---
 
@@ -4737,6 +4781,21 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 | FR-235 | `GITHUB_TOKEN` SHALL be installed once on the Pi via Docker secret (long-lived PAT acceptable) |
 | FR-236 | Token values MUST NOT be committed to AI-sailing-data |
 | FR-237 | `harbor-pull.sh` SHALL refuse image pull when lifecycle `race_mode` is true |
+
+### 11.20 Enriched live snapshot
+
+**ADR:** [0028](./adr/0028-enriched-live-snapshot-fleet-performance-temporal.md) · **Spec:** [§7.27](./spec.md#727-enriched-live-snapshot)
+
+| ID | Requirement |
+|----|-------------|
+| FR-238 | `RaceLiveSnapshot` SHALL include `standings[]` with corrected-time projection if race finished at `observed_at` |
+| FR-239 | `RaceLiveSnapshot` SHALL include `fleet_performance[]` per tracked vessel with polar %, VMG %, position, and conditions |
+| FR-240 | Each `fleet_performance` entry SHALL include `rank_delta_since_last` vs previous `sequence` |
+| FR-241 | `race-live-sync` SHALL rollup Influx `fleet_polar_performance` over the sync interval (default 5 min) |
+| FR-242 | `insights[]` SHALL precompute polar outperformers, underperformers, VMG leg leaders, and wind-advantage summaries |
+| FR-243 | Polar outlier classification SHALL use configurable thresholds (default above ≥ 105%, below ≤ 90%) |
+| FR-244 | 30 s performance data SHALL remain in Influx — git snapshot MUST NOT duplicate full AIS time series |
+| FR-245 | Optional Dolt mirror MAY store per-tick rows for `DOLT_DIFF` without replacing git YAML-LD |
 
 ---
 
