@@ -147,7 +147,7 @@ Not YAML-LD: `collected/**/*.json`, binaries, OKF/wiki markdown, compose/env fil
 | FR-192 | `context.jsonld` | Committed |
 | FR-193 | Agent skills | Both repos |
 | FR-194 | Runtime resolution | Read skills + legacy fallback |
-| FR-195 | CI JSON-LD expand | Phase 2B backlog |
+| FR-195 | CI JSON-LD expand | Done — see [ADR-0023](./0023-shacl-neo4j-projection-no-fuseki.md) for SHACL |
 | FR-196 | `kind` ↔ `@type` match | Validation rule in skills |
 
 ---
@@ -163,6 +163,7 @@ Not YAML-LD: `collected/**/*.json`, binaries, OKF/wiki markdown, compose/env fil
 | Write skill | AI-sailing-data `.cursor/skills/yaml-ld-write/` |
 | Read skills | AI-sailing-data + AI-sailing-system (see above) |
 | Spec | [§7.15.8](../spec.md#7158-yaml-ld-linked-data-format), [§11.14](../spec.md#1114-yaml-ld-linked-data-ai-sailing-data), goal G32 |
+| Follow-on | [ADR-0023](./0023-shacl-neo4j-projection-no-fuseki.md) — SHACL + Neo4j projection |
 
 ---
 

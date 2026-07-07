@@ -47,7 +47,7 @@ jobs:
           pip install -r requirements-dev.txt
           pytest tests/bdd/steps tests/unit -m "not wip" -q --cov=course_sk_sync --cov=polar_manager --cov=signalk_influx_bridge --cov=signalk_polar_performance --cov-report=term-missing --cov-fail-under=45
 
-      - name: Validate AI-sailing-data YAML-LD
+      - name: Validate AI-sailing-data YAML-LD and SHACL
         run: |
           pip install -r AI-sailing-data/requirements-dev.txt
           python AI-sailing-data/scripts/sync_hosted_context.py

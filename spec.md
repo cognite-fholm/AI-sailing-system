@@ -1,7 +1,9 @@
 # AI Sailing System — Specification
 
-**Version:** 0.21.0-draft  
-**Date:** 2026-07-06  
+**Version:** 0.23.0-draft  
+**Date:** 2026-07-07  
+**Changelog (0.23):** Post-race export — Neo4j insights → AI-sailing-data YAML-LD ([ADR-0024](./adr/0024-post-race-neo4j-export-to-data-repo.md), §7.24, §11.16).  
+**Changelog (0.22):** SHACL constraint validation + Neo4j projection map in CI; no Fuseki on Pi ([ADR-0023](./adr/0023-shacl-neo4j-projection-no-fuseki.md), §7.15.10, §11.15).  
 **Changelog (0.21):** SLA-1 Signal K plugin strategy — `@signalk/course-provider`, `course-sk-sync`, `signalk-polar-performance`, `polar-manager` stub ([ADR-0021](./adr/0021-sla1-signalk-plugin-strategy.md)).  
 **Changelog (0.20):** course-editor as coordinate system of record; GPX/Neo4j/runtime derived from editor saves ([ADR-0020](./adr/0020-course-editor-coordinate-system-of-record.md)).  
 **Changelog (0.19):** Three-Pi race deploy; helm UX (`race-ui` + Grafana scope); dual speaker / H5000-only safety ([ADR-0018](./adr/0018-helm-ux-three-pi-dual-speaker.md)); PredictWind multi-model GRIB + onboard scoring ([ADR-0019](./adr/0019-predictwind-multi-model-grib.md)).  
@@ -55,13 +57,14 @@ Normative detail stays in §7–§11 and ADRs. This table is the **recommended b
 |-------|---------------|------|---------|--------|--------------------------|
 | **0** | Spec, repos, deploy scaffold | [0001](./adr/0001-system-architecture-and-technology-choices.md), [0002](./adr/0002-three-tier-sla-architecture.md), [0008](./adr/0008-github-docker-deployment-lifecycle.md), [0009](./adr/0009-dual-repository-race-data.md) | [§5](./spec.md#5-three-tier-sla-architecture), [§5.7](./spec.md#57-dual-repository-architecture), [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§9](./spec.md#9-deployment-architecture) | [11.6](./spec.md#116-operations) | Compose stubs, `race-data-sync` scaffold |
 | **1** | SLA-1 telemetry | [0001](./adr/0001-system-architecture-and-technology-choices.md), [0011](./adr/0011-bg-h5000-reference-model.md) (ingest), [0021](./adr/0021-sla1-signalk-plugin-strategy.md) | [§7.1](./spec.md#71-signal-k-server-hub--sla-1-only), [§7.2](./spec.md#72-time-series--influxdb--sla-1-only), [§7.4](./spec.md#74-visualization--grafana) | [11.1](./spec.md#111-sla-1--telemetry) | `signalk-server` (+ `course-provider`), `course-sk-sync`, `signalk-polar-performance`, `signalk-influx-bridge`, `grafana-telemetry` |
-| **2A** | Shore race prep (data repo) | [0009](./adr/0009-dual-repository-race-data.md), [0013](./adr/0013-orc-certificate-fleet-collection.md), [0014](./adr/0014-shore-weather-current-collection.md), [0017](./adr/0017-marine-map-gpx-export.md), [0022](./adr/0022-yaml-ld-interconnected-data.md) | [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§7.15.8](./spec.md#7158-yaml-ld-linked-data-format), [§7.19](./spec.md#719-orc-certificate-collection--fleet-enrichment), [§7.20](./spec.md#720-shore-weather--current-collection), [§7.23](./spec.md#723-marine-map-gpx-export) | [11.9](./spec.md#119-orc-certificate-collection-shore), [11.10](./spec.md#1110-shore-weather--current-collection), [11.13](./spec.md#1113-marine-map-gpx-export), [11.14](./spec.md#1114-yaml-ld-linked-data-ai-sailing-data) | [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) skills, YAML-LD, `schema/yaml-ld/`, `export/marine-map/` |
-| **2B** | Graph import & sync | [0009](./adr/0009-dual-repository-race-data.md), [0022](./adr/0022-yaml-ld-interconnected-data.md) | [§7.3](./spec.md#73-knowledge-graph--neo4j--sla-2-only), [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§7.15.8](./spec.md#7158-yaml-ld-linked-data-format) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) (import), [11.14](./spec.md#1114-yaml-ld-linked-data-ai-sailing-data) | `neo4j`, `race-data-sync`, `race-import` |
+| **2A** | Shore race prep (data repo) | [0009](./adr/0009-dual-repository-race-data.md), [0013](./adr/0013-orc-certificate-fleet-collection.md), [0014](./adr/0014-shore-weather-current-collection.md), [0017](./adr/0017-marine-map-gpx-export.md), [0022](./adr/0022-yaml-ld-interconnected-data.md), [0023](./adr/0023-shacl-neo4j-projection-no-fuseki.md) | [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§7.15.8](./spec.md#7158-yaml-ld-linked-data-format), [§7.15.10](./spec.md#71510-ontology-constraints-and-neo4j-projection), [§7.19](./spec.md#719-orc-certificate-collection--fleet-enrichment), [§7.20](./spec.md#720-shore-weather--current-collection), [§7.23](./spec.md#723-marine-map-gpx-export) | [11.9](./spec.md#119-orc-certificate-collection-shore), [11.10](./spec.md#1110-shore-weather--current-collection), [11.13](./spec.md#1113-marine-map-gpx-export), [11.14](./spec.md#1114-yaml-ld-linked-data-ai-sailing-data), [11.15](./spec.md#1115-shacl-constraints-and-neo4j-projection) | [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) skills, YAML-LD, `schema/yaml-ld/`, `schema/shacl/`, `export/marine-map/` |
+| **2B** | Graph import & sync | [0009](./adr/0009-dual-repository-race-data.md), [0022](./adr/0022-yaml-ld-interconnected-data.md), [0023](./adr/0023-shacl-neo4j-projection-no-fuseki.md) | [§7.3](./spec.md#73-knowledge-graph--neo4j--sla-2-only), [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data), [§7.15.8](./spec.md#7158-yaml-ld-linked-data-format), [§7.15.10](./spec.md#71510-ontology-constraints-and-neo4j-projection) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) (import), [11.14](./spec.md#1114-yaml-ld-linked-data-ai-sailing-data), [11.15](./spec.md#1115-shacl-constraints-and-neo4j-projection) | `neo4j`, `race-data-sync`, `race-import`, `race-export` |
 | **2C** | GRIB, polars, AIS, wind | [0004](./adr/0004-grib-polars-ais-wind-analysis.md), [0019](./adr/0019-predictwind-multi-model-grib.md) | [§7.12](./spec.md#712-grib-polars-ais--wind-on-course-analysis) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-15–26, [11.10](./spec.md#1110-shore-weather--current-collection) | `grib-ingest`, `grib-parser`, `grib-model-scorer`, `polar-manager` (full SLK), `polar-certificate-extractor`, `ais-collector`, `wind-field-analyzer` |
 | **2D** | Courses, handicaps, results | [0005](./adr/0005-course-parsing-handicaps-live-results.md), [0006](./adr/0006-start-boat-course-flags.md) | [§7.13](./spec.md#713-race-courses-waypoints--live-results), [§7.14](./spec.md#714-handicap-numbers--scoring) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-27–41 | `course-parser`, `course-editor`, `course-flag-detector`, `handicap-manager`, `live-results` |
 | **2E** | Race UX (iRegatta + H5000 parity) | [0010](./adr/0010-iregatta-reference-model.md), [0011](./adr/0011-bg-h5000-reference-model.md), [0018](./adr/0018-helm-ux-three-pi-dual-speaker.md) | [§7.4.1](./spec.md#741-race-helm-ui-grafana--signalk-plugins), [§7.6](./spec.md#76-race-intelligence-service--sla-2-only), [§7.16](./spec.md#716-iregatta-reference-model--feature-traceability), [§7.17](./spec.md#717-bg-h5000-reference-model--integration) | [11.2](./spec.md#112-sla-2--race-competitors-grib-polars--wind) FR-42–59, [11.7](./spec.md#117-bg-h5000-integration--display-parity) | `race-ui`, `race-intelligence`, `grafana-race` |
 | **2F** | Fleet analytics & alerts | [0016](./adr/0016-fleet-polar-performance-influx.md), [0015](./adr/0015-tactical-insight-alerts-annunciation.md) | [§7.22](./spec.md#722-fleet-polar-performance-timeline), [§7.21](./spec.md#721-tactical-insight-alerts--annunciation), [§7.5](./spec.md#75-ai--llama--coral) (coach) | [11.11](./spec.md#1111-tactical-insight-alerts--annunciation), [11.12](./spec.md#1112-fleet-polar-performance-timeline-influxdb), [11.5](./spec.md#115-ai-coaching-cross-tier) | `fleet-performance-tracker`, `insight-alerts`, `tactical-coach` |
 | **2G** | Race laptop MCP | [0012](./adr/0012-race-side-mcp-laptop-cursor.md) | [§7.18](./spec.md#718-race-side-mcp--laptop-cursor) | [11.8](./spec.md#118-race-side-mcp-laptop-cursor) | `race-mcp-gateway` |
+| **2H** | Post-race archive | [0024](./adr/0024-post-race-neo4j-export-to-data-repo.md), [0009](./adr/0009-dual-repository-race-data.md) | [§7.24](./spec.md#724-post-race-analysis-export), [§7.15](./spec.md#715-race--boat-data-repository-ai-sailing-data) | [11.16](./spec.md#1116-post-race-analysis-export), [11.14](./spec.md#1114-yaml-ld-linked-data-ai-sailing-data) | `race-export`, `post-race/*.yaml` |
 | **3** | SLA-3 sail vision | [0003](./adr/0003-gopro-capture-and-shore-training.md) | [§7.9](./spec.md#79-gopro-hero13-black-fleet)–[§7.11](./spec.md#711-onshore-transformer-training-pipeline), [§7.7](./spec.md#77-sail-vision-service-sla-3) | [11.3](./spec.md#113-sla-3--sail-performance-vision-gopro-hero13), [11.4](./spec.md#114-onshore-training-sla-s) | `gopro-orchestrator`, `sail-geometry`, `sail-analysis-api`, Coral |
 | **4** | CI/CD & multi-Pi ops | [0008](./adr/0008-github-docker-deployment-lifecycle.md) | [§9](./spec.md#9-deployment-architecture) | [11.6](./spec.md#116-operations) | GitHub Actions → GHCR, Watchtower, harbor scripts |
 | **5** | Shore TrimTransformer (SLA-S) | [0003](./adr/0003-gopro-capture-and-shore-training.md) | [§7.11](./spec.md#711-onshore-transformer-training-pipeline), [§9.6](./spec.md#96-shore-training--gaming-pc-sla-s) | [11.4](./spec.md#114-onshore-training-sla-s) | Gaming PC, `trim-transformer-trainer`, GHCR `trim-predictor` |
@@ -162,6 +165,8 @@ The prior CogSail stack proved that Signal K → stream buffer → structured st
 | G30 | **Fleet polar performance timeline** — all boats vs certificate polar and active race handicap, stored in InfluxDB for Grafana/MCP — [§7.22](#722-fleet-polar-performance-timeline), [ADR-0016](./adr/0016-fleet-polar-performance-influx.md) |
 | G31 | **Marine map GPX export** — chartplotter-ready route zip from race course YAML — [§7.23](#723-marine-map-gpx-export), [ADR-0017](./adr/0017-marine-map-gpx-export.md) |
 | G32 | **YAML-LD linked data** — interconnected fact YAML in AI-sailing-data follows [W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/) for verifiable cross-document references — [§7.15.8](#7158-yaml-ld-linked-data-format), [ADR-0022](./adr/0022-yaml-ld-interconnected-data.md) |
+| G33 | **SHACL ontology constraints** — shore CI validates YAML-LD facts against SHACL shapes; Neo4j is runtime projection only — [§7.15.10](#71510-ontology-constraints-and-neo4j-projection), [ADR-0023](./adr/0023-shacl-neo4j-projection-no-fuseki.md) |
+| G34 | **Post-race learning loop** — export Neo4j race insights (standings, course sailed, tactical alerts, GRIB model outcomes) to YAML-LD in AI-sailing-data for future prep — [§7.24](#724-post-race-analysis-export), [ADR-0024](./adr/0024-post-race-neo4j-export-to-data-repo.md) |
 
 ### 3.2 Non-goals (v1)
 
@@ -396,6 +401,7 @@ flowchart TB
 | `handicap-manager` | `ghcr.io/.../handicap-manager` | ORC certificate handicaps + per-race WRS TCF per vessel |
 | `race-data-sync` | `ghcr.io/.../race-data-sync` | Git pull **AI-sailing-data** when GitHub ahead of local |
 | `race-import` | `ghcr.io/.../race-import` | Apply data repo `neo4j/*.yaml` → Neo4j MERGE |
+| `race-export` | `ghcr.io/.../race-export` | Export Neo4j post-race insights → data repo `post-race/*.yaml` |
 | `course-parser` | `ghcr.io/.../course-parser` | Extract courses/waypoints from SI/NOR PDFs |
 | `live-results` | `ghcr.io/.../live-results` | Corrected-time standings + VMG along course legs |
 | `fleet-performance-tracker` | `ghcr.io/.../fleet-performance-tracker` | Fleet polar % vs certificate; writes `fleet_polar_performance` to Influx |
@@ -742,10 +748,11 @@ Read and implement §7 subsections in this sequence (links stay stable):
 | 16 | [7.21](#721-tactical-insight-alerts--annunciation) | Tactical alerts | 2F |
 | 17 | [7.5](#75-ai--llama--coral) | LLM coach | 2F |
 | 18 | [7.18](#718-race-side-mcp--laptop-cursor) | Laptop MCP | 2G |
-| 19 | [7.9](#79-gopro-hero13-black-fleet)–[7.11](#711-onshore-transformer-training-pipeline) | GoPro & training | 3, 5 |
-| 20 | [7.7](#77-sail-vision-service-sla-3) | Sail vision API | 3 |
-| 21 | [7.10](#710-sail-geometry--condition-similarity) | Sail geometry | 3 |
-| 22 | [7.8](#78-web-crawler-integration-optional-online) | Web crawler (optional) | 2D+ |
+| 19 | [7.24](#724-post-race-analysis-export) | Post-race export | 2H |
+| 20 | [7.9](#79-gopro-hero13-black-fleet)–[7.11](#711-onshore-transformer-training-pipeline) | GoPro & training | 3, 5 |
+| 21 | [7.7](#77-sail-vision-service-sla-3) | Sail vision API | 3 |
+| 22 | [7.10](#710-sail-geometry--condition-similarity) | Sail geometry | 3 |
+| 23 | [7.8](#78-web-crawler-integration-optional-online) | Web crawler (optional) | 2D+ |
 
 Reference-only sections ([§7.16](#716-iregatta-reference-model--feature-traceability), [§7.17](#717-bg-h5000-reference-model--integration)) inform Phase 2E dashboards and YAML in the data repo.
 
@@ -2507,15 +2514,34 @@ polar_document:
 | Shore authoring | Cursor skills `yaml-ld-write` / `yaml-ld-read` in AI-sailing-data |
 | Runtime services | `yaml-ld-read` skill + Pydantic models in AI-sailing-system |
 | `race-preparation` | Must invoke `yaml-ld-write` for all emitted fact YAML |
-| CI (planned) | JSON-LD expansion against `context.jsonld` on PR |
+| CI | JSON-LD expansion + pyshacl SHACL — `scripts/validate_yaml_ld.py` on PR |
 
 ##### 7.15.8.5 Legacy files
 
-Files without `@context` are **legacy**. Services and agents apply [legacy fallback](https://github.com/cognite-fholm/AI-sailing-data/blob/main/.cursor/skills/yaml-ld-read/SKILL.md#legacy-fallback) until migrated. New or substantively edited files without YAML-LD headers are **non-conformant**.
+Files without `@context` are **legacy** (none remain in `boats/`/`races/` as of 2026-07-07). Services and agents still apply [legacy fallback](https://github.com/cognite-fholm/AI-sailing-data/blob/main/.cursor/skills/yaml-ld-read/SKILL.md#legacy-fallback) for out-of-band files. New files without YAML-LD headers are **non-conformant**.
 
 ##### 7.15.8.6 Excluded files
 
 Not YAML-LD: `collected/**/*.json`, binary assets, OKF markdown, wiki prose, `docker-compose*.yml`, `deploy/env/*`.
+
+#### 7.15.10 Ontology constraints and Neo4j projection
+
+**ADR:** [0023](./adr/0023-shacl-neo4j-projection-no-fuseki.md)  
+**Artifacts:** [AI-sailing-data `schema/shacl/`](https://github.com/cognite-fholm/AI-sailing-data/tree/main/schema/shacl), [`schema/neo4j-mapping.yaml`](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/neo4j-mapping.yaml)
+
+Three-layer schema model (shore, versioned in AI-sailing-data):
+
+| Layer | Artifact | Role |
+|-------|----------|------|
+| **Vocabulary** | `schema/yaml-ld/context.jsonld` | `sailing:` IRIs, `kind` ↔ `@type` |
+| **Constraints** | `schema/shacl/*.shacl.ttl` | SHACL — cardinality, required fields, Neo4j template rules |
+| **Runtime projection** | `schema/neo4j-mapping.yaml` | Maps ontology types → Neo4j labels, MERGE keys, relationship types |
+
+**Validation (shore CI only):** `scripts/validate_yaml_ld.py` expands YAML-LD → RDF, runs **pyshacl**, and checks `Neo4jRelationship` `from_ref` / `to_ref` resolve to known `urn:sailing:entity:*` URNs.
+
+**Neo4j (SLA-2)** remains the **runtime** property graph. It is not an RDF triple store and does not run SHACL. Declarative `neo4j/*.yaml` templates are validated in CI before `race-import` MERGE.
+
+**Explicit non-goal:** Apache Jena Fuseki (or any RDF triple store) on SLA-1 or SLA-2 for v1. Optional future shore-only SPARQL endpoint; not on the critical path.
 
 #### 7.15.9 Dual-repo deployment
 
@@ -3678,6 +3704,155 @@ GPX is the **harbor handoff** to MFD apps; Neo4j remains runtime truth on the bo
 
 ---
 
+### 7.24 Post-race analysis export
+
+**ADR:** [0024](./adr/0024-post-race-neo4j-export-to-data-repo.md)  
+**Data repo guide:** [AI-sailing-data `docs/POST_RACE_ANALYSIS.md`](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/POST_RACE_ANALYSIS.md)  
+**Related:** [§7.3](#73-knowledge-graph--neo4j--sla-2-only) (runtime graph), [§7.15](#715-race--boat-data-repository-ai-sailing-data) (data repo), [ADR-0009](./adr/0009-dual-repository-race-data.md), [ADR-0022](./adr/0022-yaml-ld-interconnected-data.md), [ADR-0023](./adr/0023-shacl-neo4j-projection-no-fuseki.md)
+
+During a regatta, **Neo4j** holds knowledge that does not exist in git: final standings, the course actually sailed, tactical insights fired, and GRIB model performance. After the race, that knowledge must flow **back** into **[AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)** as **YAML-LD facts** so future regatta preparation can learn from past events.
+
+**Non-goal:** Exporting high-frequency telemetry (Influx time series, AIS track points, raw GRIB). Those remain in Influx or expire per retention policy.
+
+#### 7.24.1 Data flow (import ↔ export)
+
+```mermaid
+flowchart LR
+  subgraph shore_git [AI-sailing-data git]
+    PRE[pre-race YAML-LD<br/>fleet, courses, neo4j/]
+    POST[post-race YAML-LD<br/>results, insights, outcome]
+  end
+
+  subgraph boat [SLA-2 boat]
+    IMP[race-import]
+    NEO[(Neo4j runtime)]
+    EXP[race-export]
+    LIVE[live-results,<br/>insight-alerts,<br/>grib-model-scorer]
+  end
+
+  PRE --> IMP --> NEO
+  LIVE --> NEO
+  NEO --> EXP --> POST
+```
+
+| Direction | Service | When |
+|-----------|---------|------|
+| Git → Neo4j | `race-import` | Harbor, before / during race week |
+| Neo4j → Git | `race-export` | After race, harbor or shore |
+
+#### 7.24.2 Post-race folder layout
+
+Each archived regatta MAY include:
+
+```
+races/{year}/{year}-{month}-{slug}/
+  post-race/
+    results.yaml           # kind: RaceResults
+    outcome.yaml           # kind: RaceOutcome
+    insights.yaml          # kind: RaceInsightArchive
+    grib-scores.yaml       # kind: GribModelOutcome
+    export-manifest.yaml   # kind: PostRaceExport
+  wiki/
+    debrief.md             # human narrative (markdown, not YAML-LD)
+  collected/
+    results/               # official portal JSON/PDF scrape
+```
+
+All `post-race/*.yaml` files conform to [§7.15.8](#7158-yaml-ld-linked-data-format) and validate in CI with [§11.15](#1115-shacl-constraints-and-neo4j-projection) shapes.
+
+#### 7.24.3 YAML `kind`s and Neo4j sources
+
+| `kind` | Neo4j / source | `spec` contents (summary) |
+|--------|----------------|---------------------------|
+| `RaceResults` | Final `LiveStanding` snapshot; optional merge with `collected/results/` | `standings[]`: rank, vessel entity link, corrected/elapsed time, handicap used |
+| `RaceOutcome` | `CourseSelection` + own-boat standing row | Course route entity link, certificate ref, finish position, flags signaled |
+| `RaceInsightArchive` | `InsightAlert` nodes | `insights[]`: type, severity, leg, timestamp, message summary |
+| `GribModelOutcome` | GRIB model score nodes / Influx rollup | Per-leg best model id, error metrics ([ADR-0019](./adr/0019-predictwind-multi-model-grib.md)) |
+| `PostRaceExport` | Export run metadata | `exported_at`, `neo4j_commit` or snapshot id, `race-export` version |
+
+**Entity links** use `urn:sailing:entity:{ref}` for regatta, vessels, routes, and certificates — same rules as pre-race YAML ([§7.15.8.3](#71583-cross-document-references)).
+
+Example (`RaceResults` fragment):
+
+```yaml
+"@context":
+  - "https://sailing.cognite-fholm/schema/v1/context.jsonld"
+  - "@base": "https://sailing.cognite-fholm/data/v1/"
+"@id": "races/2026/2026-06-faerderseilasen/post-race/results.yaml"
+"@type": "sailing:RaceResults"
+apiVersion: sailing.cognite-fholm/v1
+kind: RaceResults
+metadata:
+  ref: results-faerder-2026-dh
+  "@id": "urn:sailing:entity:results-faerder-2026-dh"
+spec:
+  regatta:
+    "@type": "sailing:Regatta"
+    "@id": "urn:sailing:entity:regatta-faerder-2026"
+  source: live_results
+  class_name: Doublehanded
+  standings:
+    - rank: 1
+      vessel:
+        "@type": "sailing:Vessel"
+        "@id": "urn:sailing:entity:vessel-xbox"
+      sail_number: "NOR-10133"
+      corrected_seconds: 43210
+      elapsed_seconds: 44100
+```
+
+#### 7.24.4 `race-export` service
+
+**Container:** `race-export` (SLA-2)  
+**Config:** `config/data-repo.yaml` `active.regatta_id`, Neo4j credentials
+
+| Endpoint / CLI | Action |
+|----------------|--------|
+| `POST /export` | Export active race to `DATA_REPO_PATH` |
+| `race-export export --race {id} [--dry-run]` | CLI equivalent |
+
+**Algorithm:**
+
+1. Resolve `race_id` and data-repo race folder from config.
+2. Query Neo4j for whitelisted labels per [`neo4j-mapping.yaml` `export_projections`](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/neo4j-mapping.yaml).
+3. Map graph properties → YAML-LD `spec` per kind schema.
+4. Write `post-race/*.yaml` with `yaml-ld-write` conventions.
+5. Set `race.yaml` → `spec.status: archived`, `spec.post_race_exported_at` (ISO 8601 UTC).
+6. Emit `PostRaceExport` manifest with provenance.
+
+**Safety:**
+
+- Does **not** DELETE Neo4j data (optional admin cleanup separate).
+- Does **not** write Influx measurements.
+- Idempotent re-export overwrites `post-race/` files; git diff is the review gate.
+- Blocked while `RACE_MODE=true` unless `force=true` (config).
+
+#### 7.24.5 Human and collected layers
+
+| Layer | Format | Required |
+|-------|--------|----------|
+| `post-race/*.yaml` | YAML-LD | **Yes** for machine learning / agent prep |
+| `wiki/debrief.md` | Markdown | Recommended — lessons, what worked |
+| `collected/results/` | JSON / PDF | When official results published on portal |
+
+`race-export` MAY merge portal results into `RaceResults` when `collected/results/*.json` exists (`spec.source: merged`).
+
+#### 7.24.6 Re-import and future prep
+
+- `race-import` MUST NOT MERGE post-race kinds as runtime `LiveStanding` / `InsightAlert` nodes.
+- `race-preparation` and MCP agents SHOULD read archived `post-race/` when preparing the next regatta (competitor finish history, course choices, insight patterns).
+- `index.yaml` race entries use `status: archived` after export.
+
+#### 7.24.7 Projection contract
+
+Import and export projections are documented together in **AI-sailing-data** [`schema/neo4j-mapping.yaml`](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/neo4j-mapping.yaml):
+
+- `kinds` / `relationship_types` — git → Neo4j (`race-import`)
+- `export_projections` — Neo4j → git (`race-export`)
+- `runtime_only_labels` — never exported verbatim; summarized into post-race kinds
+
+---
+
 ## 8. Technology matrix
 
 | Concern | Choice | Language | Rationale |
@@ -4099,11 +4274,12 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 |-------------|----------------|
 | 0, 4 | [11.6](#116-operations) |
 | 1 | [11.1](#111-sla-1--telemetry) |
-| 2A | [11.9](#119-orc-certificate-collection-shore), [11.10](#1110-shore-weather--current-collection), [11.13](#1113-marine-map-gpx-export), [11.14](#1114-yaml-ld-linked-data-ai-sailing-data) |
-| 2B–2D | [11.2](#112-sla-2--race-competitors-grib-polars--wind) FR-10–41, [11.14](#1114-yaml-ld-linked-data-ai-sailing-data) |
+| 2A | [11.9](#119-orc-certificate-collection-shore), [11.10](#1110-shore-weather--current-collection), [11.13](#1113-marine-map-gpx-export), [11.14](#1114-yaml-ld-linked-data-ai-sailing-data), [11.15](#1115-shacl-constraints-and-neo4j-projection) |
+| 2B–2D | [11.2](#112-sla-2--race-competitors-grib-polars--wind) FR-10–41, [11.14](#1114-yaml-ld-linked-data-ai-sailing-data), [11.15](#1115-shacl-constraints-and-neo4j-projection) |
 | 2E | [11.2](#112-sla-2--race-competitors-grib-polars--wind) FR-42–59, [11.7](#117-bg-h5000-integration--display-parity) |
 | 2F | [11.11](#1111-tactical-insight-alerts--annunciation), [11.12](#1112-fleet-polar-performance-timeline-influxdb), [11.5](#115-ai-coaching-cross-tier) |
 | 2G | [11.8](#118-race-side-mcp-laptop-cursor) |
+| 2H | [11.16](#1116-post-race-analysis-export), [11.14](#1114-yaml-ld-linked-data-ai-sailing-data) |
 | 3 | [11.3](#113-sla-3--sail-performance-vision-gopro-hero13) |
 | 5 | [11.4](#114-onshore-training-sla-s) |
 
@@ -4362,8 +4538,37 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 | FR-192 | Shared vocabulary published at `schema/yaml-ld/context.jsonld` with one `sailing:{Kind}` term per registered `kind` |
 | FR-193 | Cursor agents use `yaml-ld-write` / `yaml-ld-read` skills with documented do/don't enforcement |
 | FR-194 | Runtime services (`race-import`, `course-sk-sync`, `polar-manager`) resolve links via YAML-LD rules with legacy fallback |
-| FR-195 | CI validates YAML-LD expand/compatibility on PR (Phase 2B follow-up) |
+| FR-195 | CI validates YAML-LD expand/compatibility on PR |
 | FR-196 | `kind` MUST equal local name of `@type`; mismatch is a validation error |
+
+### 11.15 SHACL constraints and Neo4j projection
+
+**ADR:** [0023](./adr/0023-shacl-neo4j-projection-no-fuseki.md) · **Spec:** [§7.15.10](./spec.md#71510-ontology-constraints-and-neo4j-projection) · **Standard:** [SHACL](https://www.w3.org/TR/shacl/)
+
+| ID | Requirement |
+|----|-------------|
+| FR-197 | SHACL shapes committed under `schema/shacl/` for each graph-projected `kind` |
+| FR-198 | Shore CI runs pyshacl on the combined RDF dataset from migrated YAML-LD files |
+| FR-199 | `Neo4jRelationship` `from_ref` / `to_ref` MUST resolve to `urn:sailing:entity:{ref}` in the dataset |
+| FR-200 | `schema/neo4j-mapping.yaml` documents `kind` → Neo4j label projection and runtime-only labels |
+| FR-201 | No Fuseki or RDF triple store on SLA-1/SLA-2 for v1 |
+
+### 11.16 Post-race analysis export
+
+**ADR:** [0024](./adr/0024-post-race-neo4j-export-to-data-repo.md) · **Spec:** [§7.24](./spec.md#724-post-race-analysis-export)
+
+| ID | Requirement |
+|----|-------------|
+| FR-202 | `race-export` service exports whitelisted Neo4j runtime data to AI-sailing-data `post-race/*.yaml` |
+| FR-203 | Post-race YAML kinds (`RaceResults`, `RaceOutcome`, `RaceInsightArchive`, `GribModelOutcome`, `PostRaceExport`) conform to YAML-LD 1.0 Basic profile |
+| FR-204 | Post-race documents link to regatta, vessel, and course entities via `urn:sailing:entity:{ref}` node objects |
+| FR-205 | Export excludes high-frequency telemetry (Influx series, AIS tracks, raw GRIB binaries) |
+| FR-206 | `race-import` MUST NOT re-import post-race kinds as runtime `LiveStanding` or `InsightAlert` nodes |
+| FR-207 | `schema/neo4j-mapping.yaml` documents `export_projections` (Neo4j label → post-race `kind`) |
+| FR-208 | SHACL shapes in `schema/shacl/post-race.shacl.ttl` validate post-race YAML in CI |
+| FR-209 | After export, `race.yaml` `spec.status` is `archived` with `post_race_exported_at` timestamp |
+| FR-210 | Official portal results in `collected/results/` MAY be merged into `RaceResults` with `spec.source` provenance |
+| FR-211 | Future `race-preparation` reads archived `post-race/` for competitor and own-boat history |
 
 ---
 
@@ -4488,7 +4693,7 @@ Phases match [§1.1 Implementation map](#11-implementation-map). Checklists are 
 
 - [x] Repository created; [spec.md](./spec.md) v0.21
 - [x] [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — architecture index
-- [x] ADR-0001 through ADR-0022 (see [adr/README.md](./adr/README.md#implementation-order))
+- [x] ADR-0001 through ADR-0023 (see [adr/README.md](./adr/README.md#implementation-order))
 - [x] Dual-repo model ([AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)) + race prep guide + user guides
 - [x] Deploy scaffolding, workflow stubs, harbor scripts
 - [x] Runtime containers — Phase 1 & 2B core (compose + services)
@@ -4508,7 +4713,7 @@ Phases match [§1.1 Implementation map](#11-implementation-map). Checklists are 
 
 ### Phase 2A — Shore race prep (AI-sailing-data)
 
-**ADR:** 0009, 0013, 0014, 0017, **0022** · **§7:** 7.15, 7.15.8, 7.19, 7.20, 7.23 · **FR:** 11.9, 11.10, 11.13, **11.14**
+**ADR:** 0009, 0013, 0014, 0017, **0022**, **0023** · **§7:** 7.15, 7.15.8, 7.15.10, 7.19, 7.20, 7.23 · **FR:** 11.9, 11.10, 11.13, **11.14**, **11.15**
 
 Runs onshore (laptop); can parallel Phase 1.
 
@@ -4517,16 +4722,17 @@ Runs onshore (laptop); can parallel Phase 1.
 - [x] MET GRIB, Oslofjord current plots, SMHI wind skills
 - [x] Marine map GPX export skill + Færder example
 - [x] YAML-LD standard — `schema/yaml-ld/`, ADR-0022, skills, [docs/YAML_LD.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/YAML_LD.md), CI expand validation, GitHub Pages context host
+- [x] SHACL constraints + Neo4j projection — `schema/shacl/`, `schema/neo4j-mapping.yaml`, ADR-0023, pyshacl in CI
 - [x] High-traffic YAML-LD migration — `index.yaml`, `boats/NOR-10133/boat.yaml`, Færder 2026 bundle (20 files)
-- [ ] Bulk migration of remaining legacy YAML files
+- [x] Bulk migration of all legacy YAML files (81 fact files; `scripts/migrate_bulk_yaml_ld.py`)
 - [ ] Complete waypoint lat/lon for all course variants — **via `course-editor`** (SoR); then re-export marine map
 - [ ] `prep-status.yaml` on all target races
 
 ### Phase 2B — Graph import & sync
 
-**ADR:** 0009, **0022** · **§7:** 7.3, 7.15, 7.15.8 · **FR:** 11.2 (import), **11.14**
+**ADR:** 0009, **0022**, **0023** · **§7:** 7.3, 7.15, 7.15.8, 7.15.10 · **FR:** 11.2 (import), **11.14**, **11.15**
 
-- [ ] Neo4j schema (Vessel, Polar, GribModel, Waypoint, HandicapRating, …)
+- [x] Neo4j projection map — `schema/neo4j-mapping.yaml` (ADR-0023); runtime schema in Neo4j still populated by import
 - [x] `docker-compose.sla-2.yml` (core services)
 - [x] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
 - [ ] YAML-LD CI validation (FR-195) — JSON-LD expand on PR
@@ -4575,6 +4781,16 @@ Runs onshore (laptop); can parallel Phase 1.
 - [x] `race-mcp-gateway` scaffold — Neo4j + Influx MCP (`race-mcp-gateway/`)
 - [ ] Auth, rate limits, read-only production profile
 - [ ] Cursor MCP config template in data repo (`race-laptop-mcp` skill)
+
+### Phase 2H — Post-race archive (Neo4j → data repo)
+
+**ADR:** 0024, 0009 · **§7:** 7.24, 7.15 · **FR:** 11.16, 11.14
+
+- [ ] `race-export` service — Neo4j → `post-race/*.yaml` ([ADR-0024](./adr/0024-post-race-neo4j-export-to-data-repo.md))
+- [ ] Post-race YAML kinds in `context.jsonld` + SHACL (`RaceResults`, `RaceOutcome`, `RaceInsightArchive`, `GribModelOutcome`, `PostRaceExport`)
+- [ ] `schema/neo4j-mapping.yaml` `export_projections`
+- [ ] `post-race-export` skill + [POST_RACE_ANALYSIS.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/POST_RACE_ANALYSIS.md) user guide
+- [ ] Harbor workflow: export → review → `git push` → `status: archived`
 
 ### Phase 3 — SLA-3 GoPro sail vision
 

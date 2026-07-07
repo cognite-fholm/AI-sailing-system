@@ -11,7 +11,9 @@ description: >-
 
 **Authoritative write skill:** [AI-sailing-data yaml-ld-write](https://github.com/cognite-fholm/AI-sailing-data/blob/main/.cursor/skills/yaml-ld-write/SKILL.md) — **read and follow it verbatim** for any interconnected fact shape.
 
-**ADR:** [0022-yaml-ld-interconnected-data](../../adr/0022-yaml-ld-interconnected-data.md)
+**How it fits together:** [AI-sailing-data DATA_SCHEMA.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/DATA_SCHEMA.md)
+
+**ADR:** [0022](../../adr/0022-yaml-ld-interconnected-data.md) · [0023](../../adr/0023-shacl-neo4j-projection-no-fuseki.md)
 
 ---
 
@@ -80,5 +82,6 @@ Register `DataRepoConfig` in data-repo `context.jsonld` when migrating this file
 
 ## Related
 
+- **Big picture:** [DATA_SCHEMA.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/DATA_SCHEMA.md)
 - Read: [yaml-ld-read](../yaml-ld-read/SKILL.md)
 - Pydantic: [pydantic-first-coding](../pydantic-first-coding/SKILL.md)

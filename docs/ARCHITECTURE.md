@@ -2,7 +2,7 @@
 
 Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, data stores, and reference products fit together. Normative detail remains in [spec.md](../spec.md) and [adr/](../adr/).
 
-**Last updated:** 2026-07-06 · **Spec version:** 0.21.0-draft
+**Last updated:** 2026-07-07 · **Spec version:** 0.22.0-draft
 
 ---
 
@@ -13,7 +13,7 @@ Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, d
 | **[AI-sailing-system](https://github.com/cognite-fholm/AI-sailing-system)** (this repo) | Code, Docker images, CI/CD, ADRs, spec | `/opt/ai-sailing-system/` |
 | **[AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)** | Races, boats, ORC certs, planning **YAML-LD**, Neo4j templates | `/opt/ai-sailing-data/` |
 
-**YAML format:** Interconnected facts use [W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/) — [ADR-0022](../adr/0022-yaml-ld-interconnected-data.md) · [data repo schema/yaml-ld](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/yaml-ld/README.md)
+**YAML format:** Interconnected facts use [W3C YAML-LD 1.0](https://w3c.github.io/yaml-ld/) — [ADR-0022](../adr/0022-yaml-ld-interconnected-data.md) · [ADR-0023](../adr/0023-shacl-neo4j-projection-no-fuseki.md) · [data repo schema/yaml-ld](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/yaml-ld/README.md)
 
 **Rule:** Prepare regattas in **AI-sailing-data** on shore (Cursor + Git). Freeze **both** git refs and system image digests before a race ([ADR-0009](../adr/0009-dual-repository-race-data.md)).
 
@@ -57,6 +57,7 @@ flowchart TB
   subgraph data [AI-sailing-data Git]
     YAML[YAML + OKF]
     YAML -->|race-import| NEO
+    NEO -->|race-export| YAML
   end
 
   subgraph shore [Shore / LTE]
@@ -91,7 +92,7 @@ Spec: [§5 Three-tier SLA](../spec.md#5-three-tier-sla-architecture) · [§6 Dat
 | **Git (data repo)** | Shore → boat | Plans, certificates, static graph templates |
 | **OKF bundles** | 2–3 | LLM concept context |
 
-**Not in git:** Live AIS tracks, `LiveStanding`, `CourseSelection`, GRIB binaries (metadata only in YAML).
+**Not in git (runtime only):** Live AIS tracks, per-second standing history, raw GRIB binaries. **Archived after race:** Summarized standings, course outcome, insights in `post-race/*.yaml` ([ADR-0024](../adr/0024-post-race-neo4j-export-to-data-repo.md)).
 
 ---
 
@@ -133,6 +134,8 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0017](../adr/0017-marine-map-gpx-export.md) | Marine map GPX export (PredictWind-compatible zip) |
 | [0021](../adr/0021-sla1-signalk-plugin-strategy.md) | SLA-1 Signal K plugins — course geometry + polar performance |
 | [0022](../adr/0022-yaml-ld-interconnected-data.md) | YAML-LD linked data (AI-sailing-data) |
+| [0023](../adr/0023-shacl-neo4j-projection-no-fuseki.md) | SHACL constraints + Neo4j projection (shore CI) |
+| [0024](../adr/0024-post-race-neo4j-export-to-data-repo.md) | Post-race Neo4j → data repo export (learning loop) |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -186,6 +189,16 @@ Detail: [spec §7.19](../spec.md#719-orc-certificate-collection--fleet-enrichmen
 
 Detail: [data repo schema/README.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/README.md)
 
+**Schema layers (shore, CI-validated):**
+
+| Layer | Path |
+|-------|------|
+| Vocabulary | `schema/yaml-ld/context.jsonld` |
+| SHACL constraints | `schema/shacl/*.shacl.ttl` |
+| Neo4j projection | `schema/neo4j-mapping.yaml` |
+
+Neo4j on SLA-2 is the **runtime** graph; RDF/SHACL validation runs in GitHub Actions only ([ADR-0023](../adr/0023-shacl-neo4j-projection-no-fuseki.md)).
+
 ---
 
 ## Key services (SLA-1)
@@ -208,6 +221,7 @@ ADR: [0021](../adr/0021-sla1-signalk-plugin-strategy.md) · Spec: [§7.1](../spe
 |---------|----------------|
 | `race-data-sync` | `git pull` data repo via LTE/Wi‑Fi |
 | `race-import` | MERGE `neo4j/*.yaml` bundles |
+| `race-export` | Export Neo4j post-race insights → data repo `post-race/*.yaml` ([ADR-0024](../adr/0024-post-race-neo4j-export-to-data-repo.md)) |
 | `polar-manager` | ORC target-speeds API (`GET /polars/{id}/target`); full SLK parser in Phase 2C |
 | `race-intelligence` | Start line, lift, laylines, steering hints |
 | `live-results` | VMG, corrected-time fleet rank |

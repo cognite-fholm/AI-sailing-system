@@ -4,14 +4,33 @@ description: >-
   Read AI-sailing-data YAML as W3C YAML-LD 1.0 in Python services and agents.
   Use when implementing race-import, course-sk-sync, polar-manager, race-data-sync,
   or any code that loads boats/, races/, config/data-repo.yaml kinds from the data
-  repo. Strict do's and don'ts — never parse interconnected YAML as untyped dicts.
+  repo. Neo4j is runtime projection only — SHACL runs in shore CI. See DATA_SCHEMA.md.
 ---
 
 # YAML-LD read — AI-sailing-system (runtime)
 
-**Data-repo normative docs:** [AI-sailing-data schema/yaml-ld](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/yaml-ld/README.md) · [context.jsonld](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/yaml-ld/context.jsonld) · [ADR-0022](../../adr/0022-yaml-ld-interconnected-data.md)
+**Data-repo normative docs:** [AI-sailing-data schema/yaml-ld](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/yaml-ld/README.md) · [context.jsonld](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/yaml-ld/context.jsonld) · [ADR-0022](../../adr/0022-yaml-ld-interconnected-data.md) · [ADR-0023](../../adr/0023-shacl-neo4j-projection-no-fuseki.md)
+
+**How it fits together:** [AI-sailing-data DATA_SCHEMA.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/DATA_SCHEMA.md)
 
 **Companion (authoring):** [AI-sailing-data yaml-ld-write](https://github.com/cognite-fholm/AI-sailing-data/blob/main/.cursor/skills/yaml-ld-write/SKILL.md)
+
+---
+
+## Schema mental model (runtime services)
+
+Services on the boat read **layer 1** (YAML-LD facts). They do **not** run SHACL or Fuseki.
+
+| Layer | Where | Runtime service behavior |
+|-------|-------|--------------------------|
+| Facts | `DATA_REPO_PATH` mount | Load with this skill → Pydantic |
+| Vocabulary | `context.jsonld` | Optional expand; structural checks in skill |
+| Constraints | SHACL in CI | **Trust CI** — log warning if `@context` missing (legacy) |
+| Neo4j graph | SLA-2 | `race-import` MERGE; live writers add runtime nodes |
+
+**Projection:** [neo4j-mapping.yaml](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/neo4j-mapping.yaml) documents label/relationship contract. `race-import` uses `metadata.ref` as `_import_ref` for relationship MATCH.
+
+**Runtime-only Neo4j labels** (never import from git): `LiveStanding`, `CourseSelection`, `InsightAlert`, `StartLineState`.
 
 ---
 
@@ -71,6 +90,7 @@ After load → **Pydantic** `model_validate` on `spec` (+ metadata) per [.agents
 | D8 | **DO** use `pathlib.Path` and `DATA_REPO_PATH` — never hardcode boat-specific paths in code. |
 | D9 | **DO** strip or ignore `@context`/`@id`/`@type` at Pydantic boundary if models use `model_config = extra="ignore"`. |
 | D10 | **DO** read [AI-sailing-data yaml-ld-read](https://github.com/cognite-fholm/AI-sailing-data/blob/main/.cursor/skills/yaml-ld-read/SKILL.md) for graph walk semantics. |
+| D11 | **DO** consult [neo4j-mapping.yaml](https://github.com/cognite-fholm/AI-sailing-data/blob/main/schema/neo4j-mapping.yaml) when implementing `race-import` label/relationship handling. |
 
 ---
 
@@ -124,13 +144,16 @@ def parse_kind(doc: dict) -> str:
 
 ---
 
-## Future: JSON-LD processor
+## CI validation (data repo)
 
-When `pyld` or equivalent is added to CI, expand with remote + local context before `model_validate`. Until then, structural checks in this skill are **required**.
+Shore CI runs `validate_yaml_ld.py`: JSON-LD expand + pyshacl + entity-ref resolution. Services may assume migrated YAML-LD passed CI at the git ref pinned for the race.
+
+When adding `pyld` to service code, expand with local `context.jsonld` before `model_validate` for parity with CI.
 
 ---
 
 ## Related
 
+- **Big picture:** [DATA_SCHEMA.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/DATA_SCHEMA.md)
 - Pydantic patterns: [pydantic-first-coding](../pydantic-first-coding/SKILL.md)
-- ADR: [0022-yaml-ld-interconnected-data](../../adr/0022-yaml-ld-interconnected-data.md)
+- ADR: [0022](../../adr/0022-yaml-ld-interconnected-data.md) · [0023](../../adr/0023-shacl-neo4j-projection-no-fuseki.md)
