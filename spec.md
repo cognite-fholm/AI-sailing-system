@@ -4516,8 +4516,9 @@ Runs onshore (laptop); can parallel Phase 1.
 - [x] ORC certificate collection skill (`orc-sailor-services`)
 - [x] MET GRIB, Oslofjord current plots, SMHI wind skills
 - [x] Marine map GPX export skill + Færder example
-- [x] YAML-LD standard — `schema/yaml-ld/`, ADR-0022, `yaml-ld-write` / `yaml-ld-read` skills, [docs/YAML_LD.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/YAML_LD.md)
-- [ ] Bulk migration of legacy YAML files to `@context` headers
+- [x] YAML-LD standard — `schema/yaml-ld/`, ADR-0022, skills, [docs/YAML_LD.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/YAML_LD.md), CI expand validation, GitHub Pages context host
+- [x] High-traffic YAML-LD migration — `index.yaml`, `boats/NOR-10133/boat.yaml`, Færder 2026 bundle (20 files)
+- [ ] Bulk migration of remaining legacy YAML files
 - [ ] Complete waypoint lat/lon for all course variants — **via `course-editor`** (SoR); then re-export marine map
 - [ ] `prep-status.yaml` on all target races
 
@@ -4529,6 +4530,7 @@ Runs onshore (laptop); can parallel Phase 1.
 - [x] `docker-compose.sla-2.yml` (core services)
 - [x] `race-data-sync` + `race-import` — pull [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data)
 - [ ] YAML-LD CI validation (FR-195) — JSON-LD expand on PR
+- [x] YAML-LD CI in AI-sailing-data + system CI checkout validation
 
 ### Phase 2C — GRIB, polars, AIS, wind
 
