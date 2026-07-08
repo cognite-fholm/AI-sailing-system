@@ -47,4 +47,5 @@ if [[ -d models ]]; then
 fi
 
 echo "=== Harbor sync complete ==="
-echo "Next: ./scripts/harbor-pull.sh --tier {1|2|3}"
+echo "Next: python deploy/secrets/check_secrets.py --secrets-dir /opt/ai-sailing-system/secrets"
+echo "Then: ./scripts/harbor-pull.sh --tier {1|2|3}"

@@ -37,6 +37,7 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | **2G — Laptop MCP** | [0012](./0012-race-side-mcp-laptop-cursor.md), [0029](./0029-signalk-mcp-ecosystem-vpn-remote-access.md) | Race-side MCP; Signal K ecosystem + VPN remote access |
 | **3 — SLA-3 vision** | [0003](./0003-gopro-capture-and-shore-training.md) | GoPro HERO13 fleet capture and onshore TrimTransformer training |
 | **4 — CI/CD** | [0008](./0008-github-docker-deployment-lifecycle.md) | (deployment lifecycle — see Phase 0) |
+| | [0030](./0030-simple-hybrid-secrets-model.md) | Simple hybrid secrets model (GitHub CI + on-device runtime secrets) |
 | **5 — Shore training** | [0003](./0003-gopro-capture-and-shore-training.md) | (TrimTransformer pipeline — see Phase 3) |
 
 ## ADR index (by number)
@@ -71,6 +72,7 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | [0027](./0027-data-repo-runtime-policy-zero-pi-config.md) | Data-repo runtime policy — zero per-race Pi env | 2H | Accepted |
 | [0028](./0028-enriched-live-snapshot-fleet-performance-temporal.md) | Enriched live snapshot — fleet performance 5 min rollup | 2H, 2F | Accepted |
 | [0029](./0029-signalk-mcp-ecosystem-vpn-remote-access.md) | Signal K MCP ecosystem alignment + VPN remote access | 2G | Accepted |
+| [0030](./0030-simple-hybrid-secrets-model.md) | Simple hybrid secrets model for race operations | 4 | Accepted |
 
 ## Format
 

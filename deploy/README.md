@@ -1,6 +1,6 @@
 # Deployment — GitHub + Docker lifecycle
 
-This directory holds **environment templates**, **digest lock files**, and **topology overrides** for Raspberry Pi deployment. Full specification: [spec.md §9](../spec.md#9-deployment-architecture). ADR: [0008](../adr/0008-github-docker-deployment-lifecycle.md).
+This directory holds **environment templates**, **digest lock files**, **runtime secret guidance**, and **topology overrides** for Raspberry Pi deployment. Full specification: [spec.md §9](../spec.md#9-deployment-architecture). ADRs: [0008](../adr/0008-github-docker-deployment-lifecycle.md), [0030](../adr/0030-simple-hybrid-secrets-model.md).
 
 ## Prerequisites (new machine)
 
@@ -64,6 +64,27 @@ Grafana telemetry: `http://localhost:3001` · Signal K: `http://localhost:3000` 
 | GR-5 | Stop `training-export` when `RACE_MODE=true` |
 | GR-7 | Keep previous lock file for rollback |
 
+## Secrets model (simple hybrid)
+
+Use:
+
+- **GitHub Actions secrets** for CI/CD only
+- **On-device runtime secret files** on each Pi (`/opt/ai-sailing-system/secrets`)
+
+Install and validate runtime files:
+
+```bash
+python deploy/secrets/check_secrets.py --secrets-dir /opt/ai-sailing-system/secrets
+```
+
+For RMS VPN:
+
+```bash
+python deploy/secrets/check_secrets.py --secrets-dir /opt/ai-sailing-system/secrets --require-rms
+```
+
+Details and required filenames: [deploy/secrets/README.md](./secrets/README.md)
+
 ## Race freeze checklist
 
 **Shore (per regatta):**
@@ -81,7 +102,8 @@ Grafana telemetry: `http://localhost:3001` · Signal K: `http://localhost:3000` 
 5. `./scripts/harbor-pull.sh --tier 3` then `--tier 2` then `--tier 1` if needed
 6. Pre-flight: Signal K `candump`, Grafana health, Neo4j auth
 7. Confirm `deploy/secrets/github_token` exists (long-lived PAT — [ADR-0027](../adr/0027-data-repo-runtime-policy-zero-pi-config.md))
-8. Stacks run with **`harbor.env` only** — `race-lifecycle` handles race mode at `start_at`
+8. Validate runtime secrets: `python deploy/secrets/check_secrets.py --secrets-dir /opt/ai-sailing-system/secrets`
+9. Stacks run with **`harbor.env` only** — `race-lifecycle` handles race mode at `start_at`
 
 **Do not** switch to `race.env` before the start gun.
 

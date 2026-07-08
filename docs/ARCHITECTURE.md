@@ -213,6 +213,17 @@ Remote access guide: [vpn-remote-access.md](./vpn-remote-access.md) · Laptop se
 
 ---
 
+### Secrets control plane ([ADR-0030](../adr/0030-simple-hybrid-secrets-model.md))
+
+| Plane | Source of truth | Usage |
+|-------|-----------------|-------|
+| CI/CD | GitHub Actions secrets | Build/publish/deploy automation |
+| Runtime (boat) | `/opt/ai-sailing-system/secrets` | MCP credentials, GitHub live-sync token, optional RMS VPN profile |
+
+Runtime secret validation runs before harbor image pull via `deploy/secrets/check_secrets.py`.
+
+---
+
 ## Data stores
 
 | Store | SLA | Holds |
@@ -270,7 +281,7 @@ flowchart LR
   LIVE -->|finalize| MAIN
 ```
 
-**Secrets:** `GITHUB_TOKEN` via Docker secret or `deploy/env/race.env` — never baked into images ([ADR-0025](../adr/0025-race-live-sync-github-temporal.md)).
+**Secrets:** Runtime credentials are installed as on-device files (`/opt/ai-sailing-system/secrets`) and validated pre-pull; never baked into images ([ADR-0025](../adr/0025-race-live-sync-github-temporal.md), [ADR-0030](../adr/0030-simple-hybrid-secrets-model.md)).
 
 User guide: [AI-sailing-data RACE_LIVE_SYNC.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_LIVE_SYNC.md) · [POST_RACE_ANALYSIS.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/POST_RACE_ANALYSIS.md)
 
@@ -307,6 +318,7 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0027](../adr/0027-data-repo-runtime-policy-zero-pi-config.md) | Data-repo runtime policy — zero per-race Pi env |
 | [0028](../adr/0028-enriched-live-snapshot-fleet-performance-temporal.md) | Enriched live snapshot — fleet performance 5 min rollup |
 | [0029](../adr/0029-signalk-mcp-ecosystem-vpn-remote-access.md) | Signal K MCP ecosystem alignment + VPN remote access |
+| [0030](../adr/0030-simple-hybrid-secrets-model.md) | Simple hybrid secrets model (GitHub CI + on-device runtime secrets) |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -477,5 +489,6 @@ Local dev: [deploy/README.md](../deploy/README.md#local-dev-single-machine).
 
 - [spec.md](../spec.md) — full specification
 - [README.md](../README.md) — project entry point
+- [deploy/secrets/README.md](../deploy/secrets/README.md) — runtime secrets installation and validation
 - [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) — race/boat content
 - [cogsail-python](https://github.com/cognite-fholm/cogsail-python) — prior art

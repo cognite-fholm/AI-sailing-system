@@ -141,6 +141,8 @@ If RMS shows **inactive for longer than 90 days**, re-download and re-apply VPN 
 3. Re-import the profile on your laptop OpenVPN client.
 4. Re-download/re-apply any router-side client config if RMS indicates stale configuration.
 
+Store boat-side VPN material in `/opt/ai-sailing-system/secrets/rms_client.ovpn` (mode `600`), not in git.
+
 ### 2. Confirm hub routing
 
 1. In hub routes, ensure the boat LAN subnet is advertised (example `192.168.8.0/24`).
@@ -148,6 +150,11 @@ If RMS shows **inactive for longer than 90 days**, re-download and re-apply VPN 
 3. Verify DNS strategy:
    - Preferred: `race.local` and `telemetry.local` resolve over VPN.
    - Fallback: add temporary `/etc/hosts` or hosts file entries.
+4. Validate local secret files:
+
+```bash
+python deploy/secrets/check_secrets.py --secrets-dir /opt/ai-sailing-system/secrets --require-rms
+```
 
 ### 3. Validate from shore laptop
 

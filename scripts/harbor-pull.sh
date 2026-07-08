@@ -33,6 +33,18 @@ if [[ -f deploy/env/harbor.env ]]; then
   set +a
 fi
 
+SECRETS_DIR="${AI_SAILING_SECRETS_DIR:-/opt/ai-sailing-system/secrets}"
+if [[ "${SKIP_SECRETS_CHECK:-false}" != "true" ]] && [[ -f deploy/secrets/check_secrets.py ]]; then
+  if command -v python3 &>/dev/null; then
+    RMS_FLAG=()
+    [[ "${VPN_PROVIDER:-}" == "rms" ]] && RMS_FLAG=(--require-rms)
+    echo "Validating runtime secrets in $SECRETS_DIR ..."
+    python3 deploy/secrets/check_secrets.py --secrets-dir "$SECRETS_DIR" "${RMS_FLAG[@]}"
+  else
+    echo "WARN: python3 not found; skipping deploy/secrets/check_secrets.py validation."
+  fi
+fi
+
 if [[ "${RACE_MODE:-false}" == "true" ]]; then
   echo "ERROR: RACE_MODE=true — refuse pull (guardrail GR-1). Use race freeze procedure."
   exit 1

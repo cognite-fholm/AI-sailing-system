@@ -61,6 +61,22 @@ Detail: [deployment-lifecycle.md](./deployment-lifecycle.md) · [data repo: Harb
 
 **No `race.env` swap:** Competition boats keep a single `harbor.env` + long-lived GitHub secret on the Pi.
 
+### Runtime secrets checklist (per boat)
+
+Install runtime credentials as files under `/opt/ai-sailing-system/secrets` (`700` dir, `600` files), then validate:
+
+```bash
+python deploy/secrets/check_secrets.py --secrets-dir /opt/ai-sailing-system/secrets
+```
+
+If using RMS VPN:
+
+```bash
+python deploy/secrets/check_secrets.py --secrets-dir /opt/ai-sailing-system/secrets --require-rms
+```
+
+Guide: [deploy/secrets/README.md](../deploy/secrets/README.md) · ADR: [0030](../adr/0030-simple-hybrid-secrets-model.md)
+
 ## During the race
 
 | Tool | Use |
@@ -135,6 +151,7 @@ Full setup: [race-laptop-mcp.md](./race-laptop-mcp.md) · [mcp-neo4j-influx.md](
 | [spec §7.15.8–10](./spec.md#7158-yaml-ld-linked-data-format) | YAML-LD, SHACL, Neo4j projection |
 | [adr/README.md](../adr/README.md) | Architecture decisions |
 | [deploy/README.md](../deploy/README.md) | Env files, race freeze |
+| [deploy/secrets/README.md](../deploy/secrets/README.md) | Runtime secret files and permissions |
 
 ## Quick troubleshooting (onboard)
 

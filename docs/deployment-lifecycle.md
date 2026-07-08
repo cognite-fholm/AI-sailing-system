@@ -12,8 +12,10 @@ Operational guide for **GitHub Actions → GHCR → Docker Compose** on Raspberr
 - [ADR-0026 — Race lifecycle](../adr/0026-race-lifecycle-scheduled-harbor-automation.md) — schedule-driven harbor automation
 - [ADR-0027 — Data-repo runtime policy](../adr/0027-data-repo-runtime-policy-zero-pi-config.md) — **no per-race `race.env` swap**
 - [ADR-0012 — Race-side MCP](../adr/0012-race-side-mcp-laptop-cursor.md) — laptop Cursor at regatta
+- [ADR-0030 — Simple hybrid secrets](../adr/0030-simple-hybrid-secrets-model.md) — GitHub CI secrets + on-device runtime secret files
 - [race-laptop-mcp.md](./race-laptop-mcp.md) — setup guide
 - [deploy/README.md](../deploy/README.md) — env files, lock files, race freeze checklist
+- [deploy/secrets/README.md](../deploy/secrets/README.md) — required runtime secret files and permissions
 - [DEV-SETUP.md](./DEV-SETUP.md) — laptop Docker/WSL prerequisites (not installed by `git clone`)
 
 ## Quick reference
