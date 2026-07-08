@@ -4863,6 +4863,7 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 | FR-252 | Helm heading recommendations SHALL state magnetic steer target, intended VMG/speed trade-off, and primary invalidation conditions (shift/current change) |
 | FR-253 | Sail/trim recommendations (main, traveler, sheet, forestay, jib shape) SHALL report confidence level based on available telemetry/vision evidence |
 | FR-254 | User documentation SHALL provide race-day playbook examples for these decision families with copy/paste prompts for tactical-coach and MCP |
+| FR-255 | The decision workflow SHALL support an optional boat-specific `SailDecisionMatrix` input (TWS/TWA sail crossover guidance) to improve sail/trim recommendations |
 
 ---
 

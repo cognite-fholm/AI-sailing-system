@@ -172,8 +172,35 @@ This creates a feedback loop for sail-choice and trim heuristics in future races
 
 ---
 
+## Using your sail matrix card
+
+A TWS/TWA card like your `NOR 10133` table is one of the best decision inputs for sail/trim calls.
+
+How it contributes:
+
+- Anchors recommendations to your **boat-specific** target behavior.
+- Gives stable sail crossover priors when telemetry is noisy.
+- Improves confidence for "wrong sail / wrong trim bucket" detection.
+
+Operational pattern:
+
+1. Keep the image card onboard for quick crew reference.
+2. Mirror the same logic into a structured `SailDecisionMatrix` YAML in AI-sailing-data.
+3. Ask MCP/coach to evaluate current setup against the matrix and quantify likely gain/loss.
+
+Quick prompt:
+
+```text
+Use our SailDecisionMatrix plus current TWS/TWA and sea state.
+Confirm sail choice and top three trim actions now.
+If current setup differs from matrix recommendation, estimate expected gain/loss.
+```
+
+---
+
 ## Related docs
 
 - [race-laptop-mcp.md](./race-laptop-mcp.md)
+- [race-day-command-sheet.md](./race-day-command-sheet.md)
 - [mcp-neo4j-influx.md](./mcp-neo4j-influx.md)
 - [USER_GUIDE.md](./USER_GUIDE.md)

@@ -57,6 +57,13 @@ Recommend sail plan and trim priorities (main, traveler, mainsheet, forestay, ji
 for current TWS/TWA and sea state. Include confidence and missing sensors.
 ```
 
+### Sail matrix assisted call
+
+```text
+Use our SailDecisionMatrix and current TWS/TWA to confirm sail choice and trim priorities.
+Flag mismatch between active sail and matrix recommendation, and estimate gain/loss.
+```
+
 ### Helm heading
 
 ```text
@@ -71,3 +78,11 @@ Use these when evidence is weak:
 - "Confidence medium: no direct sail-shape geometry in current dataset."
 - "Confidence low: wind shift regime unstable; recommendation valid only for next 60-120 seconds."
 - "Re-check after next tack/mark rounding or 2 minutes, whichever comes first."
+
+## When user provides a sail card image
+
+Treat it as a high-value boat-specific prior.
+
+1. Extract sail crossover zones and key target ranges (with user confirmation).
+2. Propose a structured `SailDecisionMatrix` YAML mirror.
+3. Use matrix + live conditions for sail/trim recommendations.
