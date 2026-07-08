@@ -1,6 +1,6 @@
 ---
 name: race-decision-intelligence
-description: Converts live race telemetry and MCP outputs into actionable tactical decisions with evidence, confidence, risks, and re-check timing. Use when the user asks race-winning tactical questions about corrected-time projection, polar outliers, favored end, laylines, sail/trim, or steer heading.
+description: Converts live race telemetry and MCP outputs into actionable tactical decisions with evidence, confidence, risks, and re-check timing. Use when the user asks race-winning tactical questions about corrected-time projection, polar outliers, favored end, laylines, sail/trim, steer heading, or pre-race ORC certificate and sail-inventory optimization.
 disable-model-invocation: true
 ---
 
@@ -32,6 +32,19 @@ Keep answers concise enough for race conditions.
 - Layline/mark-approach overshoot control
 - Sail choice and trim priorities (main, traveler, sheet, forestay, jib shape)
 - Magnetic steer heading recommendation with fallback trigger
+- **Pre-race ORC optimization** — certificate window, sail inventory, declared areas, fleet scenario vs forecast profile
+
+## Pre-race optimization rules
+
+Use when the user asks about certificate timing, sail inventory before a regatta, or "winning on paper":
+
+1. State the **certificate issuance deadline** context — changes are only actionable before issue (or via new certificate request).
+2. Compare **profile strategies**: all-around, light-air coastal, heavy-air offshore.
+3. Use **forecast + current + competitor certificates** as primary evidence.
+4. Recommend **sail inventory to bring** and whether to **request a new certificate**.
+5. Flag that full automation is via planned **`pre-race-optimizer`** — until deployed, run scenario comparison manually with MCP + data repo inputs.
+
+Structural levers to mention when relevant: declared sail areas, crew weight bands, internal ballast / CDL effects.
 
 ## Confidence rules
 
@@ -57,6 +70,7 @@ Use one of these compact forms:
 - "Favored end now, with bias degrees and boat-length advantage."
 - "Layline overshoot risk and tack/jibe trigger margin."
 - "Best magnetic steer heading for next 3 minutes + fallback on shift."
+- "Pre-race: optimize sail inventory and certificate profile for forecast + fleet before issue deadline."
 
 ## Additional resources
 

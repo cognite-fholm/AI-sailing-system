@@ -13,6 +13,24 @@ Deploy **both** to the boat.
 
 **Data format:** Race and boat facts in AI-sailing-data use **[YAML-LD](https://w3c.github.io/yaml-ld/)** (linked YAML) so boats, certificates, and courses reference each other unambiguously. Shore CI validates **SHACL** constraints before import. See [DATA_SCHEMA.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/DATA_SCHEMA.md) · [YAML_LD.md](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/YAML_LD.md) · [ADR-0022](../adr/0022-yaml-ld-interconnected-data.md) · [ADR-0023](../adr/0023-shacl-neo4j-projection-no-fuseki.md).
 
+## Pre-race ORC optimization (winning on paper)
+
+In ORC racing, advantage often starts **before the certificate is issued**. Until the program's issuance deadline you can still adjust sail inventory, declared sail areas, crew weight bands, and configuration choices that affect rating (e.g. CDL). After that, you need a **new certificate** to race under a different profile.
+
+| Step | What to do |
+|------|------------|
+| 1 | Pick a **profile strategy** — all-around, light-air coastal, or heavy-air offshore — matched to your target events |
+| 2 | Gather **forecast** (GRIB/shore weather), **current** forecast, and **competitor ORC certificates** in AI-sailing-data |
+| 3 | Run **scenario comparison** — which sails to bring and declare for best expected corrected-time rank |
+| 4 | **Issue or re-issue certificate** before the deadline for the chosen configuration |
+| 5 | Link active certificate in `course-preference.yaml` before harbor import |
+
+**Prompts and workflow:** [race-decision-playbook.md](./race-decision-playbook.md#pre-race-orc-optimization-winning-on-paper) · [race-day command sheet — pre-race shore](./race-day-command-sheet.md#pre-race-shore-certificate-window)
+
+A planned **`pre-race-optimizer`** service will automate this; until then use Cursor + MCP with fleet and forecast data from the data repo.
+
+**Portal cross-check:** [race-decision-playbook — Manage2Sail & SailRace System](./race-decision-playbook.md#cross-check-manage2sail-sailrace-system-and-prep-pipeline) · [RACE_PREPARATION_GUIDE Phase 6b](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_PREPARATION_GUIDE.md#phase-6b--pre-race-orc-optimization)
+
 ## Shore preparation (start here)
 
 **New laptop?** Install WSL2 + Docker Desktop before running local stacks: [DEV-SETUP.md](./DEV-SETUP.md).

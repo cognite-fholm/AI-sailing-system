@@ -491,6 +491,6 @@ Local dev: [deploy/README.md](../deploy/README.md#local-dev-single-machine).
 - [spec.md](../spec.md) — full specification
 - [README.md](../README.md) — project entry point
 - [deploy/secrets/README.md](../deploy/secrets/README.md) — runtime secrets installation and validation
-- [race-decision-playbook.md](./race-decision-playbook.md) — tactical race question and decision guide
+- [race-decision-playbook.md](./race-decision-playbook.md) — tactical race question and decision guide (race-day + pre-race ORC optimization)
 - [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) — race/boat content
 - [cogsail-python](https://github.com/cognite-fholm/cogsail-python) — prior art

@@ -71,6 +71,24 @@ What magnetic heading should we steer now for best VMG/speed to next mark over 3
 Include fallback if wind shifts ±5°.
 ```
 
+### Pre-race ORC optimization
+
+```text
+Before our ORC certificate issue deadline, recommend sail inventory and declared configuration
+for this regatta. Inputs: weather forecast, current forecast, competitor certificates.
+Compare all-around, light-air coastal, and heavy-air offshore profiles.
+```
+
+```text
+Simulate corrected-time rank for our boat under candidate sail inventories vs published fleet
+in the forecast wind band. Which configuration wins on paper?
+```
+
+```text
+We can still change declared spinnaker area and crew weight before certificate issue.
+List top 3 changes, rating impact, and whether to request a new certificate.
+```
+
 ## Data-quality fallback phrases
 
 Use these when evidence is weak:

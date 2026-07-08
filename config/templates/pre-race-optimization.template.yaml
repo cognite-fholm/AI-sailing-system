@@ -1,0 +1,46 @@
+# PreRaceOptimization template — copy into race planning/ or boats/{sail}/planning/
+apiVersion: sailing.cognite-fholm/v1
+kind: PreRaceOptimization
+metadata:
+  ref: your-race-pre-race-opt-v1
+spec:
+  race_id: your-regatta-id
+  vessel_ref: your-vessel-ref
+  portal: manage2sail  # or sailracesystem
+  orc_certificate_type: null  # e.g. DH CL from fleet.yaml — must match active cert
+
+  # From NOR/SI/ORC rules — NOT from Manage2Sail or SailRace System
+  certificate_issue_deadline: null  # ISO date
+
+  # Forecast context (Phase 6 outputs)
+  weather_refs:
+    grib_plan: planning/grib-plan.yaml
+    weather_notes: planning/weather-notes.md
+
+  # Fleet context (Phase 2 + 3b)
+  fleet_ref: fleet.yaml
+  fleet_orc_index: collected/orc/{race-slug}/fleet-orc-index.yaml
+
+  profile_candidates:
+    - id: all-around
+      description: Balanced for mixed conditions
+    - id: light-air-coastal
+      description: Light wind, flat water, short legs
+    - id: heavy-air-offshore
+      description: Strong breeze, open course
+
+  sail_inventory_candidates:
+    - name: Genoa
+      declared: true
+    - name: Code55
+      declared: true
+    - name: A3
+      declared: false
+
+  # Fill after scenario run (manual or pre-race-optimizer)
+  chosen_profile: null
+  chosen_sail_inventory: []
+  active_certificate_ref: null
+  certificate_reissue_required: false
+  rating_notes: ""
+  optimizer_source: manual  # manual | pre-race-optimizer

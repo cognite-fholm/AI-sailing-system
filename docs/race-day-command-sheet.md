@@ -4,6 +4,8 @@ One-page prompt sheet for high-pressure racing moments.
 
 Use with `tactical-coach` or laptop Cursor + MCP.
 
+For **pre-race ORC optimization** (certificate window, sail inventory, fleet scenarios), see [race-decision-playbook.md](./race-decision-playbook.md#pre-race-orc-optimization-winning-on-paper).
+
 ---
 
 ## Always require this answer format
@@ -136,3 +138,25 @@ Paths in this repo:
 
 - `config/templates/sail-decision-matrix.template.yaml` — blank starter
 - `config/examples/nor10133-xbox-sail-decision-matrix.yaml` — Xbox prefilled from crew card
+
+---
+
+## Pre-race shore (certificate window)
+
+Use **before** the ORC certificate issuance deadline for your target event.
+
+```text
+Given regatta forecast, current forecast, and competitor ORC certificates,
+recommend sail inventory and declared areas to optimize before certificate issue.
+Compare all-around vs light-air coastal vs heavy-air offshore profiles.
+```
+
+```text
+List top 3 configuration changes we can still make (sail areas, crew weight, inventory)
+with expected rating impact and whether we should request a new certificate.
+```
+
+```text
+Which sails should we bring to this regatta to maximize expected corrected-time rank
+under the forecast wind band? Show evidence vs fleet handicap spread.
+```

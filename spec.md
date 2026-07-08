@@ -1,7 +1,8 @@
 # AI Sailing System — Specification
 
-**Version:** 0.28.0-draft
+**Version:** 0.29.0-draft
 **Date:** 2026-07-08  
+**Changelog (0.29):** Pre-race ORC optimization — certificate-window sail inventory and configuration strategy, optimizer inputs/outputs, and FR coverage ([ADR-0031](./adr/0031-race-decision-intelligence-playbook.md), §7.28.6, §11.21).  
 **Changelog (0.28):** Race decision intelligence playbook — canonical tactical questions, decision answer contract, and FR coverage for race-winning guidance ([ADR-0031](./adr/0031-race-decision-intelligence-playbook.md), §7.28, §11.21).  
 **Changelog (0.27):** Enriched live snapshot — fleet performance rollup every 5 min for tactical fleet questions ([ADR-0028](./adr/0028-enriched-live-snapshot-fleet-performance-temporal.md), §7.27, §11.20).  
 **Changelog (0.26):** Data-repo runtime policy — single `harbor.env` on Pi, no per-regatta `race.env` switch ([ADR-0027](./adr/0027-data-repo-runtime-policy-zero-pi-config.md), §7.26, §11.19).  
@@ -4080,6 +4081,28 @@ Both sets are valid operational inputs:
 - the experience-based set captures local knowledge (sea state, crew handling, inventory reality),
 - decision workflows SHOULD compare both when they diverge and report confidence/expected gain-loss trade-off.
 
+#### 7.28.6 Pre-race ORC optimization (winning on paper)
+
+**Related:** [§7.19](#719-orc-certificate-collection--fleet-enrichment), [§7.20](#720-shore-weather--current-collection), [docs/race-decision-playbook.md](./docs/race-decision-playbook.md)
+
+In ORC handicap racing, competitive advantage often begins **before certificate issuance**. ORC evaluates physical measurements — declared sail inventory, sail areas, crew weight allocation, and configuration changes (e.g. internal ballast affecting CDL) may be adjusted until the program's certificate issue deadline for the target event. After issuance, a **new certificate request** is required to race under a different declared configuration.
+
+The platform SHALL support a **pre-race optimization** workflow:
+
+| Phase | Action |
+|-------|--------|
+| **Before deadline** | Evaluate candidate sail inventories, declared areas, and structural options |
+| **Profile choice** | Select optimization target: all-around, light-air coastal, or heavy-air offshore |
+| **Fleet context** | Compare expected corrected-time performance vs competitor ORC certificates/polars |
+| **Forecast context** | Weight scenarios by regatta weather and current forecast |
+| **Certificate action** | Issue certificate for chosen profile, or request re-issue when configuration changes |
+
+Manual spreadsheet analysis across sail combinations and fleet mixes is insufficient at scale. A planned **`pre-race-optimizer`** service SHALL automate scenario evaluation (inputs: GRIB/shore weather, current forecast, `fleet.yaml` competitor certificates, candidate sail inventory YAML; outputs: recommended inventory, rating impact, profile comparison, certificate re-issue recommendation).
+
+**Data-source cross-check:** competitor fleet and `OrcCertificateType` / `orc_ref` come from **Manage2Sail** or **SailRace System** (Phase 2); ORC PDFs and polars from Phase 3b/4; weather from Phase 6. Certificate issue deadlines are **not** provided by either portal — they MUST be recorded manually from NOR/SI/ORC rules in `planning/pre-race-optimization.yaml`.
+
+Pre-race answers use the same decision contract as §7.28.1 (recommendation, evidence, confidence, risk, re-check).
+
 ---
 
 ## 8. Technology matrix
@@ -4878,6 +4901,11 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 | FR-254 | User documentation SHALL provide race-day playbook examples for these decision families with copy/paste prompts for tactical-coach and MCP |
 | FR-255 | The decision workflow SHALL support optional boat-specific `SailDecisionMatrix` inputs (TWS/TWA sail crossover guidance) to improve sail/trim recommendations |
 | FR-256 | For own boat planning, the system SHALL support two sail-card YAML sets: one polar-based and one experience-based; tactical answers SHALL state which set is active, and MAY report divergence between sets |
+| FR-257 | Pre-race optimization workflow SHALL be documented for the ORC certificate window — adjustments to sail inventory, declared sail areas, and configuration before issuance, and new-certificate request when profile changes |
+| FR-258 | Pre-race optimization SHALL use weather forecast, current forecast, and competitor fleet ORC certificates/polars as primary inputs |
+| FR-259 | Pre-race optimization outputs SHALL recommend sail inventory to bring, certificate configuration choices, expected rating impact, and profile comparison (all-around vs condition-specific) |
+| FR-260 | A planned `pre-race-optimizer` service SHALL automate scenario evaluation; until deployed, MCP and playbook prompts SHALL support manual scenario comparison from data-repo inputs |
+| FR-261 | User documentation and `race-decision-intelligence` skill SHALL include pre-race optimization prompts and answer contract |
 
 ---
 

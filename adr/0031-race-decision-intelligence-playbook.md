@@ -64,6 +64,17 @@ For own-boat sail recommendations, maintain two `SailDecisionMatrix` YAML sets:
 
 Decision workflows may use either as active guidance, but should explicitly state the active set and highlight material divergence when both are available.
 
+### 5. Pre-race ORC optimization
+
+Extend decision intelligence to the **certificate window** before the start line:
+
+- ORC programs define when a certificate must be issued; until then teams may adjust sail inventory, declared sail areas, crew weight allocation, and configuration (e.g. ballast affecting CDL).
+- After issuance, configuration changes require a **new certificate request**.
+- Strategic choice: optimize for **all-around**, **light-air coastal**, or **heavy-air offshore** profile based on target event history and forecast — not every profile wins in every fleet.
+- Inputs: weather forecast, current forecast, competitor certificates/polars from `fleet.yaml` and `boats/`.
+- Outputs: recommended sails to bring, certificate configuration, rating impact, and whether to re-issue.
+- Automation via planned **`pre-race-optimizer`** — manual scenario work is too heavy for race-week iteration.
+
 ---
 
 ## Rationale
