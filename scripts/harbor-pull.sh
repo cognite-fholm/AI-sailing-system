@@ -33,6 +33,13 @@ if [[ -f deploy/env/harbor.env ]]; then
   set +a
 fi
 
+if [[ -f deploy/env/harbor.secrets.env ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source deploy/env/harbor.secrets.env
+  set +a
+fi
+
 SECRETS_DIR="${AI_SAILING_SECRETS_DIR:-/opt/ai-sailing-system/secrets}"
 if [[ "${SKIP_SECRETS_CHECK:-false}" != "true" ]] && [[ -f deploy/secrets/check_secrets.py ]]; then
   if command -v python3 &>/dev/null; then

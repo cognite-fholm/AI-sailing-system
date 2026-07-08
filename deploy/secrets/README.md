@@ -57,7 +57,30 @@ python deploy/secrets/check_secrets.py --secrets-dir /opt/ai-sailing-system/secr
 
 ## Wire secrets into runtime env
 
-Set these environment variables in local, gitignored `deploy/env/harbor.env`:
+Render a gitignored env include from secret files:
+
+```bash
+./scripts/render-secrets-env.sh
+```
+
+This writes `deploy/env/harbor.secrets.env` with:
+
+```env
+RACE_MCP_API_KEY=...
+NEO4J_MCP_PASSWORD=...
+INFLUX_READ_TOKEN=...
+```
+
+Then source it in your shell before compose/pull scripts:
+
+```bash
+set -a
+source deploy/env/harbor.secrets.env
+source deploy/env/harbor.env
+set +a
+```
+
+Or copy these values into local, gitignored `deploy/env/harbor.env`:
 
 ```env
 RACE_MCP_API_KEY=...
@@ -68,7 +91,6 @@ INFLUX_READ_TOKEN=...
 Recommended workflow:
 
 1. Keep canonical secret values in files under `/opt/ai-sailing-system/secrets`.
-2. Copy values to `harbor.env` during harbor setup (never commit `harbor.env`).
-3. Run `python deploy/secrets/check_secrets.py` before `harbor-pull.sh`.
-
-If you need fully file-driven env injection later, add a local wrapper script that exports values from secret files before calling `docker compose`.
+2. Run `./scripts/render-secrets-env.sh` to generate `deploy/env/harbor.secrets.env`.
+3. Source `harbor.secrets.env` + `harbor.env` before harbor operations.
+4. Run `python deploy/secrets/check_secrets.py` before `harbor-pull.sh`.
