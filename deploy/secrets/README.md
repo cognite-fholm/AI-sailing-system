@@ -63,6 +63,12 @@ Render a gitignored env include from secret files:
 ./scripts/render-secrets-env.sh
 ```
 
+Or run one-step preparation (render + validate):
+
+```bash
+./scripts/harbor-prepare.sh
+```
+
 This writes `deploy/env/harbor.secrets.env` with:
 
 ```env
@@ -91,6 +97,5 @@ INFLUX_READ_TOKEN=...
 Recommended workflow:
 
 1. Keep canonical secret values in files under `/opt/ai-sailing-system/secrets`.
-2. Run `./scripts/render-secrets-env.sh` to generate `deploy/env/harbor.secrets.env`.
+2. Run `./scripts/harbor-prepare.sh` (or run render + validate separately).
 3. Source `harbor.secrets.env` + `harbor.env` before harbor operations.
-4. Run `python deploy/secrets/check_secrets.py` before `harbor-pull.sh`.

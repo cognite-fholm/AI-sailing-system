@@ -83,6 +83,12 @@ Render env include from secret files:
 ./scripts/render-secrets-env.sh
 ```
 
+One-step helper (render + validate):
+
+```bash
+./scripts/harbor-prepare.sh
+```
+
 For RMS VPN:
 
 ```bash
@@ -108,8 +114,8 @@ Details and required filenames: [deploy/secrets/README.md](./secrets/README.md)
 5. `./scripts/harbor-pull.sh --tier 3` then `--tier 2` then `--tier 1` if needed
 6. Pre-flight: Signal K `candump`, Grafana health, Neo4j auth
 7. Confirm `deploy/secrets/github_token` exists (long-lived PAT — [ADR-0027](../adr/0027-data-repo-runtime-policy-zero-pi-config.md))
-8. Render env include: `./scripts/render-secrets-env.sh`
-9. Validate runtime secrets: `python deploy/secrets/check_secrets.py --secrets-dir /opt/ai-sailing-system/secrets`
+8. Prepare runtime secrets: `./scripts/harbor-prepare.sh`
+   - (equivalent to render + validate)
 10. Stacks run with **`harbor.env` only** — `race-lifecycle` handles race mode at `start_at`
 
 **Do not** switch to `race.env` before the start gun.
