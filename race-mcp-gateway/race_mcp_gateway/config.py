@@ -18,6 +18,7 @@ class GatewayConfig:
     neo4j_uri: str
     neo4j_user: str
     neo4j_password: str
+    signalk_url: str
     max_flux_range_hours: int
     max_cypher_per_minute: int
     data_repo_path: Path | None
@@ -49,6 +50,7 @@ def load_config(path: Path | None = None) -> GatewayConfig:
         neo4j_uri=upstreams.get("neo4j_uri", _env("NEO4J_URI", "bolt://localhost:7687")),
         neo4j_user=upstreams.get("neo4j_user", _env("NEO4J_USER", "mcp_analyst")),
         neo4j_password=_env(neo4j_password_env) or _env("NEO4J_PASSWORD"),
+        signalk_url=upstreams.get("signalk_url", _env("SIGNALK_URL", "http://telemetry.local:3000")),
         max_flux_range_hours=int(limits.get("max_flux_range_hours", 48)),
         max_cypher_per_minute=int(limits.get("max_cypher_per_minute", 30)),
         data_repo_path=Path(paths.get("data_repo", _env("DATA_REPO_PATH", "")))

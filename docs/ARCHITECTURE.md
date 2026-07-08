@@ -2,7 +2,7 @@
 
 Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, data stores, and reference products fit together. Normative detail remains in [spec.md](../spec.md) and [adr/](../adr/).
 
-**Last updated:** 2026-07-07 · **Spec version:** 0.24.0-draft
+**Last updated:** 2026-07-08 · **Spec version:** 0.24.0-draft
 
 ---
 
@@ -68,17 +68,148 @@ flowchart TB
 
   subgraph laptop [Navigator laptop]
     CUR[Cursor + MCP]
-    CUR -.->|boat LAN Wi‑Fi| GW
+    CUR -.->|boat Wi‑Fi or VPN| GW
+  end
+
+  subgraph vpn [Remote access optional]
+    TS[Tailscale / RMS VPN]
+    TS -.-> GW
   end
 
   subgraph mcp [SLA-2 MCP]
     GW[race-mcp-gateway]
     GW --> NEO
     GW --> IFX
+    GW --> SK
   end
 ```
 
-Spec: [§5 Three-tier SLA](../spec.md#5-three-tier-sla-architecture) · [§6 Data flow](../spec.md#6-system-context-and-data-flow)
+Spec: [§5 Three-tier SLA](../spec.md#5-three-tier-sla-architecture) · [§6 Data flow](../spec.md#6-system-context-and-data-flow) · VPN: [vpn-remote-access.md](./vpn-remote-access.md)
+
+---
+
+## Deployment topology — what runs where
+
+Physical and logical placement of every major component. Hostnames resolve on **boat LAN** (Teltonika DHCP/DNS) or via **VPN subnet route** ([ADR-0029](../adr/0029-signalk-mcp-ecosystem-vpn-remote-access.md)).
+
+```mermaid
+flowchart TB
+  subgraph cloud [Cloud — GitHub]
+    GH_REPO_SYS[AI-sailing-system repo]
+    GH_REPO_DATA[AI-sailing-data repo]
+    GHA[GitHub Actions CI]
+    GHCR[GHCR images]
+    GHA --> GHCR
+  end
+
+  subgraph shore [Shore — prep and remote]
+    DEV_LAPTOP[Dev laptop\nDocker harbor stack]
+    NAV_LAPTOP[Navigator laptop\nCursor + MCP client]
+    GAMING[Gaming PC SLA-S\nTrimTransformer training]
+  end
+
+  subgraph lte [LTE / internet]
+    GH_LIVE[race-live-sync push\nevery 5 min]
+  end
+
+  subgraph teltonika [Teltonika RUT — boat network hub]
+    RUT_LTE[LTE modem CGNAT]
+    RUT_WIFI[Wi‑Fi AP boat-race]
+    RUT_DNS[DNS telemetry.local\nrace.local vision.local]
+    RUT_VPN[Optional RMS VPN\nor pass-through to Pi Tailscale]
+  end
+
+  subgraph pi1 [SLA-1 Pi — telemetry.local]
+    direction TB
+    SK1[signalk-server :3000]
+    CSP[course-sk-sync]
+    SPP[signalk-polar-performance]
+    BRIDGE[signalk-influx-bridge]
+    IFX1[(InfluxDB :8086)]
+    GF1[grafana-telemetry :3001]
+    SK1 --> BRIDGE --> IFX1
+    SK1 --> CSP
+    SK1 --> SPP
+    IFX1 --> GF1
+  end
+
+  subgraph pi2 [SLA-2 Pi — race.local]
+    direction TB
+    NEO2[(Neo4j)]
+    RDS[race-data-sync]
+    RIMP[race-import]
+    RLC[race-lifecycle]
+    RLS[race-live-sync]
+    PM[polar-manager]
+    LR[live-results]
+    FPT[fleet-performance-tracker]
+    AIS[ais-collector]
+    GRIB[grib-model-scorer]
+    GW2[race-mcp-gateway :3100\n/mcp /neo4j /influx /signalk]
+    GF2[grafana-race]
+    TS2[Tailscale subnet router]
+    NEO2 --> LR
+    NEO2 --> RLS
+    GW2 --> NEO2
+    GW2 --> IFX1
+    GW2 --> SK1
+    FPT --> IFX1
+    AIS --> IFX1
+    LR --> GF2
+    TS2 -.-> RUT_WIFI
+  end
+
+  subgraph pi3 [SLA-3 Pi — vision.local]
+    GOPRO[GoPro capture]
+    CORAL[Coral inference]
+    GF3[grafana-vision]
+  end
+
+  subgraph data_mount [Mounted on SLA-2]
+    DATA[/opt/ai-sailing-data/]
+  end
+
+  GH_REPO_DATA -->|git pull harbor| RDS
+  RLS -->|git push| GH_LIVE --> GH_REPO_DATA
+  GHCR -->|harbor-pull| pi1
+  GHCR -->|harbor-pull| pi2
+  DEV_LAPTOP -.->|dev compose| GH_REPO_SYS
+  NAV_LAPTOP -->|Wi‑Fi or VPN| GW2
+  RUT_LTE --> RUT_WIFI
+  RUT_WIFI --> pi1
+  RUT_WIFI --> pi2
+  RUT_WIFI --> pi3
+  RUT_WIFI --> NAV_LAPTOP
+  RIMP --> NEO2
+  RDS --> DATA
+  RLS --> DATA
+  PM --> DATA
+```
+
+### Host matrix
+
+| Host | Hardware | Compose | Key services |
+|------|----------|---------|--------------|
+| **Teltonika RUT** | LTE router | — | LTE, boat Wi‑Fi AP, LAN DNS, optional RMS VPN |
+| **telemetry.local** | Pi 5 + PiCAN | `docker-compose.sla-1.yml` | Signal K, Influx, telemetry Grafana, course-sk-sync, polar-performance, influx-bridge |
+| **race.local** | Pi 5 8 GB | `docker-compose.sla-2.yml` | Neo4j, race-import, race-data-sync, race-live-sync, race-lifecycle, polar-manager, live-results, fleet-performance-tracker, ais-collector, grib-model-scorer, race-mcp-gateway, race Grafana, **Tailscale subnet router** (recommended) |
+| **vision.local** | Pi 5 + Coral | `docker-compose.sla-3.yml` | GoPro ingest, vision Grafana *(Phase 3)* |
+| **Shore laptop** | Navigator PC | — | Cursor + MCP → `race.local:3100`; clone AI-sailing-data |
+| **Shore dev laptop** | Developer | `docker-compose.dev*.yml` | Full stack emulation |
+| **Gaming PC** | CUDA | `shore/docker-compose.sla-shore.yml` | TrimTransformer training *(Phase 5)* |
+| **GitHub** | Cloud | Actions | CI, image publish, data-repo SHACL validation |
+
+### MCP and Signal K ecosystem ([ADR-0029](../adr/0029-signalk-mcp-ecosystem-vpn-remote-access.md))
+
+| Component | Runs on | Notes |
+|-----------|---------|-------|
+| **signalk-mcp-server** (official npm) | *Not deployed* | Tool contracts implemented in Python on gateway |
+| **race-mcp-gateway** `/mcp/signalk` | SLA-2 | `get_vessel_state`, `get_ais_targets`, … → SLA-1 Signal K REST |
+| **race-mcp-gateway** `/mcp/neo4j`, `/mcp/influx` | SLA-2 | Race graph + telemetry history |
+| **influxdb-mcp-server** (generic) | *Not used* | Bounded Flux tools instead |
+| **VPN** (Tailscale recommended) | SLA-2 + laptop | Inbound to boat LAN without LTE port-forward |
+
+Remote access guide: [vpn-remote-access.md](./vpn-remote-access.md) · Laptop setup: [race-laptop-mcp.md](./race-laptop-mcp.md)
 
 ---
 
@@ -175,6 +306,7 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0026](../adr/0026-race-lifecycle-scheduled-harbor-automation.md) | Race lifecycle — schedule-driven harbor automation |
 | [0027](../adr/0027-data-repo-runtime-policy-zero-pi-config.md) | Data-repo runtime policy — zero per-race Pi env |
 | [0028](../adr/0028-enriched-live-snapshot-fleet-performance-temporal.md) | Enriched live snapshot — fleet performance 5 min rollup |
+| [0029](../adr/0029-signalk-mcp-ecosystem-vpn-remote-access.md) | Signal K MCP ecosystem alignment + VPN remote access |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -274,18 +406,20 @@ ADR: [0021](../adr/0021-sla1-signalk-plugin-strategy.md) · Spec: [§7.1](../spe
 | `ais-collector` | Fleet AIS from Signal K |
 | `tactical-coach` | Local LLM advisory |
 | `insight-alerts` | Tactical alert broker — UI feed, ack, Piper TTS to speaker |
-| `race-mcp-gateway` | MCP tools for laptop Cursor — **Neo4j** (`/mcp/neo4j`) + **Influx** (`/mcp/influx`) ([guide](./race-laptop-mcp.md), [tools](./mcp-neo4j-influx.md)) |
+| `race-mcp-gateway` | MCP tools for laptop Cursor — **Neo4j** (`/mcp/neo4j`) + **Influx** (`/mcp/influx`) + **Signal K** (`/mcp/signalk`, [ADR-0029](../adr/0029-signalk-mcp-ecosystem-vpn-remote-access.md)) ([guide](./race-laptop-mcp.md), [tools](./mcp-neo4j-influx.md)) |
 
 ---
 
 ## Race laptop (Cursor + MCP)
 
-Bring a **laptop** on boat Wi‑Fi; Cursor connects to `race-mcp-gateway` at `http://race.local:3100` for live standings, Influx queries, Neo4j, and YAML context — ad hoc analysis during the race.
+Bring a **laptop** on boat Wi‑Fi **or over VPN** ([vpn-remote-access.md](./vpn-remote-access.md)); Cursor connects to `race-mcp-gateway` at `http://race.local:3100` for live standings, Influx queries, Neo4j, Signal K snapshot, and YAML context — ad hoc analysis during the race.
 
 | Doc | Content |
 |-----|---------|
 | [race-laptop-mcp.md](./race-laptop-mcp.md) | Laptop setup, MCP config, example prompts |
+| [vpn-remote-access.md](./vpn-remote-access.md) | Tailscale / Teltonika RMS VPN for remote MCP |
 | [ADR-0012](../adr/0012-race-side-mcp-laptop-cursor.md) | Architecture decision |
+| [ADR-0029](../adr/0029-signalk-mcp-ecosystem-vpn-remote-access.md) | Signal K MCP ecosystem + VPN |
 
 **Note:** MCP stays **enabled** when `RACE_MODE=true` (read-only; does not auto-update containers).
 
@@ -317,7 +451,7 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 | **2D — Courses & results** | Not started |
 | **2E — Race UX** | Not started |
 | **2F — Analytics & alerts** | Not started |
-| **2G — Laptop MCP** | Scaffold only (`race-mcp-gateway/`) |
+| **2G — Laptop MCP** | **Partial** — `race-mcp-gateway` Neo4j/Influx/Signal K (`/mcp/signalk`); VPN doc; context/tactical tools planned |
 | **2H — Live sync & archive** | **Partial** — enriched rollup; `fleet-performance-tracker` 30 s own-boat writer; `race-live-sync finalize`; lifecycle auto-finalize |
 | **3 — SLA-3 vision** | Not started |
 | **4 — CI/CD multi-Pi** | **Partial** — CI + publish-sla-1/2 + release; publish-sla-3 pending |
@@ -330,7 +464,7 @@ Detail: [spec §14](../spec.md#14-implementation-phases) · BDD: [tests/bdd/READ
 | Compose | Services (v1) |
 |---------|-----------------|
 | `docker-compose.sla-1.yml` | `signalk-server`, `course-sk-sync`, `signalk-polar-performance`, `influxdb`, `signalk-influx-bridge`, `grafana-telemetry` |
-| `docker-compose.sla-2.yml` | `neo4j`, `polar-manager`, `race-import`, `race-data-sync`, `race-lifecycle`, `race-live-sync`, `race-mcp-gateway` (profile `mcp`) |
+| `docker-compose.sla-2.yml` | `neo4j`, `polar-manager`, `race-import`, `race-data-sync`, `race-lifecycle`, `race-live-sync`, `live-results`, `fleet-performance-tracker`, `ais-collector`, `grib-model-scorer`, `race-mcp-gateway` (profile `mcp`) |
 | `docker-compose.dev.yml` | SLA-1 laptop overlay — bridge network |
 | `docker-compose.dev-sla2.yml` | SLA-2 laptop overlay — data-repo mount, sync policy |
 | `docker-compose.harbor.yml` | Watchtower overlay (SLA-2/3 only) |

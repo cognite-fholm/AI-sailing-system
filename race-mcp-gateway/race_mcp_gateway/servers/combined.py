@@ -15,11 +15,13 @@ from race_mcp_gateway.neo4j_client import (
     STANDINGS_QUERY,
     format_rows,
 )
+from race_mcp_gateway.signalk_client import SignalKClient
 
 mcp = FastMCP("race-boat")
 
 _neo4j: Neo4jReadClient | None = None
 _influx: InfluxReadClient | None = None
+_signalk: SignalKClient | None = None
 
 
 def _load_cfg():
@@ -51,6 +53,16 @@ def _influx() -> InfluxReadClient:
             max_range_hours=cfg.max_flux_range_hours,
         )
     return _influx
+
+
+def _signalk() -> SignalKClient:
+    global _signalk
+    if _signalk is None:
+        cfg = _load_cfg()
+        if not cfg.signalk_url:
+            raise RuntimeError("SIGNALK_URL is not configured.")
+        _signalk = SignalKClient(cfg.signalk_url)
+    return _signalk
 
 
 # --- Neo4j tools ---
@@ -126,3 +138,23 @@ def list_influx_buckets() -> str:
     """Buckets visible to the Influx read token."""
     api = _influx().list_buckets()
     return format_influx_rows([{"bucket": n} for n in api])
+
+
+# --- Signal K tools (signalk-mcp-server compatible) ---
+
+
+@mcp.tool()
+def get_vessel_state() -> str:
+    """Current navigation, environment, and performance from Signal K."""
+    import json
+
+    return json.dumps(_signalk().get_vessel_state(), indent=2)
+
+
+@mcp.tool()
+def get_ais_targets(max_distance_m: float = 0) -> str:
+    """Nearby AIS targets with optional distance filter in metres (0 = all)."""
+    import json
+
+    limit = max_distance_m if max_distance_m > 0 else None
+    return json.dumps(_signalk().get_ais_targets(max_distance_m=limit), indent=2)

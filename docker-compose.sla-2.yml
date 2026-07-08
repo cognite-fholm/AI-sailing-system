@@ -266,6 +266,7 @@ services:
       RACE_MCP_API_KEY: ${RACE_MCP_API_KEY:-change-me-mcp-key}
       NEO4J_MCP_PASSWORD: ${NEO4J_MCP_PASSWORD:-change-me-mcp-neo4j}
       INFLUX_READ_TOKEN: ${INFLUX_READ_TOKEN:-change-me-influx-read}
+      SIGNALK_URL: ${SIGNALK_URL:-http://telemetry.local:3000}
       RACE_MCP_ENABLED: ${RACE_MCP_ENABLED:-true}
 
 volumes:

@@ -54,7 +54,7 @@ flowchart LR
 | **race-boat** | `/mcp` | All Neo4j + Influx tools | Combined |
 | **race-context** | *(planned)* | `read_yaml`, `read_wiki`, `list_race_assets`, `get_okf_concept` | `AI-sailing-data` mount + OKF |
 | **race-tactical** | *(planned)* | `get_wind_zones`, `get_polar_target`, `get_start_line_state` | SLA-2 REST services |
-| **signalk-snapshot** | *(planned)* | `get_vessel_delta`, `get_wind_now` | Signal K HTTP/WS one-shot |
+| **signalk-snapshot** | `/mcp/signalk` | `get_vessel_state`, `get_ais_targets`, `get_active_alarms`, `list_available_paths`, `get_path_value` | Signal K REST on SLA-1 ([ADR-0029](./0029-signalk-mcp-ecosystem-vpn-remote-access.md)) |
 
 Optional v2: **race-notes** write tool → append to `wiki/race-day.md` on data repo (harbor sync only, explicit enable).
 

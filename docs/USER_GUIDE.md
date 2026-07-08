@@ -111,8 +111,8 @@ Example fixture: [race-live/current.yaml.example](https://github.com/cognite-fho
 ## Laptop at the regatta (Cursor + MCP)
 
 1. Clone **AI-sailing-data** on laptop
-2. Join boat Wi‑Fi
-3. Configure `.cursor/mcp.json` → `http://race.local:3100`
+2. Join boat Wi‑Fi **or** VPN ([vpn-remote-access.md](./vpn-remote-access.md))
+3. Configure `.cursor/mcp.json` → `http://race.local:3100` (Neo4j, Influx, Signal K)
 
 Full setup: [race-laptop-mcp.md](./race-laptop-mcp.md) · [mcp-neo4j-influx.md](./mcp-neo4j-influx.md)
 
@@ -130,6 +130,7 @@ Full setup: [race-laptop-mcp.md](./race-laptop-mcp.md) · [mcp-neo4j-influx.md](
 |-----|----------|
 | [DEV-SETUP.md](./DEV-SETUP.md) | **New laptop** — WSL2, Docker, local compose |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Architecture index |
+| [vpn-remote-access.md](./vpn-remote-access.md) | Tailscale / RMS VPN for remote MCP |
 | [spec.md](./spec.md) | Full specification |
 | [spec §7.15.8–10](./spec.md#7158-yaml-ld-linked-data-format) | YAML-LD, SHACL, Neo4j projection |
 | [adr/README.md](../adr/README.md) | Architecture decisions |
@@ -143,6 +144,6 @@ Full setup: [race-laptop-mcp.md](./race-laptop-mcp.md) · [mcp-neo4j-influx.md](
 | No fleet on map | AIS, `ais-collector`, SLA-2 running |
 | Wrong handicap | `scoring.yaml` + `course-preference.yaml` on boat git pull |
 | Stale GRIB | Age in Grafana; copy fresh files to `/data/grib/` |
-| MCP won’t connect | Same LAN, API key, `race-mcp-gateway` logs |
+| MCP won’t connect | Same LAN or VPN, API key, `race-mcp-gateway` logs |
 
 More: [data repo troubleshooting](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/TROUBLESHOOTING.md)

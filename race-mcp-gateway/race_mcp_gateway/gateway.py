@@ -14,6 +14,7 @@ from race_mcp_gateway.config import load_config
 from race_mcp_gateway.servers import combined as combined_server
 from race_mcp_gateway.servers import influx as influx_server
 from race_mcp_gateway.servers import neo4j as neo4j_server
+from race_mcp_gateway.servers import signalk as signalk_server
 
 
 def health(_request) -> JSONResponse:
@@ -29,6 +30,7 @@ def create_app(config_path: Path | None = None) -> Starlette:
             Route("/health", health),
             Mount("/mcp/neo4j", app=neo4j_server.mcp.sse_app()),
             Mount("/mcp/influx", app=influx_server.mcp.sse_app()),
+            Mount("/mcp/signalk", app=signalk_server.mcp.sse_app()),
             Mount("/mcp", app=combined_server.mcp.sse_app()),
         ],
     )

@@ -2,7 +2,7 @@
 
 Use a **laptop** at the regatta with **Cursor** and **MCP** to query live race data on the boat LAN — the same agent workflow as shore prep, but against runtime Neo4j, Influx, and standings.
 
-**ADR:** [0012 — Race-side MCP](../adr/0012-race-side-mcp-laptop-cursor.md)  
+**ADR:** [0012 — Race-side MCP](../adr/0012-race-side-mcp-laptop-cursor.md) · [0029 — Signal K MCP + VPN](../adr/0029-signalk-mcp-ecosystem-vpn-remote-access.md)  
 **Spec:** [§7.18](../spec.md#718-race-side-mcp--laptop-cursor)
 
 ---
@@ -21,6 +21,8 @@ Use a **laptop** at the regatta with **Cursor** and **MCP** to query live race d
 
 ## Network
 
+### On boat Wi‑Fi
+
 1. Join the **boat Wi‑Fi** (Teltonika AP or marina net bridged to boat LAN).
 2. Verify connectivity:
 
@@ -29,7 +31,13 @@ ping race.local
 curl -s -o /dev/null -w "%{http_code}" http://race.local:3100/health
 ```
 
-MCP is **not** exposed on LTE/internet — boat LAN only.
+### Remote over VPN (shore, harbor tent)
+
+When not on boat Wi‑Fi, use **Tailscale** (recommended) or **Teltonika RMS VPN** so your laptop routes to the boat LAN. Same hostnames and MCP URLs apply.
+
+See **[vpn-remote-access.md](./vpn-remote-access.md)** for provider comparison, Tailscale subnet-router setup on SLA-2, and security checklist.
+
+MCP is **not** exposed on the Teltonika LTE WAN — use VPN, not port-forward.
 
 ---
 
@@ -53,6 +61,10 @@ Copy [`.cursor/mcp.json.example`](../.cursor/mcp.json.example) to `.cursor/mcp.j
     "race-influx": {
       "url": "http://race.local:3100/mcp/influx",
       "headers": { "Authorization": "Bearer YOUR_RACE_MCP_API_KEY" }
+    },
+    "race-signalk": {
+      "url": "http://race.local:3100/mcp/signalk",
+      "headers": { "Authorization": "Bearer YOUR_RACE_MCP_API_KEY" }
     }
   }
 }
@@ -62,7 +74,8 @@ Copy [`.cursor/mcp.json.example`](../.cursor/mcp.json.example) to `.cursor/mcp.j
 |--------|------|
 | **race-neo4j** | Live standings, Cypher, fleet positions, course selection |
 | **race-influx** | Flux queries, instrument snapshots, wind history |
-| **race-boat** | Both Neo4j and Influx in one connection |
+| **race-signalk** | Live vessel state, AIS targets, alarms ([signalk-mcp-server](https://signalk.org/2025/introducing-signalk-mcp-server-ai-powered-marine-data-access) compatible) |
+| **race-boat** | Neo4j + Influx + key Signal K tools (combined endpoint) |
 
 **Harbor dev (local Docker):** use [`.cursor/mcp.harbor.json.example`](../.cursor/mcp.harbor.json.example) with stdio servers against `localhost` Neo4j/Influx.
 
@@ -95,6 +108,13 @@ Run a Cypher query via MCP: all vessels within 2 nm on the port side of leg 2
 with their corrected-time rank. Include sail numbers.
 ```
 
+### Signal K (live instruments)
+
+```
+Via race-signalk MCP: get_vessel_state and summarize wind, SOG, COG, and heading.
+Compare to Influx wind history for the last 15 minutes.
+```
+
 ### Tactical context
 
 ```
@@ -117,10 +137,10 @@ Cross-check with start-line.yaml in planning/.
 |--------|------------------|
 | **race-neo4j** | `cypher_query`, live standings, course selection, fleet positions, graph schema |
 | **race-influx** | `flux_query`, latest instruments, wind history, list buckets |
-| **race-boat** | All Neo4j + Influx tools above (combined endpoint) |
+| **race-signalk** | `get_vessel_state`, `get_ais_targets`, `get_active_alarms`, `list_available_paths`, `get_path_value` |
+| **race-boat** | All Neo4j + Influx + key Signal K tools above (combined endpoint) |
 | **race-context** | YAML, wiki, OKF concepts from onboard data repo *(planned)* |
 | **race-tactical** | Wind zones, polar targets, start-line state *(planned)* |
-| **signalk-snapshot** | Current wind, SOG, COG from Signal K *(planned)* |
 
 Tool reference: [mcp-neo4j-influx.md](./mcp-neo4j-influx.md)
 
@@ -130,7 +150,7 @@ Tool reference: [mcp-neo4j-influx.md](./mcp-neo4j-influx.md)
 
 - Treat `RACE_MCP_API_KEY` like a race password — rotate per regatta.
 - MCP is **read-only** in v1; it cannot steer, write Signal K, or push git.
-- Do not port-forward `:3100` on the Teltonika LTE interface.
+- Do not port-forward `:3100` on the Teltonika LTE interface — use [VPN](./vpn-remote-access.md) instead.
 - Prefer wired Ethernet to `race.local` in heavy Wi‑Fi traffic if available.
 
 ---

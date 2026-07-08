@@ -17,6 +17,12 @@
       "headers": {
         "Authorization": "Bearer YOUR_RACE_MCP_API_KEY"
       }
+    },
+    "race-signalk": {
+      "url": "http://race.local:3100/mcp/signalk",
+      "headers": {
+        "Authorization": "Bearer YOUR_RACE_MCP_API_KEY"
+      }
     }
   }
 }

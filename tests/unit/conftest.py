@@ -21,6 +21,7 @@ for _pkg in (
     "race-live-sync",
     "ais-collector",
     "grib-model-scorer",
+    "race-mcp-gateway",
 ):
     _path = REPO_ROOT / _pkg
     if _path.is_dir() and str(_path) not in sys.path:
