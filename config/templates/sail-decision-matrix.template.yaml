@@ -28,15 +28,13 @@ spec:
       to: 180
       sail: "S2"
 
-  # Optional target matrix:
-  # use this to capture expected speed or VMG entries for each TWS/TWA bucket.
-  # You can use either target_bsp_knots or target_vmg_knots, or both.
+  # Optional target matrix — each cell may include sail, target_bsp_knots, trim_mode.
+  # Optional VMG columns from sail card: kryss_vmg (upwind) and lens_vmg (downwind).
   targets:
     - tws: 6
       twa: 52
+      sail: "Code55"
       target_bsp_knots: 5.86
-      target_vmg_knots: 4.2
-      trim_mode: "upwind-power"
     - tws: 12
       twa: 135
       target_bsp_knots: 7.95

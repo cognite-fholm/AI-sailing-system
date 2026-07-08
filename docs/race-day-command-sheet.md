@@ -96,6 +96,7 @@ Best practice:
 1. Keep the visual card for cockpit use.
 2. Mirror the same content into structured YAML in AI-sailing-data (for MCP/coach use).
 3. Start from template: `config/templates/sail-decision-matrix.template.yaml`.
+4. **Xbox (NOR 10133):** prefilled example at `config/examples/nor10133-xbox-sail-decision-matrix.yaml` (canonical copy in AI-sailing-data `boats/NOR-10133/planning/sail-decision-matrix.yaml`).
 
 Suggested YAML shape:
 
@@ -131,6 +132,7 @@ Use our SailDecisionMatrix and current TWS/TWA to confirm sail choice and trim p
 Flag if current setup differs from matrix recommendation and estimate gain/loss.
 ```
 
-Template path in this repo:
+Paths in this repo:
 
-- `config/templates/sail-decision-matrix.template.yaml`
+- `config/templates/sail-decision-matrix.template.yaml` — blank starter
+- `config/examples/nor10133-xbox-sail-decision-matrix.yaml` — Xbox prefilled from crew card

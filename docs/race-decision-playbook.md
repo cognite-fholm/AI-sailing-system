@@ -186,8 +186,8 @@ Operational pattern:
 
 1. Keep the image card onboard for quick crew reference.
 2. Mirror the same logic into a structured `SailDecisionMatrix` YAML in AI-sailing-data.
-3. Use `config/templates/sail-decision-matrix.template.yaml` as a starter template.
-3. Ask MCP/coach to evaluate current setup against the matrix and quantify likely gain/loss.
+3. Use `config/templates/sail-decision-matrix.template.yaml` as a starter template, or the Xbox prefilled example at `config/examples/nor10133-xbox-sail-decision-matrix.yaml`.
+4. Ask MCP/coach to evaluate current setup against the matrix and quantify likely gain/loss.
 
 Quick prompt:
 

@@ -87,6 +87,7 @@ Treat it as a high-value boat-specific prior.
 2. Propose a structured `SailDecisionMatrix` YAML mirror.
 3. Use matrix + live conditions for sail/trim recommendations.
 
-Starter template in this repo:
+Starter template and Xbox example in this repo:
 
 - `config/templates/sail-decision-matrix.template.yaml`
+- `config/examples/nor10133-xbox-sail-decision-matrix.yaml` (canonical: `AI-sailing-data/boats/NOR-10133/planning/sail-decision-matrix.yaml`)

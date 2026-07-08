@@ -12,6 +12,10 @@ Feature: Phase 2F — Race decision intelligence playbook
     And the file "docs/race-day-command-sheet.md" contains "How your sail matrix contributes"
     And the file "config/templates/sail-decision-matrix.template.yaml" exists in the system repo
     And the file "config/templates/sail-decision-matrix.template.yaml" contains "kind: SailDecisionMatrix"
+    And the file "config/examples/nor10133-xbox-sail-decision-matrix.yaml" exists in the system repo
+    And the file "config/examples/nor10133-xbox-sail-decision-matrix.yaml" contains "kind: SailDecisionMatrix"
+    And the file "config/examples/nor10133-xbox-sail-decision-matrix.yaml" contains "kryss_vmg"
+    And the file "config/examples/nor10133-xbox-sail-decision-matrix.yaml" contains "Code60"
 
   Scenario: Project skill exists for tactical decision answering
     Given the file ".cursor/skills/race-decision-intelligence/SKILL.md" exists in the system repo

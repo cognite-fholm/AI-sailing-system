@@ -1,0 +1,516 @@
+# NOR 10133 Xbox — prefilled SailDecisionMatrix from crew sail card.
+# Canonical copy: AI-sailing-data/boats/NOR-10133/planning/sail-decision-matrix.yaml
+apiVersion: sailing.cognite-fholm/v1
+kind: SailDecisionMatrix
+metadata:
+  ref: nor10133-sail-matrix-v1
+spec:
+  vessel_ref: vessel-xbox
+  source: crew sail card NOR 10133 - XBOX (7710.slk companion)
+  notes: 'Transcribed from onboard sail/polar selection card. Kryss = upwind VMG optimum (BSP/TWA). Lens = downwind VMG optimum
+    (TWA/BSP). Sails: Genoa (upwind), Code55 (light tight), Code60 (reach), A3 (broad reach), S2 (downwind).'
+  sails_legend:
+    Genoa: orange — primary upwind from ~10 kt
+    Code55: blue — light-air upwind / tight reach
+    Code60: grey — reaching 60–90° in light/moderate air
+    A3: purple — broad reach ~110–135°
+    S2: green — downwind 120–180° and Lens VMG
+  tws_knots:
+  - 6
+  - 8
+  - 10
+  - 12
+  - 14
+  - 16
+  - 20
+  - 24
+  twa_degrees:
+  - 52
+  - 60
+  - 70
+  - 75
+  - 80
+  - 90
+  - 110
+  - 120
+  - 135
+  - 150
+  - 165
+  - 180
+  kryss_vmg:
+  - tws: 6
+    target_bsp_knots: 5.25
+    target_twa_degrees: 42.4
+    sail: Code55
+  - tws: 8
+    target_bsp_knots: 6.1
+    target_twa_degrees: 40.5
+    sail: Code55
+  - tws: 10
+    target_bsp_knots: 6.49
+    target_twa_degrees: 39.9
+    sail: Genoa
+  - tws: 12
+    target_bsp_knots: 6.66
+    target_twa_degrees: 38.2
+    sail: Genoa
+  - tws: 14
+    target_bsp_knots: 6.76
+    target_twa_degrees: 37.8
+    sail: Genoa
+  - tws: 16
+    target_bsp_knots: 6.84
+    target_twa_degrees: 37.8
+    sail: Genoa
+  - tws: 20
+    target_bsp_knots: 6.95
+    target_twa_degrees: 38.5
+    sail: Genoa
+  - tws: 24
+    target_bsp_knots: 6.84
+    target_twa_degrees: 39.6
+    sail: Genoa
+  lens_vmg:
+  - tws: 6
+    target_twa_degrees: 142
+    target_bsp_knots: 4.91
+    sail: S2
+  - tws: 8
+    target_twa_degrees: 147
+    target_bsp_knots: 5.77
+    sail: S2
+  - tws: 10
+    target_twa_degrees: 151
+    target_bsp_knots: 6.58
+    sail: S2
+  - tws: 12
+    target_twa_degrees: 157
+    target_bsp_knots: 7.09
+    sail: S2
+  - tws: 14
+    target_twa_degrees: 166
+    target_bsp_knots: 7.36
+    sail: S2
+  - tws: 16
+    target_twa_degrees: 176
+    target_bsp_knots: 7.69
+    sail: S2
+  - tws: 20
+    target_twa_degrees: 177
+    target_bsp_knots: 8.59
+    sail: S2
+  - tws: 24
+    target_twa_degrees: 172
+    target_bsp_knots: 9.68
+    sail: S2
+  targets:
+  - tws: 6
+    twa: 52
+    target_bsp_knots: 5.86
+    sail: Code55
+  - tws: 6
+    twa: 60
+    target_bsp_knots: 6.16
+    sail: Code60
+  - tws: 6
+    twa: 70
+    target_bsp_knots: 6.42
+    sail: Code60
+  - tws: 6
+    twa: 75
+    target_bsp_knots: 6.48
+    sail: Code60
+  - tws: 6
+    twa: 80
+    target_bsp_knots: 6.51
+    sail: Code60
+  - tws: 6
+    twa: 90
+    target_bsp_knots: 6.48
+    sail: Code60
+  - tws: 6
+    twa: 110
+    target_bsp_knots: 6.18
+    sail: A3
+  - tws: 6
+    twa: 120
+    target_bsp_knots: 5.86
+    sail: S2
+  - tws: 6
+    twa: 135
+    target_bsp_knots: 5.29
+    sail: S2
+  - tws: 6
+    twa: 150
+    target_bsp_knots: 4.38
+    sail: S2
+  - tws: 6
+    twa: 165
+    target_bsp_knots: 3.62
+    sail: S2
+  - tws: 6
+    twa: 180
+    target_bsp_knots: 3.36
+    sail: S2
+  - tws: 8
+    twa: 52
+    target_bsp_knots: 6.82
+    sail: Code55
+  - tws: 8
+    twa: 60
+    target_bsp_knots: 7.06
+    sail: Code55
+  - tws: 8
+    twa: 70
+    target_bsp_knots: 7.27
+    sail: Code60
+  - tws: 8
+    twa: 75
+    target_bsp_knots: 7.33
+    sail: Code60
+  - tws: 8
+    twa: 80
+    target_bsp_knots: 7.36
+    sail: Code60
+  - tws: 8
+    twa: 90
+    target_bsp_knots: 7.38
+    sail: Code60
+  - tws: 8
+    twa: 110
+    target_bsp_knots: 7.24
+    sail: A3
+  - tws: 8
+    twa: 120
+    target_bsp_knots: 7.06
+    sail: S2
+  - tws: 8
+    twa: 135
+    target_bsp_knots: 7.53
+    sail: S2
+  - tws: 8
+    twa: 150
+    target_bsp_knots: 5.61
+    sail: S2
+  - tws: 8
+    twa: 165
+    target_bsp_knots: 4.76
+    sail: S2
+  - tws: 8
+    twa: 180
+    target_bsp_knots: 4.44
+    sail: S2
+  - tws: 10
+    twa: 52
+    target_bsp_knots: 7.25
+    sail: Genoa
+  - tws: 10
+    twa: 60
+    target_bsp_knots: 7.47
+    sail: Genoa
+  - tws: 10
+    twa: 70
+    target_bsp_knots: 7.65
+    sail: Code60
+  - tws: 10
+    twa: 75
+    target_bsp_knots: 7.72
+    sail: Code60
+  - tws: 10
+    twa: 80
+    target_bsp_knots: 7.78
+    sail: Code60
+  - tws: 10
+    twa: 90
+    target_bsp_knots: 7.85
+    sail: Code60
+  - tws: 10
+    twa: 110
+    target_bsp_knots: 7.83
+    sail: A3
+  - tws: 10
+    twa: 120
+    target_bsp_knots: 7.75
+    sail: S2
+  - tws: 10
+    twa: 135
+    target_bsp_knots: 7.39
+    sail: S2
+  - tws: 10
+    twa: 150
+    target_bsp_knots: 6.64
+    sail: S2
+  - tws: 10
+    twa: 165
+    target_bsp_knots: 5.78
+    sail: S2
+  - tws: 10
+    twa: 180
+    target_bsp_knots: 5.44
+    sail: S2
+  - tws: 12
+    twa: 52
+    target_bsp_knots: 7.45
+    sail: Genoa
+  - tws: 12
+    twa: 60
+    target_bsp_knots: 7.67
+    sail: Genoa
+  - tws: 12
+    twa: 70
+    target_bsp_knots: 7.85
+    sail: Genoa
+  - tws: 12
+    twa: 75
+    target_bsp_knots: 7.92
+    sail: Code60
+  - tws: 12
+    twa: 80
+    target_bsp_knots: 8.02
+    sail: Code60
+  - tws: 12
+    twa: 90
+    target_bsp_knots: 8.18
+    sail: Code60
+  - tws: 12
+    twa: 110
+    target_bsp_knots: 8.27
+    sail: A3
+  - tws: 12
+    twa: 120
+    target_bsp_knots: 8.24
+    sail: S2
+  - tws: 12
+    twa: 135
+    target_bsp_knots: 7.95
+    sail: S2
+  - tws: 12
+    twa: 150
+    target_bsp_knots: 7.41
+    sail: S2
+  - tws: 12
+    twa: 165
+    target_bsp_knots: 6.67
+    sail: S2
+  - tws: 12
+    twa: 180
+    target_bsp_knots: 6.33
+    sail: S2
+  - tws: 14
+    twa: 52
+    target_bsp_knots: 7.56
+    sail: Genoa
+  - tws: 14
+    twa: 60
+    target_bsp_knots: 7.78
+    sail: Genoa
+  - tws: 14
+    twa: 70
+    target_bsp_knots: 7.99
+    sail: Genoa
+  - tws: 14
+    twa: 75
+    target_bsp_knots: 8.09
+    sail: Genoa
+  - tws: 14
+    twa: 80
+    target_bsp_knots: 8.18
+    sail: Genoa
+  - tws: 14
+    twa: 90
+    target_bsp_knots: 8.42
+    sail: Code60
+  - tws: 14
+    twa: 110
+    target_bsp_knots: 8.68
+    sail: A3
+  - tws: 14
+    twa: 120
+    target_bsp_knots: 8.69
+    sail: S2
+  - tws: 14
+    twa: 135
+    target_bsp_knots: 8.45
+    sail: S2
+  - tws: 14
+    twa: 150
+    target_bsp_knots: 7.94
+    sail: S2
+  - tws: 14
+    twa: 165
+    target_bsp_knots: 7.38
+    sail: S2
+  - tws: 14
+    twa: 180
+    target_bsp_knots: 7.09
+    sail: S2
+  - tws: 16
+    twa: 52
+    target_bsp_knots: 7.63
+    sail: Genoa
+  - tws: 16
+    twa: 60
+    target_bsp_knots: 7.86
+    sail: Genoa
+  - tws: 16
+    twa: 70
+    target_bsp_knots: 8.1
+    sail: Genoa
+  - tws: 16
+    twa: 75
+    target_bsp_knots: 8.21
+    sail: Genoa
+  - tws: 16
+    twa: 80
+    target_bsp_knots: 8.32
+    sail: Genoa
+  - tws: 16
+    twa: 90
+    target_bsp_knots: 8.59
+    sail: Code60
+  - tws: 16
+    twa: 110
+    target_bsp_knots: 9.04
+    sail: A3
+  - tws: 16
+    twa: 120
+    target_bsp_knots: 9.13
+    sail: A3
+  - tws: 16
+    twa: 135
+    target_bsp_knots: 8.96
+    sail: S2
+  - tws: 16
+    twa: 150
+    target_bsp_knots: 8.42
+    sail: S2
+  - tws: 16
+    twa: 165
+    target_bsp_knots: 7.89
+    sail: S2
+  - tws: 16
+    twa: 180
+    target_bsp_knots: 7.67
+    sail: S2
+  - tws: 20
+    twa: 52
+    target_bsp_knots: 7.69
+    sail: Genoa
+  - tws: 20
+    twa: 60
+    target_bsp_knots: 7.94
+    sail: Genoa
+  - tws: 20
+    twa: 70
+    target_bsp_knots: 8.23
+    sail: Genoa
+  - tws: 20
+    twa: 75
+    target_bsp_knots: 8.38
+    sail: Genoa
+  - tws: 20
+    twa: 80
+    target_bsp_knots: 8.53
+    sail: Genoa
+  - tws: 20
+    twa: 90
+    target_bsp_knots: 8.84
+    sail: Genoa
+  - tws: 20
+    twa: 110
+    target_bsp_knots: 9.62
+    sail: A3
+  - tws: 20
+    twa: 120
+    target_bsp_knots: 10.11
+    sail: A3
+  - tws: 20
+    twa: 135
+    target_bsp_knots: 10.17
+    sail: A3
+  - tws: 20
+    twa: 150
+    target_bsp_knots: 9.47
+    sail: S2
+  - tws: 20
+    twa: 165
+    target_bsp_knots: 8.81
+    sail: S2
+  - tws: 20
+    twa: 180
+    target_bsp_knots: 8.58
+    sail: S2
+  - tws: 24
+    twa: 52
+    target_bsp_knots: 7.64
+    sail: Genoa
+  - tws: 24
+    twa: 60
+    target_bsp_knots: 7.89
+    sail: Genoa
+  - tws: 24
+    twa: 70
+    target_bsp_knots: 8.25
+    sail: Genoa
+  - tws: 24
+    twa: 75
+    target_bsp_knots: 8.44
+    sail: Genoa
+  - tws: 24
+    twa: 80
+    target_bsp_knots: 8.62
+    sail: Genoa
+  - tws: 24
+    twa: 90
+    target_bsp_knots: 9.03
+    sail: Genoa
+  - tws: 24
+    twa: 110
+    target_bsp_knots: 10.03
+    sail: A3
+  - tws: 24
+    twa: 120
+    target_bsp_knots: 10.98
+    sail: A3
+  - tws: 24
+    twa: 135
+    target_bsp_knots: 11.79
+    sail: A3
+  - tws: 24
+    twa: 150
+    target_bsp_knots: 10.96
+    sail: S2
+  - tws: 24
+    twa: 165
+    target_bsp_knots: 9.9
+    sail: S2
+  - tws: 24
+    twa: 180
+    target_bsp_knots: 9.56
+    sail: S2
+  trim_defaults:
+    Genoa:
+      mainsheet: medium
+      traveler: up to centerline
+      forestay: base
+      jib_shape: entry neutral
+    Code55:
+      mainsheet: ease slightly
+      traveler: slightly down
+      forestay: base+
+      jib_shape: deeper
+    Code60:
+      mainsheet: eased
+      traveler: down
+      forestay: base
+      jib_shape: power reach
+    A3:
+      mainsheet: eased
+      traveler: down
+      forestay: reduced
+      jib_shape: power
+    S2:
+      mainsheet: open leech
+      traveler: down
+      forestay: reduced
+      jib_shape: stable flow

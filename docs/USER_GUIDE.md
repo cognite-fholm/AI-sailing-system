@@ -155,6 +155,7 @@ Fast one-page prompts: [race-day-command-sheet.md](./race-day-command-sheet.md)
 | [race-decision-playbook.md](./race-decision-playbook.md) | Tactical decision questions and answer format |
 | [race-day-command-sheet.md](./race-day-command-sheet.md) | Fast race-day prompts and sail matrix usage |
 | [config/templates/sail-decision-matrix.template.yaml](../config/templates/sail-decision-matrix.template.yaml) | Starter template for your boat sail matrix |
+| [config/examples/nor10133-xbox-sail-decision-matrix.yaml](../config/examples/nor10133-xbox-sail-decision-matrix.yaml) | Xbox (NOR 10133) prefilled sail matrix from crew card |
 | [spec.md](./spec.md) | Full specification |
 | [spec §7.15.8–10](./spec.md#7158-yaml-ld-linked-data-format) | YAML-LD, SHACL, Neo4j projection |
 | [adr/README.md](../adr/README.md) | Architecture decisions |
