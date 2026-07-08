@@ -4067,6 +4067,19 @@ Decision intelligence is advisory only:
 - no silent write-back to Signal K,
 - user confirms critical maneuvers (start, mark approach, tactical tack/jibe).
 
+#### 7.28.5 Dual own-boat sail card datasets
+
+For the own boat, sail-card guidance SHALL support two complementary YAML datasets:
+
+1. `SailDecisionMatrix` **polar-based** set derived from certificate/SLK performance targets.
+2. `SailDecisionMatrix` **experience-based** set derived from crew-observed crossover and trim practice.
+
+Both sets are valid operational inputs:
+
+- the polar-based set is the objective baseline,
+- the experience-based set captures local knowledge (sea state, crew handling, inventory reality),
+- decision workflows SHOULD compare both when they diverge and report confidence/expected gain-loss trade-off.
+
 ---
 
 ## 8. Technology matrix
@@ -4863,7 +4876,8 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 | FR-252 | Helm heading recommendations SHALL state magnetic steer target, intended VMG/speed trade-off, and primary invalidation conditions (shift/current change) |
 | FR-253 | Sail/trim recommendations (main, traveler, sheet, forestay, jib shape) SHALL report confidence level based on available telemetry/vision evidence |
 | FR-254 | User documentation SHALL provide race-day playbook examples for these decision families with copy/paste prompts for tactical-coach and MCP |
-| FR-255 | The decision workflow SHALL support an optional boat-specific `SailDecisionMatrix` input (TWS/TWA sail crossover guidance) to improve sail/trim recommendations |
+| FR-255 | The decision workflow SHALL support optional boat-specific `SailDecisionMatrix` inputs (TWS/TWA sail crossover guidance) to improve sail/trim recommendations |
+| FR-256 | For own boat planning, the system SHALL support two sail-card YAML sets: one polar-based and one experience-based; tactical answers SHALL state which set is active, and MAY report divergence between sets |
 
 ---
 

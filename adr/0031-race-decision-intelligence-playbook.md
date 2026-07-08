@@ -55,6 +55,15 @@ The same decision language and questions must be usable in:
 - tactical-coach prompts,
 - race and post-race user guides.
 
+### 4. Dual SailDecisionMatrix sets for own boat
+
+For own-boat sail recommendations, maintain two `SailDecisionMatrix` YAML sets:
+
+- **Polar-based set**: derived from ORC/SLK target-speed evidence (objective baseline).
+- **Experience-based set**: derived from crew practice and observed crossover performance (practical race prior).
+
+Decision workflows may use either as active guidance, but should explicitly state the active set and highlight material divergence when both are available.
+
 ---
 
 ## Rationale
