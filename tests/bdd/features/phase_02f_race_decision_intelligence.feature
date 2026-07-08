@@ -10,6 +10,8 @@ Feature: Phase 2F — Race decision intelligence playbook
     And the file "docs/race-decision-playbook.md" contains "Corrected-time if finished now"
     And the file "docs/race-day-command-sheet.md" exists in the system repo
     And the file "docs/race-day-command-sheet.md" contains "How your sail matrix contributes"
+    And the file "config/templates/sail-decision-matrix.template.yaml" exists in the system repo
+    And the file "config/templates/sail-decision-matrix.template.yaml" contains "kind: SailDecisionMatrix"
 
   Scenario: Project skill exists for tactical decision answering
     Given the file ".cursor/skills/race-decision-intelligence/SKILL.md" exists in the system repo

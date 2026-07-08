@@ -95,6 +95,7 @@ Best practice:
 
 1. Keep the visual card for cockpit use.
 2. Mirror the same content into structured YAML in AI-sailing-data (for MCP/coach use).
+3. Start from template: `config/templates/sail-decision-matrix.template.yaml`.
 
 Suggested YAML shape:
 
@@ -129,3 +130,7 @@ When this exists, ask:
 Use our SailDecisionMatrix and current TWS/TWA to confirm sail choice and trim priorities.
 Flag if current setup differs from matrix recommendation and estimate gain/loss.
 ```
+
+Template path in this repo:
+
+- `config/templates/sail-decision-matrix.template.yaml`

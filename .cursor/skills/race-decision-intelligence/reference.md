@@ -86,3 +86,7 @@ Treat it as a high-value boat-specific prior.
 1. Extract sail crossover zones and key target ranges (with user confirmation).
 2. Propose a structured `SailDecisionMatrix` YAML mirror.
 3. Use matrix + live conditions for sail/trim recommendations.
+
+Starter template in this repo:
+
+- `config/templates/sail-decision-matrix.template.yaml`

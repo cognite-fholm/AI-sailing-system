@@ -1,0 +1,70 @@
+# SailDecisionMatrix template
+# Copy into AI-sailing-data race or boat planning folder and fill values from your sail card.
+apiVersion: sailing.cognite-fholm/v1
+kind: SailDecisionMatrix
+metadata:
+  ref: your-boat-sail-matrix-v1
+spec:
+  vessel_ref: your-vessel-ref
+  source: "crew sail card"
+  notes: "Translate your TWS/TWA matrix and sail color bands."
+
+  # TWS rows and TWA columns represented in your matrix.
+  tws_knots: [6, 8, 10, 12, 14, 16, 20, 24]
+  twa_degrees: [52, 60, 70, 75, 80, 90, 110, 120, 135, 150, 165, 180]
+
+  # Sail crossover zones by TWA (example values, replace for your boat).
+  sail_zone_by_twa:
+    - from: 52
+      to: 80
+      sail: "Genoa"
+    - from: 80
+      to: 120
+      sail: "Code55"
+    - from: 120
+      to: 135
+      sail: "A3"
+    - from: 135
+      to: 180
+      sail: "S2"
+
+  # Optional target matrix:
+  # use this to capture expected speed or VMG entries for each TWS/TWA bucket.
+  # You can use either target_bsp_knots or target_vmg_knots, or both.
+  targets:
+    - tws: 6
+      twa: 52
+      target_bsp_knots: 5.86
+      target_vmg_knots: 4.2
+      trim_mode: "upwind-power"
+    - tws: 12
+      twa: 135
+      target_bsp_knots: 7.95
+      trim_mode: "reach-stable"
+    - tws: 20
+      twa: 150
+      target_bsp_knots: 9.47
+      trim_mode: "downwind-control"
+
+  # Optional trim defaults per sail in your own language.
+  trim_defaults:
+    Genoa:
+      mainsheet: "medium"
+      traveler: "up to centerline"
+      forestay: "base"
+      jib_shape: "entry neutral"
+    Code55:
+      mainsheet: "ease slightly"
+      traveler: "slightly down"
+      forestay: "base+"
+      jib_shape: "deeper"
+    A3:
+      mainsheet: "eased"
+      traveler: "down"
+      forestay: "reduced"
+      jib_shape: "power"
+    S2:
+      mainsheet: "open leech"
+      traveler: "down"
+      forestay: "reduced"
+      jib_shape: "stable flow"

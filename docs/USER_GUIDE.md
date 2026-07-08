@@ -154,6 +154,7 @@ Fast one-page prompts: [race-day-command-sheet.md](./race-day-command-sheet.md)
 | [vpn-remote-access.md](./vpn-remote-access.md) | Tailscale / RMS VPN for remote MCP |
 | [race-decision-playbook.md](./race-decision-playbook.md) | Tactical decision questions and answer format |
 | [race-day-command-sheet.md](./race-day-command-sheet.md) | Fast race-day prompts and sail matrix usage |
+| [config/templates/sail-decision-matrix.template.yaml](../config/templates/sail-decision-matrix.template.yaml) | Starter template for your boat sail matrix |
 | [spec.md](./spec.md) | Full specification |
 | [spec §7.15.8–10](./spec.md#7158-yaml-ld-linked-data-format) | YAML-LD, SHACL, Neo4j projection |
 | [adr/README.md](../adr/README.md) | Architecture decisions |
