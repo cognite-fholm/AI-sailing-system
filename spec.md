@@ -1,7 +1,8 @@
 # AI Sailing System — Specification
 
-**Version:** 0.27.0-draft  
-**Date:** 2026-07-07  
+**Version:** 0.28.0-draft
+**Date:** 2026-07-08  
+**Changelog (0.28):** Race decision intelligence playbook — canonical tactical questions, decision answer contract, and FR coverage for race-winning guidance ([ADR-0031](./adr/0031-race-decision-intelligence-playbook.md), §7.28, §11.21).  
 **Changelog (0.27):** Enriched live snapshot — fleet performance rollup every 5 min for tactical fleet questions ([ADR-0028](./adr/0028-enriched-live-snapshot-fleet-performance-temporal.md), §7.27, §11.20).  
 **Changelog (0.26):** Data-repo runtime policy — single `harbor.env` on Pi, no per-regatta `race.env` switch ([ADR-0027](./adr/0027-data-repo-runtime-policy-zero-pi-config.md), §7.26, §11.19).  
 **Changelog (0.25):** Race lifecycle automation — schedule-driven harbor import and race mode from active context ([ADR-0026](./adr/0026-race-lifecycle-scheduled-harbor-automation.md), §7.25, §11.18).  
@@ -4018,6 +4019,56 @@ Polar outlier thresholds (defaults): **above** ≥ 105% `performance_pct`; **bel
 
 ---
 
+### 7.28 Race decision intelligence
+
+**ADR:** [0031](./adr/0031-race-decision-intelligence-playbook.md)  
+**Related:** [§7.21](#721-tactical-insight-alerts-and-annunciation), [§7.22](#722-fleet-polar-performance-timeline), [§7.27](#727-enriched-live-snapshot), [docs/race-decision-playbook.md](./docs/race-decision-playbook.md)
+
+The system SHALL provide practical, repeatable answers to high-value race questions and present recommendations in a consistent decision format.
+
+#### 7.28.1 Decision answer contract
+
+Every tactical answer SHOULD include:
+
+1. Recommendation (action now),
+2. Evidence (signals + sources),
+3. Confidence (high/medium/low),
+4. Risk/guardrail (what could invalidate),
+5. Next reassessment window.
+
+#### 7.28.2 Canonical question families
+
+| Family | Typical question |
+|--------|-------------------|
+| Corrected-time projection | If race finished now, what are results and deltas? |
+| Fleet performance outliers | Who is above/below polar; where and in what conditions? |
+| Mark progress efficiency | Who has best VMG/course to next mark (own boat vs fleet)? |
+| Wind/current leverage | Which boats likely have better pressure/current now? |
+| Start line tactics | Favored end, long-tack-first bias, time-to-line adjustments |
+| Layline & mark control | Overshoot risk, layline margin, tack/jibe timing |
+| Sail and trim setup | Sail choice, main/traveler/sheet/forestay/jib-shape guidance |
+| Helm command | Magnetic steer target balancing VMG, speed, and risk |
+
+#### 7.28.3 Sail trim confidence model
+
+When direct sail-shape sensing is unavailable, trim answers MUST declare reduced confidence and identify missing signals.
+
+| Data available | Confidence ceiling |
+|----------------|--------------------|
+| Telemetry + polar only | Medium |
+| + fleet comparative evidence | Medium-high |
+| + SLA-3 vision and trim geometry | High |
+
+#### 7.28.4 Safety and authority
+
+Decision intelligence is advisory only:
+
+- no automatic helm/autopilot control,
+- no silent write-back to Signal K,
+- user confirms critical maneuvers (start, mark approach, tactical tack/jibe).
+
+---
+
 ## 8. Technology matrix
 
 | Concern | Choice | Language | Rationale |
@@ -4796,6 +4847,22 @@ FR subsections below follow **SLA tier** grouping. For **build order**, use [§1
 | FR-243 | Polar outlier classification SHALL use configurable thresholds (default above ≥ 105%, below ≤ 90%) |
 | FR-244 | 30 s performance data SHALL remain in Influx — git snapshot MUST NOT duplicate full AIS time series |
 | FR-245 | Optional Dolt mirror MAY store per-tick rows for `DOLT_DIFF` without replacing git YAML-LD |
+
+### 11.21 Race decision intelligence
+
+**ADR:** [0031](./adr/0031-race-decision-intelligence-playbook.md) · **Spec:** [§7.28](./spec.md#728-race-decision-intelligence)
+
+| ID | Requirement |
+|----|-------------|
+| FR-246 | Tactical-coach and MCP workflows SHALL support a canonical race question set covering corrected-time projection, polar outliers, course/VMG leaders, wind/current leverage, start favored end, layline control, sail choice, and steer target |
+| FR-247 | Decision responses SHALL include recommendation, evidence, confidence, risk/guardrail, and next reassessment window |
+| FR-248 | Corrected-time “if finished now” answers SHALL source from `RaceLiveSnapshot.standings[]` or `live-results` equivalent and include leader delta |
+| FR-249 | Polar outlier answers SHALL include position, leg context, and prevailing conditions (minimum TWS/TWA and course progress) |
+| FR-250 | Start-line favored-end answers SHALL include bias angle, boat-length advantage, and long-tack-first implication when route geometry supports it |
+| FR-251 | Layline/overshoot control answers SHALL include mark approach margin and explicit tack/jibe trigger guidance with uncertainty bounds |
+| FR-252 | Helm heading recommendations SHALL state magnetic steer target, intended VMG/speed trade-off, and primary invalidation conditions (shift/current change) |
+| FR-253 | Sail/trim recommendations (main, traveler, sheet, forestay, jib shape) SHALL report confidence level based on available telemetry/vision evidence |
+| FR-254 | User documentation SHALL provide race-day playbook examples for these decision families with copy/paste prompts for tactical-coach and MCP |
 
 ---
 

@@ -13,7 +13,7 @@ Use a **laptop** at the regatta with **Cursor** and **MCP** to query live race d
 |------|--------|
 | Boat Pis running SLA-1 + SLA-2 | `race.local`, `telemetry.local` resolve on boat Wi‑Fi |
 | `race-mcp-gateway` container | SLA-2, port **3100** |
-| `RACE_MCP_API_KEY` | `deploy/env/race.env` on Pi (share securely with laptop) |
+| `RACE_MCP_API_KEY` | `/opt/ai-sailing-system/secrets/race_mcp_api_key` on Pi (share securely with laptop) |
 | Cursor on laptop | Recent Cursor with MCP support |
 | `AI-sailing-data` clone | Same regatta folder as onboard (`index.yaml` → active race) |
 
@@ -79,7 +79,7 @@ Copy [`.cursor/mcp.json.example`](../.cursor/mcp.json.example) to `.cursor/mcp.j
 
 **Harbor dev (local Docker):** use [`.cursor/mcp.harbor.json.example`](../.cursor/mcp.harbor.json.example) with stdio servers against `localhost` Neo4j/Influx.
 
-Replace the API key with the value from the boat’s `race.env` (navigator copy, not committed to git).
+Replace the API key with the value from the boat secret store (`/opt/ai-sailing-system/secrets/race_mcp_api_key`).
 
 **Workspace:** Open the **`AI-sailing-data`** folder for the active regatta in Cursor so the agent has local YAML/wiki context **and** live MCP tools.
 
@@ -129,6 +129,21 @@ MCP: current start-line state — DTL, bias boat lengths, time to gun vs time to
 Cross-check with start-line.yaml in planning/.
 ```
 
+### Race-winning decision pack
+
+```text
+Use race MCP and answer in this format: recommendation, evidence, confidence, risk, re-check.
+1) If race finished now, what are corrected-time results and our delta?
+2) Who is above 105% polar and below 90% polar, where are they, and why?
+3) Who has best VMG/course toward next mark (us vs top competitors)?
+4) Who likely has wind/current advantage right now?
+5) What is favored end now and does long-tack-first still hold?
+6) How do we avoid overshooting mark; what layline trigger margin should we use?
+7) What magnetic heading should we steer for next 3 minutes, with fallback on 5° shift?
+```
+
+Playbook: [race-decision-playbook.md](./race-decision-playbook.md)
+
 ---
 
 ## Available MCP tool groups
@@ -160,7 +175,7 @@ Tool reference: [mcp-neo4j-influx.md](./mcp-neo4j-influx.md)
 | Symptom | Check |
 |---------|--------|
 | MCP connection refused | `docker ps` on race Pi — is `race-mcp-gateway` running? |
-| 401 Unauthorized | API key matches `race.env` |
+| 401 Unauthorized | API key matches `/opt/ai-sailing-system/secrets/race_mcp_api_key` |
 | Empty standings | Race session started? `CourseSelection` set? |
 | Slow responses | Narrow Flux time range; avoid huge Cypher |
 

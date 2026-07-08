@@ -29,6 +29,7 @@ All detailed user guides live in the **data repo**:
 | [Harbor and race week](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/HARBOR_AND_RACE_WEEK.md) | Sync, GPX, Grafana, MCP, live sync |
 | [Race live sync](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/RACE_LIVE_SYNC.md) | 5 min LTE push, GitHub token, cloud AI |
 | [Post-race archive](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/POST_RACE_ANALYSIS.md) | Finalize → `post-race/` on `main` |
+| [Race decision playbook](./race-decision-playbook.md) | Tactical Q&A and race-winning decision workflow |
 | [YAML-LD (linked data)](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/YAML_LD.md) | How boat/race YAML files link together |
 | [**Data schema (ontology + Neo4j)**](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/DATA_SCHEMA.md) | How YAML-LD, SHACL, and Neo4j fit together |
 | [Troubleshooting](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/TROUBLESHOOTING.md) | Common fixes |
@@ -132,6 +133,8 @@ Example fixture: [race-live/current.yaml.example](https://github.com/cognite-fho
 
 Full setup: [race-laptop-mcp.md](./race-laptop-mcp.md) · [mcp-neo4j-influx.md](./mcp-neo4j-influx.md)
 
+Race-day decisions and prompt patterns: [race-decision-playbook.md](./race-decision-playbook.md)
+
 ## Instrument reference
 
 | System | Doc |
@@ -147,6 +150,7 @@ Full setup: [race-laptop-mcp.md](./race-laptop-mcp.md) · [mcp-neo4j-influx.md](
 | [DEV-SETUP.md](./DEV-SETUP.md) | **New laptop** — WSL2, Docker, local compose |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Architecture index |
 | [vpn-remote-access.md](./vpn-remote-access.md) | Tailscale / RMS VPN for remote MCP |
+| [race-decision-playbook.md](./race-decision-playbook.md) | Tactical decision questions and answer format |
 | [spec.md](./spec.md) | Full specification |
 | [spec §7.15.8–10](./spec.md#7158-yaml-ld-linked-data-format) | YAML-LD, SHACL, Neo4j projection |
 | [adr/README.md](../adr/README.md) | Architecture decisions |

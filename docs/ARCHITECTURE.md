@@ -319,6 +319,7 @@ Manuals: [docs/references/README.md](./references/README.md)
 | [0028](../adr/0028-enriched-live-snapshot-fleet-performance-temporal.md) | Enriched live snapshot — fleet performance 5 min rollup |
 | [0029](../adr/0029-signalk-mcp-ecosystem-vpn-remote-access.md) | Signal K MCP ecosystem alignment + VPN remote access |
 | [0030](../adr/0030-simple-hybrid-secrets-model.md) | Simple hybrid secrets model (GitHub CI + on-device runtime secrets) |
+| [0031](../adr/0031-race-decision-intelligence-playbook.md) | Race decision intelligence playbook and answer contract |
 
 Full index: [adr/README.md](../adr/README.md)
 
@@ -462,7 +463,7 @@ Phases match [spec §1.1](../spec.md#11-implementation-map) and [spec §14](../s
 | **2C — GRIB, polars, AIS** | **Partial** — `polar-manager`, `ais-collector`, `grib-model-scorer` (observed baseline); full GRIB ingest deferred |
 | **2D — Courses & results** | Not started |
 | **2E — Race UX** | Not started |
-| **2F — Analytics & alerts** | Not started |
+| **2F — Analytics & alerts** | **Partial** — decision playbook + skill + BDD coverage; live alert/coach integration still in progress |
 | **2G — Laptop MCP** | **Partial** — `race-mcp-gateway` Neo4j/Influx/Signal K (`/mcp/signalk`); VPN doc; context/tactical tools planned |
 | **2H — Live sync & archive** | **Partial** — enriched rollup; `fleet-performance-tracker` 30 s own-boat writer; `race-live-sync finalize`; lifecycle auto-finalize |
 | **3 — SLA-3 vision** | Not started |
@@ -490,5 +491,6 @@ Local dev: [deploy/README.md](../deploy/README.md#local-dev-single-machine).
 - [spec.md](../spec.md) — full specification
 - [README.md](../README.md) — project entry point
 - [deploy/secrets/README.md](../deploy/secrets/README.md) — runtime secrets installation and validation
+- [race-decision-playbook.md](./race-decision-playbook.md) — tactical race question and decision guide
 - [AI-sailing-data](https://github.com/cognite-fholm/AI-sailing-data) — race/boat content
 - [cogsail-python](https://github.com/cognite-fholm/cogsail-python) — prior art
