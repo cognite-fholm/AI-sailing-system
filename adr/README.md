@@ -39,6 +39,8 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | **4 — CI/CD** | [0008](./0008-github-docker-deployment-lifecycle.md) | (deployment lifecycle — see Phase 0) |
 | | [0030](./0030-simple-hybrid-secrets-model.md) | Simple hybrid secrets model (GitHub CI + on-device runtime secrets) |
 | | [0031](./0031-race-decision-intelligence-playbook.md) | Race decision intelligence playbook and answer contract |
+| | [0032](./0032-yaml-ld-ontology-pyshacl-dq-reports.md) | YAML-LD ontology and pySHACL DQ reports (AI-sailing-data) |
+| | [0033](./0033-vault-ld-okf-advisory-layer.md) | Vault-LD for OKF advisory layer only |
 | **5 — Shore training** | [0003](./0003-gopro-capture-and-shore-training.md) | (TrimTransformer pipeline — see Phase 3) |
 
 ## ADR index (by number)
@@ -75,6 +77,8 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | [0029](./0029-signalk-mcp-ecosystem-vpn-remote-access.md) | Signal K MCP ecosystem alignment + VPN remote access | 2G | Accepted |
 | [0030](./0030-simple-hybrid-secrets-model.md) | Simple hybrid secrets model for race operations | 4 | Accepted |
 | [0031](./0031-race-decision-intelligence-playbook.md) | Race decision intelligence playbook | 2F, 2G | Accepted |
+| [0032](./0032-yaml-ld-ontology-pyshacl-dq-reports.md) | YAML-LD ontology + pySHACL DQ reports | 2A | Accepted |
+| [0033](./0033-vault-ld-okf-advisory-layer.md) | Vault-LD for OKF advisory layer only | 2A | Accepted |
 
 ## Format
 
