@@ -52,6 +52,7 @@ All detailed user guides live in the **data repo**:
 | [YAML-LD (linked data)](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/YAML_LD.md) | How boat/race YAML files link together |
 | [**Data schema (ontology + Neo4j)**](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/DATA_SCHEMA.md) | How YAML-LD, SHACL, and Neo4j fit together |
 | [Troubleshooting](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/TROUBLESHOOTING.md) | Common fixes |
+| [Equipment list](./EQUIPMENT_LIST.md) | Hardware and software to purchase |
 
 ## Onboard system overview
 

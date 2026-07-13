@@ -2,6 +2,10 @@
 
 Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, data stores, and reference products fit together. Normative detail remains in [spec.md](../spec.md) and [adr/](../adr/).
 
+**Complete diagrams:** [SYSTEM_DIAGRAM.md](./SYSTEM_DIAGRAM.md) — physical topology, services by host, data flows, Signal K namespaces, shore pipeline.
+
+**Equipment to buy:** [EQUIPMENT_LIST.md](./EQUIPMENT_LIST.md) — hardware, software licenses, and phased shopping checklist.
+
 **Last updated:** 2026-07-08 · **Spec version:** 0.24.0-draft
 
 ---

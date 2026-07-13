@@ -4105,6 +4105,28 @@ Pre-race answers use the same decision contract as §7.28.1 (recommendation, evi
 
 ---
 
+### 7.29 Expedition laptop bridge
+
+**ADR:** [0034](./adr/0034-expedition-laptop-signalk-federation.md)  
+**Extension spec:** [docs/SIGNALK_RACE_EXTENSION.md](./docs/SIGNALK_RACE_EXTENSION.md)  
+**Service:** `expedition-bridge/` (Windows nav laptop — not deployed on Pi)
+
+A **Windows nav laptop** runs Expedition plus `expedition-bridge`, which polls ExpDLL via [Expedition-Python](https://pypi.org/project/Expedition-Python/) and publishes grouped tactical state under **`race.expedition.*`** to Signal K.
+
+| Rule | Detail |
+|------|--------|
+| Instrument SoR | **SLA-1** `telemetry.local` Signal K (N2K / H5000) — laptop does not ingest N2K in v1 |
+| Federation | Bridge **dual-publishes** to laptop SK (`127.0.0.1:3000`) and Pi SK (`telemetry.local:3000`) |
+| AI value-add | SLA-2 publishes **`race.tactical.*`** (same extension doc) — distinct from Expedition paths |
+| Testing | `MockExpeditionClient` + Pydantic models — no ExpDLL required in CI |
+| Commands | MOB, competitor position, user channels via typed command models (not SK paths) |
+
+**FR-262** — `expedition-bridge` SHALL map Expedition start, layline, target, and routing outputs to `race.expedition.*` per SIGNALK_RACE_EXTENSION.md.  
+**FR-263** — Federation mode SHALL be configurable (`local_only`, `upstream_only`, `dual_publish`).  
+**FR-264** — Pi services (Grafana, MCP, Influx bridge) SHALL treat Pi Signal K as the federated read endpoint for `race.expedition.*` when laptop is connected.
+
+---
+
 ## 8. Technology matrix
 
 | Concern | Choice | Language | Rationale |
