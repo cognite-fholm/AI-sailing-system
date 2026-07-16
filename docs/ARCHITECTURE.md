@@ -6,7 +6,9 @@ Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, d
 
 **Equipment to buy:** [EQUIPMENT_LIST.md](./EQUIPMENT_LIST.md) — hardware, software licenses, and phased shopping checklist.
 
-**Last updated:** 2026-07-08 · **Spec version:** 0.24.0-draft
+**Boat domotics:** [ADR-0035](../adr/0035-home-assistant-non-nmea-domotics.md) — Home Assistant on SLA-2 for non-NMEA systems (lights, climate, house power).
+
+**Last updated:** 2026-07-16 · **Spec version:** 0.24.0-draft
 
 ---
 

@@ -2,7 +2,7 @@
 
 What you need to purchase or license for the **AI Sailing System** regatta deployment (race profile) and shore preparation. Normative detail: [spec.md §4](../spec.md#4-hardware-and-deployment-profiles) · [ADR-0018](../adr/0018-helm-ux-three-pi-dual-speaker.md) · [SYSTEM_DIAGRAM.md](./SYSTEM_DIAGRAM.md).
 
-**Last updated:** 2026-07-13
+**Last updated:** 2026-07-16
 
 ---
 
@@ -134,7 +134,27 @@ Optional: **Tailscale** on SLA-2 (software) — no extra hardware ([vpn-remote-a
 
 ---
 
-## 5. Phase 3+ — sail vision (optional / later)
+## 5. Home Assistant — non-NMEA domotics
+
+[ADR-0035](../adr/0035-home-assistant-non-nmea-domotics.md) — **Home Assistant on SLA-2** (`homeassistant.local:8123`). Controls boat systems **not** on NMEA 2000. Marine telemetry stays on SLA-1 Signal K.
+
+| Item | Qty | Status | Indic. NOK | Indic. EUR | Notes |
+|------|-----|--------|------------|------------|-------|
+| **Zigbee 3.0 USB coordinator** (Sonoff ZBDongle-E, ConBee III) | 1 | Recommended | 400–700 | 35–60 | Plugs into SLA-2 Pi USB |
+| **Shelly / ESPHome Wi‑Fi relays** | 3–10 | Recommended | 300–600 ea. | 25–50 ea. | Lights, pumps, outlets — boat LAN |
+| **Z-Wave USB stick** (optional) | 1 | Optional | 500–900 | 45–80 | Only if Z-Wave devices chosen |
+| **12 V relay modules** (dry contact) | 2–6 | Optional | 150–400 ea. | 15–35 ea. | Nav/anchor lights off N2K path |
+| **Home Assistant** (software) | 1 | Free | 0 | 0 | Docker on SLA-2 — no extra Pi |
+
+**Typical domains:** cabin lighting, courtesy LEDs, diesel heater, bilge float monitoring, house battery (Modbus/Victron non-N2K), hatch sensors, fridge temperature.
+
+**Do not buy:** N2K Wi‑Fi gateway for domotics; do not run HA on the SLA-1 PiCAN node.
+
+**Subtotal §5 (starter kit):** ~**2 000–5 000 NOK** · **€175–435** (excluding per-circuit Shelly count)
+
+---
+
+## 6. Phase 3+ — sail vision (optional / later)
 
 | Item | Qty | Status | Indic. NOK | Indic. EUR | Notes |
 |------|-----|--------|------------|------------|-------|
@@ -144,11 +164,11 @@ Optional: **Tailscale** on SLA-2 (software) — no extra hardware ([vpn-remote-a
 | **USB Bluetooth 5.0 dongle** | 1–2 | Phase 3+ | 150–300 ea. | 15–25 ea. | Multi-GoPro BLE |
 | **GoPro batteries + charger** | several | Phase 3+ | 1 500–3 000 | 130–260 | |
 
-**Subtotal §5 (3-camera starter):** ~**18 000–25 000 NOK** · **€1 560–2 170**
+**Subtotal §6 (3-camera starter):** ~**18 000–25 000 NOK** · **€1 560–2 170**
 
 ---
 
-## 6. Shore — development and training
+## 7. Shore — development and training
 
 | Item | Qty | Status | Indic. NOK | Indic. EUR | Notes |
 |------|-----|--------|------------|------------|-------|
@@ -160,7 +180,7 @@ Optional: **Tailscale** on SLA-2 (software) — no extra hardware ([vpn-remote-a
 
 ---
 
-## 7. Software and services (no hardware)
+## 8. Software and services (no hardware)
 
 ### 7.1 Onboard — free / open source
 
@@ -196,7 +216,7 @@ Optional: **Tailscale** on SLA-2 (software) — no extra hardware ([vpn-remote-a
 
 ---
 
-## 8. Shopping checklist by phase (with budgets)
+## 9. Shopping checklist by phase (with budgets)
 
 ### Phase A — Minimum viable race week
 
@@ -237,7 +257,7 @@ Optional: **Tailscale** on SLA-2 (software) — no extra hardware ([vpn-remote-a
 
 ---
 
-## 9. Estimated bundles (indicative)
+## 10. Estimated bundles (indicative)
 
 | Bundle | Contents | Est. NOK | Est. EUR |
 |--------|----------|----------|----------|
@@ -248,13 +268,13 @@ Optional: **Tailscale** on SLA-2 (software) — no extra hardware ([vpn-remote-a
 | **Rack kit** | Enclosure + DC-DC + fusing + labels | 1 050–3 450 | 90–300 |
 | **Nav kit** | Laptop + Expedition (if both new) | 23 000–30 500 | 1 950–2 550 |
 | **Helm kit** | Tablet + tactical speaker | 2 800–7 500 | 245–650 |
-| **Vision kit** | Pi 8GB + Coral + 3× GoPro HERO13 + mounts | 20 000–28 000 | 1 735–2 430 |
+| **Domotics kit** | Zigbee dongle + 4× Shelly + HA on SLA-2 | 2 000–5 000 | 175–435 |
 
-**Rough order of spend:** Expedition + laptop (if new) → Teltonika → Pi kits + PiCAN → GoPro/Coral (later).
+**Rough order of spend:** Expedition + laptop (if new) → Teltonika → Pi kits + PiCAN → domotics (parallel) → GoPro/Coral (later).
 
 ---
 
-## 10. Printable one-page checklist
+## 11. Printable one-page checklist
 
 *Print this section. Tick when ordered / received. Prices = Phase A mid-range estimates.*
 
@@ -300,6 +320,12 @@ Boat: _________________________   Regatta: _________________________
 [ ] AIS transponder on N2K
 [ ] 12 V instrument / house power
 
+── HOME ASSISTANT — NON-NMEA (ADR-0035) ────────────────────────────
+[ ] Zigbee 3.0 USB coordinator (SLA-2 Pi)              ~550 NOK
+[ ] Shelly / ESPHome relays  ×___                        ~400 NOK ea.
+[ ] Home Assistant Docker on SLA-2 (free)                —
+[ ] Verify: NOT on SLA-1 / PiCAN node
+
 ── PHASE C — VISION (later) ────────────────────────────────────────
 [ ] GoPro HERO13 Black  ×___                         ~5 000 NOK ea.
 [ ] GoPro mounts + tethers  ×___
@@ -330,7 +356,7 @@ Signed off: _________________________   Budget approved: ___________
 
 ---
 
-## 11. Related documents
+## 12. Related documents
 
 | Document | Topic |
 |----------|--------|
@@ -340,3 +366,4 @@ Signed off: _________________________   Budget approved: ___________
 | [deploy/README.md](../deploy/README.md) | Harbor deploy and secrets |
 | [race-laptop-mcp.md](./race-laptop-mcp.md) | Laptop on boat Wi‑Fi |
 | [USER_GUIDE.md](./USER_GUIDE.md) | Crew-facing overview |
+| [ADR-0035](../adr/0035-home-assistant-non-nmea-domotics.md) | Home Assistant domotics boundary |

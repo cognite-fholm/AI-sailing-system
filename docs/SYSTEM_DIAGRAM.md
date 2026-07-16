@@ -1,8 +1,8 @@
 # Complete system diagram — AI Sailing System
 
-Single-page map of **repositories**, **hardware**, **services**, **data flows**, and **integrations** (including the Expedition nav laptop). Normative detail: [spec.md](../spec.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [EQUIPMENT_LIST.md](./EQUIPMENT_LIST.md) · [adr/README.md](../adr/README.md).
+Single-page map of **repositories**, **hardware**, **services**, **data flows**, and **integrations** (including the Expedition nav laptop and Home Assistant domotics). Normative detail: [spec.md](../spec.md) · [ARCHITECTURE.md](./ARCHITECTURE.md) · [EQUIPMENT_LIST.md](./EQUIPMENT_LIST.md) · [adr/README.md](../adr/README.md).
 
-**Last updated:** 2026-07-13
+**Last updated:** 2026-07-16
 
 ---
 
@@ -91,9 +91,19 @@ flowchart TB
 
   subgraph rack [Below deck — Pi rack]
     PICAN[Pi 5 + PiCAN-M\nSLA-1]
-    PI_RACE[Pi 5 8GB\nSLA-2]
+    PI_RACE[Pi 5 8GB\nSLA-2 + Home Assistant]
     PI_VIS[Pi 5 + Coral\nSLA-3]
   end
+
+  subgraph domotics [Non-NMEA — Zigbee / Wi‑Fi / Modbus]
+    LIGHTS[Cabin & deck lights]
+    RELAYS[Relays / pumps]
+    HOUSE[House power / climate]
+  end
+
+  LIGHTS --> PI_RACE
+  RELAYS --> PI_RACE
+  HOUSE --> PI_RACE
 
   subgraph network [Teltonika RUT]
     LTE[LTE modem]
@@ -159,6 +169,12 @@ flowchart TB
     GW[race-mcp-gateway :3100]
   end
 
+  subgraph domotics [Domotics — ADR-0035]
+    HA[home-assistant :8123]
+    IOT[Zigbee / Shelly / Modbus]
+    IOT --> HA
+  end
+
   subgraph planned [Planned — spec normative]
     RI[race-intelligence]
     LR[live-results]
@@ -196,6 +212,7 @@ flowchart TB
 | `fleet-performance-tracker` | Implemented | Fleet polar % timeline |
 | `grib-model-scorer` | Partial | Observed-wind baseline (full GRIB planned) |
 | `race-mcp-gateway` | Partial | Neo4j + Influx + Signal K MCP |
+| `home-assistant` | Planned | Non-NMEA domotics — lights, climate, house power ([ADR-0035](../adr/0035-home-assistant-non-nmea-domotics.md)) |
 | `race-intelligence` | Planned | Start, laylines, lift |
 | `live-results` | Planned | Corrected standings |
 | `race-ui` | Planned | Primary helm UX |

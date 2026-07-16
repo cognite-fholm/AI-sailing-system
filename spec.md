@@ -4127,6 +4127,28 @@ A **Windows nav laptop** runs Expedition plus `expedition-bridge`, which polls E
 
 ---
 
+### 7.30 Home Assistant (non-NMEA domotics)
+
+**ADR:** [0035](./adr/0035-home-assistant-non-nmea-domotics.md)  
+**Host:** SLA-2 (`homeassistant.local:8123`) — Docker profile `domotics`
+
+[Home Assistant](https://www.home-assistant.io/) controls **non-NMEA** boat systems: lighting, relays, climate, house power (Modbus), bilge monitors, and hatch sensors. Marine navigation data remains on **SLA-1 Signal K** only.
+
+| Rule | Detail |
+|------|--------|
+| Host tier | **SLA-2** — best-effort; HA outage MUST NOT affect SLA-1 NMEA ingest |
+| Marine boundary | HA MUST NOT write NMEA, H5000, or autopilot; MUST NOT run on PiCAN host |
+| Signal K federation | **Forbidden in v1** — optional read-only mirror of house battery SOC in phase 2 |
+| Race mode | Comfort automations paused when `RACE_MODE=true`; bilge/voltage monitoring continues |
+| Protocols | Zigbee, Shelly/ESPHome Wi‑Fi, MQTT, Modbus — USB coordinator on SLA-2 |
+| Safety audio | H5000 safety + SLA-2 tactical Piper — HA does not use either speaker path |
+
+**FR-265** — Home Assistant SHALL run only on SLA-2 and SHALL NOT share the SLA-1 host with `signalk-server` or PiCAN-M.  
+**FR-266** — Non-NMEA device control (lights, climate, house power, bilge monitors) SHALL be implemented in Home Assistant, not as Signal K plugins on SLA-1.  
+**FR-267** — When `RACE_MODE=true`, comfort automations in Home Assistant SHALL pause; monitoring automations MAY continue.
+
+---
+
 ## 8. Technology matrix
 
 | Concern | Choice | Language | Rationale |
