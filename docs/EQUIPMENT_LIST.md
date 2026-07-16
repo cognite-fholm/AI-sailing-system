@@ -1,6 +1,6 @@
 # Equipment list — hardware and software to buy
 
-What you need to purchase or license for the **AI Sailing System** regatta deployment (race profile) and shore preparation. Normative detail: [spec.md §4](../spec.md#4-hardware-and-deployment-profiles) · [ADR-0018](../adr/0018-helm-ux-three-pi-dual-speaker.md) · [SYSTEM_DIAGRAM.md](./SYSTEM_DIAGRAM.md).
+What you need to purchase or license for the **AI Sailing System** regatta deployment (race profile) and shore preparation. Normative detail: [spec §4](../spec.md#4-hardware-and-deployment-profiles) · [ADR-0018](../adr/0018-helm-ux-three-pi-dual-speaker.md) · [SYSTEM_DIAGRAM.md](./SYSTEM_DIAGRAM.md). **Victron:** [ADR-0036](../adr/0036-victron-vecan-nmea2000-power.md) · **Domotics:** [ADR-0035](../adr/0035-home-assistant-non-nmea-domotics.md).
 
 **Last updated:** 2026-07-16
 
@@ -35,6 +35,8 @@ Typical for a competitive ORC boat with B&G instrumentation. **Do not duplicate*
 | **Autopilot** (N2K) | Read-only ingest | Optional for data | 15 000–40 000 | 1 300–3 500 |
 | **AIS transponder** (Class B) | Fleet tracks → `ais-collector` | Often installed | 3 000–8 000 | 260–700 |
 | **12 V house / instrument battery** | Powers N2K + Pi rack | Boat standard | — | — |
+| **Victron power system** (Cerbo, Lynx, Multi/Quattro) | House bank monitoring + charging | Often installed | 30 000–150 000+ | 2 600–13 000+ |
+| **[VE.Can → NMEA 2000 cable](https://www.victronenergy.com/cables/ve-can-to-nmea2000-micro-c-male)** | Bridge Victron to PiCAN backbone | Required for N2K ingest | 600–1 200 | 50–100 | See [ADR-0036](../adr/0036-victron-vecan-nmea2000-power.md) |
 
 ---
 
@@ -146,7 +148,7 @@ Optional: **Tailscale** on SLA-2 (software) — no extra hardware ([vpn-remote-a
 | **12 V relay modules** (dry contact) | 2–6 | Optional | 150–400 ea. | 15–35 ea. | Nav/anchor lights off N2K path |
 | **Home Assistant** (software) | 1 | Free | 0 | 0 | Docker on SLA-2 — no extra Pi |
 
-**Typical domains:** cabin lighting, courtesy LEDs, diesel heater, bilge float monitoring, house battery (Modbus/Victron non-N2K), hatch sensors, fridge temperature.
+**Typical domains:** cabin lighting, courtesy LEDs, diesel heater, bilge float monitoring, hatch sensors, fridge temperature. **House battery monitoring** uses Victron on N2K → SLA-1 ([ADR-0036](../adr/0036-victron-vecan-nmea2000-power.md)); Cerbo **control** via HA Modbus.
 
 **Do not buy:** N2K Wi‑Fi gateway for domotics; do not run HA on the SLA-1 PiCAN node.
 
@@ -367,3 +369,4 @@ Signed off: _________________________   Budget approved: ___________
 | [race-laptop-mcp.md](./race-laptop-mcp.md) | Laptop on boat Wi‑Fi |
 | [USER_GUIDE.md](./USER_GUIDE.md) | Crew-facing overview |
 | [ADR-0035](../adr/0035-home-assistant-non-nmea-domotics.md) | Home Assistant domotics boundary |
+| [ADR-0036](../adr/0036-victron-vecan-nmea2000-power.md) | Victron VE.Can → N2K power ingest |

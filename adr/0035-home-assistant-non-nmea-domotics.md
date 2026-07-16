@@ -15,7 +15,7 @@ The AI Sailing System stack is optimized for **marine telemetry** — NMEA 2000 
 |--------|----------|------------------|
 | **Lighting** | Cabin, chart light, courtesy LEDs, relay-driven nav/anchor lights | Zigbee, Wi‑Fi (Shelly/ESPHome), 12 V relay |
 | **Climate** | Diesel heater, fan, dehumidifier | Modbus, Wi‑Fi, relay |
-| **House power** | Shore inlet, inverter, house bank monitor (non-N2K path) | Modbus (Victron), BLE, shunt + ESP |
+| **House power** | Shore inlet, inverter, house bank monitor (non-N2K path) | Modbus (Cerbo GX → HA), BLE — see [ADR-0036](../adr/0036-victron-vecan-nmea2000-power.md) for N2K telemetry |
 | **Bilge / pumps** | Float switches, manual pump circuits | GPIO, ESP, relay feedback |
 | **Security / presence** | Hatch sensors, motion, anchor alarm (non-race) | Zigbee, Wi‑Fi |
 | **Comfort** | Fridge temp, USB outlets, stereo zones (non-tactical) | Wi‑Fi, Zigbee |
@@ -99,7 +99,7 @@ Home Assistant is **best-effort** — same SLA tier as Neo4j and MCP ([ADR-0002]
 
 | Direction | v1 | Phase 2 (optional) |
 |-----------|----|--------------------|
-| HA → Signal K | **Forbidden** | Selected read-only mirror (e.g. house battery SOC) under `electrical.batteries.*` via dedicated sidecar — never domotics control paths |
+| HA → Signal K | **Forbidden** | Read-only `electrical.*` already on SLA-1 from Victron N2K ([ADR-0036](../adr/0036-victron-vecan-nmea2000-power.md)) — no HA republish |
 | Signal K → HA | **Forbidden** | Read wind/TWS for “close hatches” comfort automation — **display/logic only**, not safety |
 | HA → MCP | **Forbidden** | `homeassistant_*` tools on `race-mcp-gateway` for cabin state queries |
 

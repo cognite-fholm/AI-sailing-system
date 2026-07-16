@@ -4149,6 +4149,28 @@ A **Windows nav laptop** runs Expedition plus `expedition-bridge`, which polls E
 
 ---
 
+### 7.31 Victron power on NMEA 2000
+
+**ADR:** [0036](./adr/0036-victron-vecan-nmea2000-power.md)  
+**Cable:** [Victron VE.Can to NMEA 2000 Micro-C male](https://www.victronenergy.com/cables/ve-can-to-nmea2000-micro-c-male)
+
+The boat **Victron Energy** system (Cerbo GX, Lynx shunt/distributor, MultiPlus/Quattro, MPPT) connects to the **NMEA 2000 backbone** via the official VE.Can → N2K adapter. SLA-1 Signal K ingests standard power-subset PGNs as **`electrical.*`** paths (read-only).
+
+| Rule | Detail |
+|------|--------|
+| Physical | Single N2K backbone — Victron joins via Micro-C drop; no second CAN to PiCAN |
+| Ingest | SLA-1 `signalk-server` decode only — no inverter/charger control from race stack |
+| SOC source | Prefer **Lynx Shunt / BMV** instance; Multi/Quattro PGN 127506 SOC is low-trust on boats |
+| PGN 127506 | Often disabled by default — enable via N2K PGN 126208 during harbor commissioning |
+| HA complement | Cerbo Modbus on boat LAN for automations ([ADR-0035](./adr/0035-home-assistant-non-nmea-domotics.md)) — no HA → SK republish |
+| Persistence | `signalk-influx-bridge` SHALL include `electrical.batteries.*` and `electrical.chargers.*` |
+
+**FR-268** — Victron NMEA 2000 power PGNs SHALL be ingested read-only on SLA-1 Signal K via the existing PiCAN-M `can0` interface.  
+**FR-269** — AI-sailing-system services SHALL NOT transmit N2K control PGNs to Victron devices.  
+**FR-270** — House battery state-of-charge displayed in Grafana or MCP SHALL prefer Lynx Shunt or BMV N2K instances over Multi/Quattro calculated SOC.
+
+---
+
 ## 8. Technology matrix
 
 | Concern | Choice | Language | Rationale |

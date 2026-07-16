@@ -53,7 +53,8 @@ All detailed user guides live in the **data repo**:
 | [**Data schema (ontology + Neo4j)**](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/DATA_SCHEMA.md) | How YAML-LD, SHACL, and Neo4j fit together |
 | [Troubleshooting](https://github.com/cognite-fholm/AI-sailing-data/blob/main/docs/TROUBLESHOOTING.md) | Common fixes |
 | [Equipment list](./EQUIPMENT_LIST.md) | Hardware and software to purchase |
-| [ADR-0035](../adr/0035-home-assistant-non-nmea-domotics.md) | Home Assistant for non-NMEA systems (lights, climate, house power) |
+| [ADR-0035](../adr/0035-home-assistant-non-nmea-domotics.md) | Home Assistant for non-NMEA systems (lights, climate) |
+| [ADR-0036](../adr/0036-victron-vecan-nmea2000-power.md) | Victron VE.Can on NMEA 2000 — house power monitoring |
 
 ## Onboard system overview
 

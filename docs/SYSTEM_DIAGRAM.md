@@ -114,6 +114,7 @@ flowchart TB
   H5000 -->|NMEA 2000| PICAN
   AIS_RX -->|N2K| PICAN
   AUTOPILOT -->|N2K| PICAN
+  VIC[Victron VE.Can\nCerbo + Lynx + inverter] -->|VE.Can→N2K cable| PICAN
   PICAN -->|Ethernet| WIFI
   PI_RACE -->|Ethernet| WIFI
   PI_VIS -->|Ethernet| WIFI
@@ -146,7 +147,7 @@ flowchart LR
 
 | Service | Status | Role |
 |---------|--------|------|
-| `signalk-server` | Implemented | Marine hub; `@signalk/course-provider` |
+| `signalk-server` | Implemented | Marine hub; N2K incl. Victron `electrical.*` ([ADR-0036](../adr/0036-victron-vecan-nmea2000-power.md)) |
 | `signalk-influx-bridge` | Implemented | Telemetry → Influx `signalk` bucket |
 | `course-sk-sync` | Implemented | WaypointList YAML → `navigation.course` |
 | `signalk-polar-performance` | Implemented | `performance.polarSpeed*` paths |

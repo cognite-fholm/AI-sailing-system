@@ -41,7 +41,7 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | | [0031](./0031-race-decision-intelligence-playbook.md) | Race decision intelligence playbook and answer contract |
 | | [0032](./0032-yaml-ld-ontology-pyshacl-dq-reports.md) | YAML-LD ontology and pySHACL DQ reports (AI-sailing-data) |
 | | [0033](./0033-vault-ld-okf-advisory-layer.md) | Vault-LD for OKF advisory layer only |
-| **2I — Boat domotics** | [0035](./0035-home-assistant-non-nmea-domotics.md) | Home Assistant for non-NMEA systems on SLA-2 |
+| **2I — Boat domotics & power** | [0035](./0035-home-assistant-non-nmea-domotics.md), [0036](./0036-victron-vecan-nmea2000-power.md) | Home Assistant non-NMEA; Victron VE.Can on N2K ingest |
 | **5 — Shore training** | [0003](./0003-gopro-capture-and-shore-training.md) | (TrimTransformer pipeline — see Phase 3) |
 
 ## ADR index (by number)
@@ -82,6 +82,7 @@ ADR numbers are permanent (chronological). Build sequence groups related decisio
 | [0033](./0033-vault-ld-okf-advisory-layer.md) | Vault-LD for OKF advisory layer only | 2A | Accepted |
 | [0034](./0034-expedition-laptop-signalk-federation.md) | Expedition laptop bridge and Signal K federation | 2G | Accepted |
 | [0035](./0035-home-assistant-non-nmea-domotics.md) | Home Assistant for non-NMEA boat systems on SLA-2 | 2I | Accepted |
+| [0036](./0036-victron-vecan-nmea2000-power.md) | Victron VE.Can power system on NMEA 2000 (SLA-1 ingest) | 2I | Accepted |
 
 ## Format
 
@@ -93,4 +94,4 @@ Each ADR follows the structure:
 4. **Consequences** — positive, negative, risks
 5. **Alternatives considered**
 
-New decisions should use the next sequential number: `0036-short-title.md`.
+New decisions should use the next sequential number: `0037-short-title.md`.

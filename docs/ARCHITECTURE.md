@@ -6,7 +6,9 @@ Consolidated map of the **AI Sailing System** — how repositories, SLA tiers, d
 
 **Equipment to buy:** [EQUIPMENT_LIST.md](./EQUIPMENT_LIST.md) — hardware, software licenses, and phased shopping checklist.
 
-**Boat domotics:** [ADR-0035](../adr/0035-home-assistant-non-nmea-domotics.md) — Home Assistant on SLA-2 for non-NMEA systems (lights, climate, house power).
+**Boat domotics:** [ADR-0035](../adr/0035-home-assistant-non-nmea-domotics.md) — Home Assistant on SLA-2 for non-NMEA systems (lights, climate).
+
+**Victron power:** [ADR-0036](../adr/0036-victron-vecan-nmea2000-power.md) — VE.Can → NMEA 2000 ingest on SLA-1; Cerbo control via HA.
 
 **Last updated:** 2026-07-16 · **Spec version:** 0.24.0-draft
 
