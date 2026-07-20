@@ -1,9 +1,18 @@
 # ADR-0001: System architecture and technology choices
 
-**Status:** Accepted  
+**Status:** Accepted (SLA-2 tech table below superseded — see note)  
 **Date:** 2026-07-04  
 **Deciders:** cognite-fholm  
 **Supersedes:** N/A (greenfield evolution of CogSail)
+
+> **2026-07-20 update:** the SLA-2 "Knowledge graph: Neo4j" / "Coach / analytics API: Python"
+> rows below are superseded by
+> [AI-sailing-system-jvm ADR-0001](https://github.com/cognite-fholm/AI-sailing-system-jvm/blob/main/adr/0001-java-consolidated-sla2-graph-spatial-store.md):
+> SLA-2 becomes one consolidated Java process (MCP folded in) with an embedded
+> YouTrackDB graph store and an embedded H2GIS spatial store, replacing Neo4j and
+> the 13 Python SLA-2 services. Signal K, InfluxDB, Grafana, and llama.cpp
+> (this ADR's other rows) are unchanged. See also
+> [ADR-0002](./0002-three-tier-sla-architecture.md)'s note.
 
 ---
 

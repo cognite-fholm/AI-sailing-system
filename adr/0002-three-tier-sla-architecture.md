@@ -6,6 +6,12 @@
 **Supersedes:** Partial refinement of ADR-0001 (single-stack assumption)  
 **Related:** [ADR-0001](./0001-system-architecture-and-technology-choices.md), [spec.md §5](../spec.md#5-three-tier-sla-architecture)
 
+> **2026-07-20 update:** SLA-2's "13 separate containers, Neo4j" model below is
+> superseded by [AI-sailing-system-jvm ADR-0001](https://github.com/cognite-fholm/AI-sailing-system-jvm/blob/main/adr/0001-java-consolidated-sla2-graph-spatial-store.md) —
+> SLA-2 is now one consolidated Java process (internal module boundaries with
+> bounded executors per module, not OS-level container isolation), embedding
+> YouTrackDB + H2GIS. SLA-1 and SLA-3 as described here are unchanged.
+
 ---
 
 ## Context

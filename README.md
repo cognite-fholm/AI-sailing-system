@@ -67,10 +67,17 @@ Each onboard tier has its own Docker Compose stack and may run on a **different 
 
 - **Marine data hub:** Signal K Server (Node.js)
 - **Time series:** InfluxDB
-- **Knowledge graph:** Neo4j
+- **Knowledge graph:** ~~Neo4j~~ → **YouTrackDB** (embedded) — SLA-2 rewrite in progress, see below
 - **Dashboards:** Grafana
 - **AI:** LLaMA via llama.cpp (local inference)
 - **Hardware:** Raspberry Pi + PiCAN-M HAT + Google Coral accelerator
+
+> **SLA-2 rewrite in progress:** Neo4j and the 13 Python SLA-2 services
+> (race/competitor info) are being replaced by one consolidated Java process with
+> embedded YouTrackDB (graph) and H2GIS (spatial), with MCP folded directly in —
+> see [AI-sailing-system-jvm](https://github.com/cognite-fholm/AI-sailing-system-jvm)
+> and its [ADR-0001](https://github.com/cognite-fholm/AI-sailing-system-jvm/blob/main/adr/0001-java-consolidated-sla2-graph-spatial-store.md).
+> SLA-1 (this repo's Signal K/InfluxDB telemetry) and SLA-3 (vision) are unaffected.
 
 ## Prior work
 
